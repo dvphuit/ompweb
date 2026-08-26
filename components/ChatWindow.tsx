@@ -575,8 +575,16 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
     if (prevSessionKeyForPagingRef.current !== sessionKeyForPaging) {
       prevSessionKeyForPagingRef.current = sessionKeyForPaging;
       setVisibleCount(VISIBLE_PAGE_SIZE);
+      // Fix #16: switching sessions left scrollTop at previous offset,
+      // so the new session opened at the compaction header instead of
+      // the latest turn. Reset anchors and scroll to bottom.
+      setNearBottom(true);
+      requestAnimationFrame(() => {
+        const el = scrollContainerRef.current;
+        if (el) el.scrollTop = el.scrollHeight;
+      });
     }
-  }, [sessionKeyForPaging]);
+  }, [sessionKeyForPaging, scrollContainerRef]);
   const [selectedSubagent, setSelectedSubagent] = useState<SubagentInfo | null>(null);
   // True while the viewport is at/near the conversation bottom. Drives the
   // anchored render window in CommittedTranscript.
