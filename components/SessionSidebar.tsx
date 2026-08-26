@@ -1309,6 +1309,17 @@ export function SessionSidebar({ selectedSessionId, optimisticSession, onSelectS
       : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
     onNewSession?.(tempId, selectedCwd);
   }, [selectedCwd, onNewSession]);
+  const handleNewSessionForProject = useCallback((projectPath: string) => {
+    activateProject(projectPath);
+    const tempId = typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+    const targetCwd = (selectedProject !== null && comparableProjectPath(selectedProject) === comparableProjectPath(projectPath) && selectedCwd)
+      ? selectedCwd
+      : projectPath;
+    onNewSession?.(tempId, targetCwd);
+  }, [activateProject, selectedProject, selectedCwd, onNewSession]);
+
 
   const [importing, setImporting] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -1671,6 +1682,7 @@ export function SessionSidebar({ selectedSessionId, optimisticSession, onSelectS
                 relativeTimeNow={relativeTimeNow}
                 onActivate={activateProject}
                 onToggleExpand={toggleProjectExpanded}
+                onNewSession={handleNewSessionForProject}
                 onRemoveProject={handleRemoveProject}
                 removeBusy={removeProjectPath === project.path}
                 onSelectSession={handleSelectSessionFromList}
@@ -1882,6 +1894,7 @@ interface ProjectRowProps {
   relativeTimeNow: number;
   onActivate: (path: string) => void;
   onToggleExpand: (path: string) => void;
+  onNewSession?: (path: string) => void;
   onRemoveProject: (path: string) => void;
   removeBusy: boolean;
   onSelectSession: (s: SessionInfo) => void;
@@ -1923,6 +1936,7 @@ function ProjectRow({
   worktreeToggleRef,
   worktreeOpen,
   onToggleWorktrees,
+  onNewSession,
 }: ProjectRowProps) {
   const { t } = useI18n();
   const [hovered, setHovered] = useState(false);
@@ -2063,6 +2077,9 @@ function ProjectRow({
         )}
         <div
           style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 2,
             flexShrink: 0,
             visibility: showActions ? "visible" : "hidden",
           }}
@@ -2078,6 +2095,16 @@ function ProjectRow({
             aria-expanded={actionMenuOpen}
             aria-haspopup="menu"
             style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, padding: 0, border: "none", borderRadius: "var(--radius-control)", background: actionMenuOpen ? "var(--bg-selected)" : "transparent", color: "var(--text-dim)", cursor: removeBusy ? "default" : "pointer", opacity: removeBusy ? 0.5 : 1, lineHeight: 0, transition: SIDEBAR_BUTTON_TRANSITION }}
+            onMouseEnter={(e) => {
+              if (removeBusy) return;
+              e.currentTarget.style.color = "var(--text)";
+              e.currentTarget.style.background = "var(--bg-hover)";
+            }}
+            onMouseLeave={(e) => {
+              if (removeBusy) return;
+              e.currentTarget.style.color = "var(--text-dim)";
+              e.currentTarget.style.background = actionMenuOpen ? "var(--bg-selected)" : "transparent";
+            }}
           >
             <MoreHorizontal size={13} strokeWidth={2} aria-hidden="true" />
           </button>
@@ -2092,6 +2119,41 @@ function ProjectRow({
               {t("projects.remove", { name: label })}
             </button>
           </SidebarPortalMenu>
+          <button
+            type="button"
+            className="sidebar-project-new-session"
+            onClick={(e) => {
+              e.stopPropagation();
+              onNewSession?.(project.path);
+            }}
+            aria-label={t("sessionSidebar.newSessionIn", { cwd: label })}
+            title={t("sessionSidebar.newSessionIn", { cwd: label })}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 24,
+              height: 24,
+              padding: 0,
+              border: "none",
+              borderRadius: "var(--radius-control)",
+              background: "transparent",
+              color: "var(--text-dim)",
+              cursor: "pointer",
+              lineHeight: 0,
+              transition: SIDEBAR_BUTTON_TRANSITION,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "var(--accent)";
+              e.currentTarget.style.background = "var(--bg-hover)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "var(--text-dim)";
+              e.currentTarget.style.background = "transparent";
+            }}
+          >
+            <Plus size={13} strokeWidth={2} aria-hidden="true" />
+          </button>
         </div>
         <button
           className="sidebar-project-toggle"
