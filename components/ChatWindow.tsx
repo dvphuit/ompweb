@@ -584,7 +584,7 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
         if (el) el.scrollTop = el.scrollHeight;
       });
     }
-  }, [sessionKeyForPaging, scrollContainerRef]);
+  }, [sessionKeyForPaging]);
   const [selectedSubagent, setSelectedSubagent] = useState<SubagentInfo | null>(null);
   // True while the viewport is at/near the conversation bottom. Drives the
   // anchored render window in CommittedTranscript.
