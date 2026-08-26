@@ -155,7 +155,9 @@ function inputShellStyle({ invalid }: InputShellStyleOptions): CSSProperties {
   return {
     padding: "6px 9px",
     background: "var(--bg)",
-    border: `1px solid ${invalid ? "var(--accent)" : "var(--border)"}`,
+    borderWidth: "1px",
+    borderStyle: "solid",
+    borderColor: invalid ? "var(--accent)" : "var(--border)",
     borderRadius: "var(--radius-control)",
     color: "var(--text)",
     fontSize: 12,

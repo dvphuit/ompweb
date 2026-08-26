@@ -1,20 +1,51 @@
+import { execFile } from "child_process";
+import { promisify } from "util";
 import { NextResponse } from "next/server";
 import { apiErrorResponse } from "@/lib/api-utils";
-import { type OmpLoginProvider, type OmpModel, runUtilityCommand } from "@/lib/omp/rpc-utility";
+import { invalidateModelsCache } from "@/lib/models-cache";
+import { resolveOmpBin } from "@/lib/omp/omp-cli";
+import { disposeUtilityRpc, type OmpLoginProvider, type OmpModel, runUtilityCommand } from "@/lib/omp/rpc-utility";
 
 export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ provider: string }> };
 
+const execFileAsync = promisify(execFile);
+
+function isValidProviderId(id: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9._-]{1,80}$/.test(id);
+}
+
+async function runLogout(provider: string): Promise<void> {
+  if (!isValidProviderId(provider)) {
+    throw Object.assign(new Error(`Invalid provider id "${provider}"`), { status: 400, code: "invalid_provider" });
+  }
+  const bin = resolveOmpBin();
+  if (!bin) throw Object.assign(new Error("omp binary not found. Install oh-my-pi or set OMP_WEB_OMP_BIN."), { status: 500, code: "omp_not_found" });
+  try {
+    await execFileAsync(bin, ["auth-broker", "logout", provider, "--json"], {
+      timeout: 30_000,
+      maxBuffer: 1 * 1024 * 1024,
+      env: { ...process.env, FORCE_COLOR: "0", NO_COLOR: "1" },
+      windowsHide: true,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/not logged in|not found|no credential/i.test(message)) return;
+    throw error;
+  }
+}
+
 // omp stores API keys in its encrypted SQLite credential store (agent.db),
 // which omp-web must never write from Node, and the omp RPC login command only
 // bridges browser-based flows (providers that prompt for a key before opening
-// a URL are rejected by omp's RPC mode). Keys therefore cannot be stored or
-// removed from the web UI.
+// a URL are rejected by omp's RPC mode). Keys therefore cannot be stored from the web UI,
+// but removal is supported via `omp auth-broker logout`.
 const API_KEY_WRITE_GUIDANCE =
-  "omp-web cannot manage stored API keys. Run `omp` in a terminal and use /login (or /logout), " +
+  "omp-web cannot store API keys from the web UI. Run `omp` in a terminal and use /login, " +
   "set the provider's environment variable (e.g. OPENAI_API_KEY), or configure an apiKey on a " +
   "custom provider in ~/.omp/agent/models.yml.";
+
 
 // GET /api/auth/api-key/[provider] — returns auth status (never returns the actual key)
 export async function GET(_req: Request, { params }: Params) {
@@ -50,11 +81,18 @@ export async function POST(_req: Request, { params }: Params) {
   );
 }
 
-// DELETE /api/auth/api-key/[provider] — not supported against omp's credential store
+// DELETE /api/auth/api-key/[provider] — remove stored credential via `omp auth-broker logout`
 export async function DELETE(_req: Request, { params }: Params) {
   const { provider } = await params;
-  return NextResponse.json(
-    { error: `Cannot remove the API key for "${provider}" from omp-web. ${API_KEY_WRITE_GUIDANCE}`, code: "api_key_remove_unsupported" },
-    { status: 501 },
-  );
+  try {
+    await runLogout(provider);
+    invalidateModelsCache();
+    disposeUtilityRpc();
+    return NextResponse.json({ success: true, provider });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const status = (error as { status?: number })?.status ?? 500;
+    const code = (error as { code?: string })?.code ?? "logout_failed";
+    return NextResponse.json({ error: message, code }, { status });
+  }
 }

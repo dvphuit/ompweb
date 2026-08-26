@@ -1493,11 +1493,35 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
 }
 
 // ── API Key detail ────────────────────────────────────────────────────────────
-// omp keeps API keys in its own encrypted credential store (agent.db), which
-// omp-web never reads or writes — this panel is status-only.
-
-function ApiKeyDetail({ provider }: { provider: ApiKeyProvider }) {
+function ApiKeyDetail({ provider, onRefresh }: { provider: ApiKeyProvider; onRefresh: () => void }) {
   const { t, tn } = useI18n();
+  const [removing, setRemoving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleRemove = useCallback(async () => {
+    setRemoving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/auth/logout/${encodeURIComponent(provider.id)}`, { method: "POST" });
+      const raw: unknown = await res.json().catch(() => ({}));
+      let errorMsg: string | undefined;
+      if (raw !== null && typeof raw === "object" && "error" in raw) {
+        const record = raw as Record<string, unknown>; // parsed JSON error shape
+        const val = record["error"];
+        if (typeof val === "string") errorMsg = val;
+      }
+      if (!res.ok || errorMsg) throw new Error(errorMsg ?? `HTTP ${res.status}`);
+      toast.success(t("modelsConfig.accountRemoved", { name: provider.displayName }));
+      onRefresh();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(t("modelsConfig.removeAccountError"), msg);
+    } finally {
+      setRemoving(false);
+    }
+  }, [provider.displayName, provider.id, onRefresh, t]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -1519,6 +1543,20 @@ function ApiKeyDetail({ provider }: { provider: ApiKeyProvider }) {
       <p style={{ margin: 0, fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>
         <CodeText text={t("modelsConfig.apiKeyManageHint")} />
       </p>
+
+      {provider.configured && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: 4 }}>
+          <button
+            type="button"
+            onClick={handleRemove}
+            disabled={removing}
+            style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 12px", background: "none", border: "1px solid color-mix(in srgb, var(--status-error) 30%, transparent)", borderRadius: 5, color: "var(--status-error)", cursor: removing ? "wait" : "pointer", fontSize: 12, opacity: removing ? 0.7 : 1 }}
+          >
+            <Trash2 size={13} aria-hidden="true" /> {removing ? t("modelsConfig.removing") : t("modelsConfig.disconnect")}
+          </button>
+          {error && <p style={{ margin: 0, fontSize: 12, color: "var(--status-error)" }}>{error}</p>}
+        </div>
+      )}
     </div>
   );
 }
@@ -1732,9 +1770,10 @@ export function ModelsConfig({ onClose, onSelectTab, onSaved, embedded = false }
   // instead of an empty form, and saving stays blocked so the hand-written file
   // is never overwritten with nothing.
   const [parseError, setParseError] = useState<{ message: string; path?: string } | null>(null);
-
+  const [confirmRemove, setConfirmRemove] = useState<{ id: string; name: string } | null>(null);
+  const [removing, setRemoving] = useState(false);
   const loadOAuthProviders = useCallback(() => {
-    fetch("/api/auth/providers")
+    fetch("/api/auth/providers", { cache: "no-store" })
       .then((r) => r.json())
       .then((d: { providers?: OAuthProvider[] }) => {
         if (Array.isArray(d.providers)) setOauthProviders(d.providers);
@@ -1743,7 +1782,7 @@ export function ModelsConfig({ onClose, onSelectTab, onSaved, embedded = false }
   }, []);
 
   const loadApiKeyProviders = useCallback(() => {
-    fetch("/api/auth/all-providers")
+    fetch("/api/auth/all-providers", { cache: "no-store" })
       .then((r) => r.json())
       .then((d: { providers?: ApiKeyProvider[] }) => {
         if (Array.isArray(d.providers)) setApiKeyProviders(d.providers);
@@ -1841,6 +1880,40 @@ export function ModelsConfig({ onClose, onSelectTab, onSaved, embedded = false }
     if (!response.ok || data.error) throw new Error(data.error || `HTTP ${response.status}`);
     await loadRuntimeModels();
   }, [loadRuntimeModels]);
+
+  const handleRemoveAccount = useCallback(async () => {
+    if (!confirmRemove) return;
+    const { id, name } = confirmRemove;
+    setRemoving(true);
+    try {
+      const res = await fetch(`/api/auth/logout/${encodeURIComponent(id)}`, { method: "POST" });
+      const raw: unknown = await res.json().catch(() => ({}));
+      let errorMsg: string | undefined;
+      if (raw !== null && typeof raw === "object" && "error" in raw) {
+        const record = raw as Record<string, unknown>; // parsed JSON error shape
+        const val = record["error"];
+        if (typeof val === "string") errorMsg = val;
+      }
+      if (!res.ok || errorMsg) {
+        throw new Error(errorMsg ?? `HTTP ${res.status}`);
+      }
+      toast.success(t("modelsConfig.accountRemoved", { name }));
+      setConfirmRemove(null);
+      setSelection((prev) => {
+        if (!prev) return prev;
+        if ((prev.type === "oauth" || prev.type === "apikey") && prev.providerId === id) return null;
+        return prev;
+      });
+      loadOAuthProviders();
+      loadApiKeyProviders();
+      await loadRuntimeModels();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(t("modelsConfig.removeAccountError"), msg);
+    } finally {
+      setRemoving(false);
+    }
+  }, [confirmRemove, loadApiKeyProviders, loadOAuthProviders, loadRuntimeModels, t]);
 
   const addCustomProvider = useCallback(() => {
     let finalName = "new-provider";
@@ -1989,7 +2062,7 @@ export function ModelsConfig({ onClose, onSelectTab, onSaved, embedded = false }
     if (selection.type === "apikey") {
       const p = apiKeyProviders.find((p) => p.id === selection.providerId);
       if (!p) return null;
-      return <ApiKeyDetail key={p.id} provider={p} />;
+      return <ApiKeyDetail key={p.id} provider={p} onRefresh={() => { loadOAuthProviders(); loadApiKeyProviders(); void loadRuntimeModels(); setSelection(null); }} />;
     }
     if (selection.type === "roles") return <ModelRolesDetail models={runtimeModels} />;
     if (selection.type === "registry") return <NativeRegistryDetail models={runtimeModels} connectedProviders={connectedProviders} onChanged={loadRuntimeModels} />;
@@ -2179,33 +2252,63 @@ export function ModelsConfig({ onClose, onSelectTab, onSaved, embedded = false }
                     {activeOAuth.map((p) => {
                       const isSelected = selection?.type === "oauth" && selection.providerId === p.id;
                       return (
-                        <button
-                          type="button"
+                        <div
                           key={p.id}
-                          onClick={() => setSelection({ type: "oauth", providerId: p.id })}
-                          style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 8px", borderRadius: "var(--radius-control)", cursor: "pointer", width: "100%", border: isSelected ? "1px solid var(--accent)" : "1px solid transparent", textAlign: "left", fontFamily: "inherit", background: isSelected ? "var(--bg-selected)" : "none", fontWeight: isSelected ? 600 : 400 }}
-                          {...hoverRow(isSelected)}
+                          style={{ display: "flex", alignItems: "center", gap: 2, border: isSelected ? "1px solid var(--accent)" : "1px solid transparent", borderRadius: "var(--radius-control)", background: isSelected ? "var(--bg-selected)" : "none" }}
                         >
-                          <ProviderIcon id={p.id} size={16} />
-                          <span style={{ fontSize: 12, color: "var(--text)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
-                          <span title={t("modelsConfig.oauthProviderTitle", { id: p.id })} style={{ padding: "2px 6px", borderRadius: 4, background: isSelected ? "var(--accent)" : "var(--bg-subtle)", color: isSelected ? "var(--on-accent)" : "var(--text-muted)", fontSize: 9, fontWeight: 600, flexShrink: 0 }}>OAuth</span>
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelection({ type: "oauth", providerId: p.id })}
+                            style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "7px 8px", borderRadius: "var(--radius-control)", cursor: "pointer", border: "none", textAlign: "left", fontFamily: "inherit", background: "none", fontWeight: isSelected ? 600 : 400, minWidth: 0 }}
+                            {...hoverRow(isSelected)}
+                          >
+                            <ProviderIcon id={p.id} size={16} />
+                            <span style={{ fontSize: 12, color: "var(--text)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+                            <span title={t("modelsConfig.oauthProviderTitle", { id: p.id })} style={{ padding: "2px 6px", borderRadius: 4, background: isSelected ? "var(--accent)" : "var(--bg-subtle)", color: isSelected ? "var(--on-accent)" : "var(--text-muted)", fontSize: 9, fontWeight: 600, flexShrink: 0 }}>OAuth</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setConfirmRemove({ id: p.id, name: p.name }); }}
+                            title={t("modelsConfig.remove")}
+                            aria-label={t("modelsConfig.removeAccountTitle", { name: p.name })}
+                            style={{ padding: "6px 7px", background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 4, flexShrink: 0 }}
+                            onMouseEnter={(e) => { e.currentTarget.style.color = "var(--status-error)"; e.currentTarget.style.background = "color-mix(in srgb, var(--status-error) 10%, transparent)"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-dim)"; e.currentTarget.style.background = "none"; }}
+                          >
+                            <Trash2 size={13} aria-hidden="true" />
+                          </button>
+                        </div>
                       );
                     })}
                     {activeApiKey.map((p) => {
                       const isSelected = selection?.type === "apikey" && selection.providerId === p.id;
                       return (
-                        <button
-                          type="button"
+                        <div
                           key={p.id}
-                          onClick={() => setSelection({ type: "apikey", providerId: p.id })}
-                          style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 8px", borderRadius: "var(--radius-control)", cursor: "pointer", width: "100%", border: isSelected ? "1px solid var(--accent)" : "1px solid transparent", textAlign: "left", fontFamily: "inherit", background: isSelected ? "var(--bg-selected)" : "none", fontWeight: isSelected ? 600 : 400 }}
-                          {...hoverRow(isSelected)}
+                          style={{ display: "flex", alignItems: "center", gap: 2, border: isSelected ? "1px solid var(--accent)" : "1px solid transparent", borderRadius: "var(--radius-control)", background: isSelected ? "var(--bg-selected)" : "none" }}
                         >
-                          <ProviderIcon id={p.id} size={16} />
-                          <span style={{ fontSize: 12, color: "var(--text)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.displayName}</span>
-                          <span title={t("modelsConfig.apiKeyProviderTitle", { id: p.id })} style={{ padding: "2px 6px", borderRadius: 4, background: isSelected ? "var(--accent)" : "var(--bg-subtle)", color: isSelected ? "var(--on-accent)" : "var(--text-muted)", fontSize: 9, fontWeight: 600, flexShrink: 0 }}>API key</span>
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelection({ type: "apikey", providerId: p.id })}
+                            style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "7px 8px", borderRadius: "var(--radius-control)", cursor: "pointer", border: "none", textAlign: "left", fontFamily: "inherit", background: "none", fontWeight: isSelected ? 600 : 400, minWidth: 0 }}
+                            {...hoverRow(isSelected)}
+                          >
+                            <ProviderIcon id={p.id} size={16} />
+                            <span style={{ fontSize: 12, color: "var(--text)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.displayName}</span>
+                            <span title={t("modelsConfig.apiKeyProviderTitle", { id: p.id })} style={{ padding: "2px 6px", borderRadius: 4, background: isSelected ? "var(--accent)" : "var(--bg-subtle)", color: isSelected ? "var(--on-accent)" : "var(--text-muted)", fontSize: 9, fontWeight: 600, flexShrink: 0 }}>API key</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setConfirmRemove({ id: p.id, name: p.displayName }); }}
+                            title={t("modelsConfig.remove")}
+                            aria-label={t("modelsConfig.removeAccountTitle", { name: p.displayName })}
+                            style={{ padding: "6px 7px", background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 4, flexShrink: 0 }}
+                            onMouseEnter={(e) => { e.currentTarget.style.color = "var(--status-error)"; e.currentTarget.style.background = "color-mix(in srgb, var(--status-error) 10%, transparent)"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-dim)"; e.currentTarget.style.background = "none"; }}
+                          >
+                            <Trash2 size={13} aria-hidden="true" />
+                          </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -2378,6 +2481,19 @@ export function ModelsConfig({ onClose, onSelectTab, onSaved, embedded = false }
         existingIds={new Set((config.providers?.[catalogPicker]?.models ?? []).map((m) => m.id))}
         onAdd={(model, baseUrl) => addModelFromCatalog(catalogPicker, model, baseUrl)}
         onClose={() => setCatalogPicker(null)}
+      />
+    )}
+    {confirmRemove && (
+      <ConfirmDialog
+        open={!!confirmRemove}
+        onOpenChange={(open) => { if (!open) setConfirmRemove(null); }}
+        title={t("modelsConfig.removeAccountTitle", { name: confirmRemove.name })}
+        description={t("modelsConfig.removeAccountBody", { name: confirmRemove.name })}
+        confirmLabel={t("modelsConfig.remove")}
+        cancelLabel={t("modelsConfig.cancel")}
+        danger
+        busy={removing}
+        onConfirm={() => void handleRemoveAccount()}
       />
     )}
     </>

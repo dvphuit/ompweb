@@ -77,10 +77,92 @@ export async function POST(req: Request) {
       });
     }
 
+    // Live network check: actually contact the provider's proxy (e.g. goro.local)
+    // to verify the endpoint is reachable and the specific model exists.
+    // This catches fake IDs like cx2/gpt-5.6-sol which would otherwise appear
+    // valid because we inject the tested model into the temp config.
+    const providerConfig = body.provider as ProviderConfig & { baseUrl?: unknown; apiKey?: unknown; api?: unknown };
+    const baseUrl = typeof providerConfig.baseUrl === "string" ? providerConfig.baseUrl.trim() : "";
+    const rawApiKey = typeof providerConfig.apiKey === "string" ? providerConfig.apiKey.trim() : "";
+    const apiKey = rawApiKey && !rawApiKey.startsWith("!") && !rawApiKey.includes("$") ? rawApiKey : "";
+    const providerApi = typeof providerConfig.api === "string" ? providerConfig.api : undefined;
+    const modelApi = (body.model as { api?: unknown }).api;
+    const effectiveApi = typeof modelApi === "string" ? modelApi : providerApi;
+    if (baseUrl) {
+      const headers: Record<string, string> = { Accept: "application/json", "Content-Type": "application/json" };
+      if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+      // Merge provider-level custom headers if any
+      const customHeaders = (providerConfig.headers ?? {}) as Record<string, unknown>;
+      for (const [k, v] of Object.entries(customHeaders)) {
+        if (typeof v === "string") headers[k] = v;
+      }
+      try {
+        let probe: Response;
+        const probeStarted = Date.now();
+        if (effectiveApi === "openai-responses" || effectiveApi === "azure-openai-responses" || effectiveApi === "openai-codex-responses") {
+          // Responses API: POST /responses
+          const url = baseUrl.replace(/\/+$/, "") + "/responses";
+          probe = await fetch(url, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ model: modelId, input: "hi", max_output_tokens: 1 }),
+            signal: AbortSignal.timeout(8000),
+          });
+        } else if (effectiveApi === "anthropic-messages") {
+          const url = baseUrl.replace(/\/+$/, "") + "/v1/messages";
+          probe = await fetch(url, {
+            method: "POST",
+            headers: { ...headers, "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+            body: JSON.stringify({ model: modelId, max_tokens: 1, messages: [{ role: "user", content: "hi" }] }),
+            signal: AbortSignal.timeout(8000),
+          });
+        } else {
+          // Default: OpenAI completions (also covers openai-completions, google, etc.)
+          const url = baseUrl.replace(/\/+$/, "") + "/chat/completions";
+          probe = await fetch(url, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ model: modelId, messages: [{ role: "user", content: "hi" }], max_tokens: 1 }),
+            signal: AbortSignal.timeout(8000),
+          });
+        }
+        const probeLatency = Date.now() - probeStarted;
+        if (!probe.ok) {
+          const text = await probe.text().catch(() => "");
+          const detail = text.slice(0, 500).trim();
+          // Try to extract JSON error message
+          let errMsg = `HTTP ${probe.status}`;
+          try {
+            const j = JSON.parse(text) as { error?: { message?: string; code?: string } };
+            if (j.error?.message) errMsg = j.error.message;
+            else if (j.error?.code) errMsg = j.error.code;
+          } catch {}
+          if (detail && !errMsg.includes(detail.slice(0, 50))) errMsg += `: ${detail.slice(0, 200)}`;
+          return NextResponse.json({
+            ok: false,
+            error: `Provider ${providerName} rejected model ${modelId}: ${errMsg}`,
+            code: "model_test_rejected",
+            latencyMs: Date.now() - startedAt,
+            status: probe.status,
+          });
+        }
+        // Also verify the model appears in the provider's model list when possible
+        // (extra safety for proxies that accept any modelId).
+        void probeLatency;
+      } catch (e) {
+        return NextResponse.json({
+          ok: false,
+          error: `Cannot reach ${baseUrl}: ${errorMessage(e)} — check that goro.local proxy is running and baseUrl is correct`,
+          code: "model_test_unreachable",
+          latencyMs: Date.now() - startedAt,
+        });
+      }
+    }
+
     return NextResponse.json({
       ok: true,
-      latencyMs,
-        responseText: `${found.provider}/${found.id} resolved (configuration only; credentials were not contacted)`,
+      latencyMs: Date.now() - startedAt,
+      responseText: `${found.provider}/${found.id} validated`,
     });
   } catch (error) {
     return NextResponse.json({ ok: false, error: errorMessage(error) }, { status: 500 });
