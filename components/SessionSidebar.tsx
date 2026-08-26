@@ -6,14 +6,14 @@ import type { ManagedProject, SessionInfo } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { formatApiError } from "@/lib/i18n/api-error";
 import { DirectoryPicker } from "./DirectoryPicker";
-import { FileExplorer, type FileExplorerHandle } from "./FileExplorer";
+import { FileExplorer } from "./FileExplorer";
 import { Tooltip } from "./ui/primitives";
 import { toast } from "./ui/toast";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { clearLastOpenSession, setLastOpenSession, workspaceKeyOf } from "@/lib/workspace-memory";
 import { groupSessionsByProject, projectActivityCounts, sortManagedProjects } from "@/lib/project-ordering";
 import { comparableProjectPath } from "@/lib/comparable-path";
-import { Archive, Check, ChevronDown, ChevronRight, FileUp, Folder, GitBranch, MoreHorizontal, Plus, RefreshCw, Search, Settings2, SlidersHorizontal, Trash2, Upload } from "lucide-react";
+import { Archive, Check, ChevronDown, ChevronRight, FileUp, Folder, GitBranch, MoreHorizontal, Plus, RefreshCw, Search, Settings2, SlidersHorizontal, Trash2 } from "lucide-react";
 import { publishSessionsChanged } from "@/lib/session-change-bus";
 
 declare global {
@@ -586,7 +586,6 @@ export function SessionSidebar({ selectedSessionId, optimisticSession, onSelectS
   const wtNewInputRef = useRef<HTMLInputElement>(null);
   const [explorerOpen, setExplorerOpen] = useState(true);
   const [explorerKey, setExplorerKey] = useState(0);
-  const [explorerUploadBusy, setExplorerUploadBusy] = useState(false);
   const [sessionRefreshDone, setSessionRefreshDone] = useState(false);
   const [runningSessionIds, setRunningSessionIds] = useState<Set<string>>(() => new Set());
   const [unreadSessionIds, setUnreadSessionIds] = useState<Set<string>>(() => loadUnreadSessionIds());
@@ -604,7 +603,6 @@ export function SessionSidebar({ selectedSessionId, optimisticSession, onSelectS
   // running state; late /api/sessions responses must not overwrite it.
   const sseAuthoritativeRef = useRef(false);
   const sessionRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const fileExplorerRef = useRef<FileExplorerHandle>(null);
 
   const sessionsEtagRef = useRef<string | null>(null);
   const sessionsAbortRef = useRef<AbortController | null>(null);
@@ -1802,41 +1800,6 @@ export function SessionSidebar({ selectedSessionId, optimisticSession, onSelectS
               />
               {t("sessionSidebar.explorer")}
             </button>
-            <div
-              inert={!explorerOpen ? true : undefined}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                opacity: explorerOpen ? 1 : 0,
-                pointerEvents: explorerOpen ? "auto" : "none",
-                transition: "opacity var(--dur-fast) var(--ease-out-warm)",
-              }}
-            >
-              <Tooltip content={t("sessionSidebar.uploadFilesTitle")} side="top">
-                <button
-                  onClick={() => fileExplorerRef.current?.openUploadPicker()}
-                  disabled={explorerUploadBusy}
-                  title={t("sessionSidebar.uploadFilesTitle")}
-                  aria-label={t("sessionSidebar.uploadFiles")}
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    width: 26, height: 26, padding: 0,
-                    background: "none",
-                    border: "none",
-                    color: "var(--text-dim)",
-                    cursor: explorerUploadBusy ? "default" : "pointer",
-                    borderRadius: "var(--radius-control)",
-                    flexShrink: 0,
-                    opacity: explorerUploadBusy ? 0.6 : 1,
-                    transition: "color var(--dur-fast) var(--ease-out-warm), background var(--dur-fast) var(--ease-out-warm)",
-                  }}
-                  onMouseEnter={(e) => { if (explorerUploadBusy) return; e.currentTarget.style.color = "var(--text-muted)"; e.currentTarget.style.background = "var(--bg-hover)"; }}
-                  onMouseLeave={(e) => { if (explorerUploadBusy) return; e.currentTarget.style.color = "var(--text-dim)"; e.currentTarget.style.background = "none"; }}
-                >
-                  <Upload size={13} strokeWidth={2} aria-hidden="true" />
-                </button>
-              </Tooltip>
-            </div>
             <Tooltip content={t("sessionSidebar.refreshExplorer")} side="top">
               <button
                 aria-label={t("sessionSidebar.refreshExplorer")}
@@ -1877,13 +1840,10 @@ export function SessionSidebar({ selectedSessionId, optimisticSession, onSelectS
           >
             <div className="accordion-flow-inner" style={{ height: "100%", overflowY: "auto", overflowX: "hidden" }}>
               <FileExplorer
-                ref={fileExplorerRef}
                 cwd={selectedCwd ?? selectedCwdProp!}
                 onOpenFile={onOpenFile ?? (() => {})}
                 refreshKey={explorerKey}
                 onAtMention={onAtMention}
-                onAtMentions={onAtMentions}
-                onUploadBusyChange={setExplorerUploadBusy}
                 onRefreshDone={onExplorerRefreshDone}
               />
             </div>
