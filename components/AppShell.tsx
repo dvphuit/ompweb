@@ -11,7 +11,7 @@ import { ChatWindow } from "./ChatWindow";
 import { TabBar, type Tab } from "./TabBar";
 import { BranchNavigator } from "./BranchNavigator";
 import { LanguageSwitcher } from "./LanguageSwitcher";
-import { Check, CircleCheck, Copy, History, Menu, Moon, PanelLeft, Sun, Terminal, Wand2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpRight, Bot, Check, CheckCheck, Copy, Database, DollarSign, Gauge, Hash, History, Menu, Moon, PanelLeft, Percent, Sun, Terminal, User, Wand2, Wrench, Zap } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 import { formatCompactNumber, formatPercent, getCacheHitRate } from "@/lib/format";
 import { translate, useI18n } from "@/lib/i18n";
@@ -1146,6 +1146,7 @@ export function AppShell() {
             const costStr = c > 0 ? (c >= 0.01 ? `$${c.toFixed(2)}` : `<$0.01`) : null;
             const cacheHitRate = tok ? getCacheHitRate(tok.input, tok.cacheRead) : null;
             const cacheRateStr = cacheHitRate !== null ? formatPercent(cacheHitRate) : null;
+            const cacheRateColor = cacheHitRate === null ? "var(--text-muted)" : cacheHitRate >= 75 ? "var(--status-success)" : cacheHitRate >= 50 ? "var(--status-warning)" : "var(--status-error)";
             const currentSpeedStr = generationSpeed?.current !== null && generationSpeed?.current !== undefined
               ? `${generationSpeed.current.toFixed(1)} t/s`
               : null;
@@ -1159,9 +1160,9 @@ export function AppShell() {
               const pct = contextUsage.percent;
               if (pct !== null && pct > 90) ctxColor = "var(--status-error)";
               else if (pct !== null && pct > 70) ctxColor = "var(--status-warning)";
+              else if (pct !== null && pct <= 35) ctxColor = "var(--status-success)";
               ctxStr = pct !== null ? `${formatPercent(pct)} / ${formatCompactNumber(contextUsage.contextWindow)}` : `? / ${formatCompactNumber(contextUsage.contextWindow)}`;
             }
-
             const tooltipParts: string[] = [];
             if (tok) {
               tooltipParts.push(t("appShell.tooltipInput", { value: tok.input.toLocaleString(locale) }));
@@ -1224,58 +1225,55 @@ export function AppShell() {
                   </svg>
                 )}
                 {!isMobile && tok && tok.input > 0 && (
-                  <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="5" y1="8.5" x2="5" y2="1.5" /><polyline points="2 4 5 1.5 8 4" />
-                    </svg>
+                  <span title={t("appShell.tooltipInput", { value: tok.input.toLocaleString(locale) })} style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--status-renamed)" }}>
+                    <ArrowUp size={12} strokeWidth={2} aria-hidden="true" />
                     {formatCompactNumber(tok.input)}
                   </span>
                 )}
                 {!isMobile && tok && tok.output > 0 && (
-                  <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="5" y1="1.5" x2="5" y2="8.5" /><polyline points="2 6 5 8.5 8 6" />
-                    </svg>
+                  <span title={t("appShell.tooltipOutput", { value: tok.output.toLocaleString(locale) })} style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--accent)" }}>
+                    <ArrowDown size={12} strokeWidth={2} aria-hidden="true" />
                     {formatCompactNumber(tok.output)}
                   </span>
                 )}
                 {!isMobile && tok && tok.cacheRead > 0 && (
-                  <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M8.5 5a3.5 3.5 0 1 1-1-2.45" /><polyline points="6.5 1.5 8.5 2.5 7.5 4.5" />
-                    </svg>
+                  <span title={t("appShell.tooltipCacheRead", { value: tok.cacheRead.toLocaleString(locale) })} style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--status-success)" }}>
+                    <Database size={12} strokeWidth={1.8} aria-hidden="true" />
                     {formatCompactNumber(tok.cacheRead)}
                   </span>
                 )}
                 {!isMobile && modelCapacity?.maxTokens && (
-                  <span style={{ color: "var(--text-muted)", whiteSpace: "nowrap" }}>↗ {formatCompactNumber(modelCapacity.maxTokens)}</span>
+                  <span title={t("appShell.tooltipMaxOutput", { tokens: modelCapacity.maxTokens.toLocaleString(locale) })} style={{ display: "flex", alignItems: "center", gap: 3, color: "var(--text-dim)", whiteSpace: "nowrap" }}>
+                    <ArrowUpRight size={12} strokeWidth={1.8} aria-hidden="true" />
+                    {formatCompactNumber(modelCapacity.maxTokens)}
+                  </span>
                 )}
                 {!isMobile && cacheRateStr && (
-                  <span style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text-muted)" }}>
-                    <CircleCheck size={12} strokeWidth={1.8} aria-hidden="true" />
+                  <span title={t("appShell.tooltipCacheRate", { percent: cacheRateStr })} style={{ display: "flex", alignItems: "center", gap: 4, color: cacheRateColor }}>
+                    <Percent size={12} strokeWidth={1.8} aria-hidden="true" />
                     {cacheRateStr}
                   </span>
                 )}
                 {ctxStr && (
-                  <span style={{ display: "flex", alignItems: "center", gap: 4, color: ctxColor, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M1 9 L1 5 Q1 1 5 1 Q9 1 9 5 L9 9" /><line x1="1" y1="9" x2="9" y2="9" />
-                    </svg>
+                  <span title={contextUsage?.contextWindow ? t("appShell.tooltipContext", { percent: contextUsage.percent !== null ? contextUsage.percent.toFixed(1) + "%" : t("appShell.unknown"), tokens: contextUsage.contextWindow.toLocaleString(locale) }) : undefined} style={{ display: "flex", alignItems: "center", gap: 4, color: ctxColor, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <Gauge size={12} strokeWidth={1.8} aria-hidden="true" />
                     {ctxStr}
                   </span>
                 )}
                 {!isMobile && costStr && (
-                  <span style={{ display: "flex", alignItems: "center", color: "var(--text)", fontWeight: 500 }}>
+                  <span title={sessionStats?.cost ? t("appShell.tooltipCost", { value: sessionStats.cost.toFixed(4) }) : undefined} style={{ display: "flex", alignItems: "center", gap: 2, color: "var(--text)", fontWeight: 500 }}>
+                    <DollarSign size={12} strokeWidth={1.8} aria-hidden="true" />
                     {costStr}
                   </span>
                 )}
                 {!isMobile && currentSpeedStr && (
-                  <span style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text)", fontWeight: 600 }}>
+                  <span title={t("appShell.tooltipCurrentSpeed", { value: currentSpeedStr })} style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--status-success)", fontWeight: 600 }}>
+                    <Zap size={12} strokeWidth={1.8} aria-hidden="true" />
                     {currentSpeedStr}
                   </span>
                 )}
                 {!isMobile && averageSpeedStr && (
-                  <span style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text-muted)" }}>
+                  <span title={t("appShell.tooltipAverageSpeed", { value: averageSpeedStr })} style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text-muted)" }}>
                     {averageSpeedStr}
                   </span>
                 )}
@@ -1339,35 +1337,50 @@ export function AppShell() {
                       { label: t("appShell.statFile"), value: sessionStats.sessionFile ?? t("appShell.inMemory"), copyField: "file" as const },
                       { label: t("appShell.statId"), value: sessionStats.sessionId, copyField: "id" as const },
                     ];
-                    const messageRows = [
-                      [t("appShell.statUser"), sessionStats.userMessages.toLocaleString(locale)],
-                      [t("appShell.statAssistant"), sessionStats.assistantMessages.toLocaleString(locale)],
-                      [t("appShell.statToolCalls"), sessionStats.toolCalls.toLocaleString(locale)],
-                      [t("appShell.statToolResults"), sessionStats.toolResults.toLocaleString(locale)],
-                      [t("appShell.statTotal"), sessionStats.totalMessages.toLocaleString(locale)],
-                    ];
-                    const tokenRows = [
-                      [t("appShell.statInput"), sessionStats.tokens.input.toLocaleString(locale)],
-                      [t("appShell.statOutput"), sessionStats.tokens.output.toLocaleString(locale)],
-                      ...(sessionStats.tokens.cacheRead > 0 ? [[t("appShell.statCacheRead"), sessionStats.tokens.cacheRead.toLocaleString(locale)]] : []),
-                      ...(sessionStats.tokens.cacheWrite > 0 ? [[t("appShell.statCacheWrite"), sessionStats.tokens.cacheWrite.toLocaleString(locale)]] : []),
-                      [t("appShell.statTotal"), sessionStats.tokens.total.toLocaleString(locale)],
+                    type MetricRow = { label: string; value: string; icon?: React.ReactNode; color?: string };
+                    const messageRows: MetricRow[] = [
+                      { label: t("appShell.statUser"), value: sessionStats.userMessages.toLocaleString(locale), icon: <User size={12} strokeWidth={1.8} aria-hidden="true" />, color: "var(--text-dim)" },
+                      { label: t("appShell.statAssistant"), value: sessionStats.assistantMessages.toLocaleString(locale), icon: <Bot size={12} strokeWidth={1.8} aria-hidden="true" />, color: "var(--text-dim)" },
+                      { label: t("appShell.statToolCalls"), value: sessionStats.toolCalls.toLocaleString(locale), icon: <Wrench size={12} strokeWidth={1.8} aria-hidden="true" />, color: "var(--text-dim)" },
+                      { label: t("appShell.statToolResults"), value: sessionStats.toolResults.toLocaleString(locale), icon: <CheckCheck size={12} strokeWidth={1.8} aria-hidden="true" />, color: "var(--text-dim)" },
+                      { label: t("appShell.statTotal"), value: sessionStats.totalMessages.toLocaleString(locale), icon: <Hash size={12} strokeWidth={1.8} aria-hidden="true" /> },
                     ];
                     const ctx = contextUsage ?? sessionStats.contextUsage;
                     const cacheHitRate = getCacheHitRate(sessionStats.tokens.input, sessionStats.tokens.cacheRead);
-                    const extraTokenRows = [
-                      ...(cacheHitRate !== null ? [[t("appShell.statCacheRate"), formatPercent(cacheHitRate)]] : []),
-                      ...(ctx?.contextWindow ? [[t("appShell.statContext"), `${ctx.percent !== null ? formatPercent(ctx.percent) : "?"} / ${formatCompactNumber(ctx.contextWindow)}`]] : []),
-                      ...(sessionStats.cost > 0 ? [[t("appShell.statCost"), `$${sessionStats.cost.toFixed(4)}`]] : []),
+                    const cacheRateColor = cacheHitRate === null ? "var(--text-muted)" : cacheHitRate >= 75 ? "var(--status-success)" : cacheHitRate >= 50 ? "var(--status-warning)" : "var(--status-error)";
+                    let ctxColor: string | undefined;
+                    if (ctx?.contextWindow) {
+                      const pct = ctx.percent;
+                      if (pct !== null && pct > 90) ctxColor = "var(--status-error)";
+                      else if (pct !== null && pct > 70) ctxColor = "var(--status-warning)";
+                      else if (pct !== null && pct <= 35) ctxColor = "var(--status-success)";
+                      else ctxColor = "var(--text)";
+                    }
+                    const tokenRows: MetricRow[] = [
+                      { label: t("appShell.statInput"), value: sessionStats.tokens.input.toLocaleString(locale), icon: <ArrowUp size={12} strokeWidth={2} aria-hidden="true" />, color: "var(--status-renamed)" },
+                      { label: t("appShell.statOutput"), value: sessionStats.tokens.output.toLocaleString(locale), icon: <ArrowDown size={12} strokeWidth={2} aria-hidden="true" />, color: "var(--accent)" },
+                      ...(sessionStats.tokens.cacheRead > 0 ? [{ label: t("appShell.statCacheRead"), value: sessionStats.tokens.cacheRead.toLocaleString(locale), icon: <Database size={12} strokeWidth={1.8} aria-hidden="true" />, color: "var(--status-success)" } as MetricRow] : []),
+                      ...(sessionStats.tokens.cacheWrite > 0 ? [{ label: t("appShell.statCacheWrite"), value: sessionStats.tokens.cacheWrite.toLocaleString(locale), icon: <Database size={12} strokeWidth={1.8} aria-hidden="true" />, color: "var(--status-modified)" } as MetricRow] : []),
+                      { label: t("appShell.statTotal"), value: sessionStats.tokens.total.toLocaleString(locale), icon: <Hash size={12} strokeWidth={1.8} aria-hidden="true" /> },
                     ];
-                    const metricCard = (title: string, sectionRows: string[][]) => (
+                    const extraTokenRows: MetricRow[] = [
+                      ...(cacheHitRate !== null ? [{ label: t("appShell.statCacheRate"), value: formatPercent(cacheHitRate), icon: <Percent size={12} strokeWidth={1.8} aria-hidden="true" />, color: cacheRateColor } as MetricRow] : []),
+                      ...(ctx?.contextWindow ? [{ label: t("appShell.statContext"), value: `${ctx.percent !== null ? formatPercent(ctx.percent) : "?"} / ${formatCompactNumber(ctx.contextWindow)}`, icon: <Gauge size={12} strokeWidth={1.8} aria-hidden="true" />, color: ctxColor } as MetricRow] : []),
+                      ...(sessionStats.cost > 0 ? [{ label: t("appShell.statCost"), value: `$${sessionStats.cost.toFixed(4)}`, icon: <DollarSign size={12} strokeWidth={1.8} aria-hidden="true" /> } as MetricRow] : []),
+                      ...(generationSpeed?.current != null ? [{ label: "Speed", value: `${generationSpeed.current.toFixed(1)} t/s`, icon: <Zap size={12} strokeWidth={1.8} aria-hidden="true" />, color: "var(--status-success)" } as MetricRow] : []),
+                      ...(modelCapacity?.maxTokens ? [{ label: "Max Output", value: formatCompactNumber(modelCapacity.maxTokens), icon: <ArrowUpRight size={12} strokeWidth={1.8} aria-hidden="true" />, color: "var(--text-dim)" } as MetricRow] : []),
+                    ];
+                    const metricCard = (title: string, sectionRows: MetricRow[]) => (
                       <section className="session-info-metric-card">
                         <h3 className="session-info-section-title">{title}</h3>
                         <dl className="session-info-metric-list">
-                          {sectionRows.map(([label, value]) => (
-                            <div key={`${title}:${label}`} className="session-info-metric-row">
-                              <dt>{label}</dt>
-                              <dd>{value}</dd>
+                          {sectionRows.map((row) => (
+                            <div key={`${title}:${row.label}`} className="session-info-metric-row">
+                              <dt style={{ display: "flex", alignItems: "center", gap: 6, color: row.color ? undefined : "var(--text-dim)" }}>
+                                {row.icon ? <span style={{ display: "inline-flex", color: row.color ?? "var(--text-dim)", flexShrink: 0 }}>{row.icon}</span> : null}
+                                <span>{row.label}</span>
+                              </dt>
+                              <dd style={row.color ? { color: row.color } : undefined}>{row.value}</dd>
                             </div>
                           ))}
                         </dl>
