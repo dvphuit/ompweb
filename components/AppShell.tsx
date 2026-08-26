@@ -11,7 +11,7 @@ import { ChatWindow } from "./ChatWindow";
 import { TabBar, type Tab } from "./TabBar";
 import { BranchNavigator } from "./BranchNavigator";
 import { LanguageSwitcher } from "./LanguageSwitcher";
-import { Check, CircleCheck, History, Menu, Moon, PanelLeft, Sun, Terminal, Wand2 } from "lucide-react";
+import { Check, CircleCheck, Copy, History, Menu, Moon, PanelLeft, Sun, Terminal, Wand2 } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 import { formatCompactNumber, formatPercent, getCacheHitRate } from "@/lib/format";
 import { translate, useI18n } from "@/lib/i18n";
@@ -838,52 +838,118 @@ export function AppShell() {
     <>
     <ToastProvider>
     <style>{`
-      @keyframes session-info-pop {
-        0% {
-          opacity: 0;
-          transform: translateY(-24px);
-        }
-        100% {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-      @keyframes session-info-light-wash {
-        0% {
-          opacity: 0;
-          transform: translateX(-110%) skewX(-16deg);
-        }
-        24% {
-          opacity: 0.42;
-        }
-        100% {
-          opacity: 0;
-          transform: translateX(115%) skewX(-16deg);
-        }
-      }
       .session-info-popover {
         position: relative;
-        overflow: visible;
-        transform-origin: top right;
-        animation: session-info-pop var(--dur-slow) var(--ease-out-warm) both;
-        will-change: transform, opacity;
+        overflow: hidden;
+        box-sizing: border-box;
+        padding: 16px;
+        background: var(--bg-panel);
       }
-      .session-info-popover::after {
-        content: "";
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 0;
-        width: 44%;
-        pointer-events: none;
-        background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 24%, transparent), transparent);
-        animation: session-info-light-wash var(--dur-slow) var(--ease-out-warm) both;
+      .session-info-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 14px;
+        min-width: 0;
+        color: var(--text-muted);
+        font-family: var(--font-mono);
+        font-size: 12px;
+        line-height: 1.45;
       }
-      @media (prefers-reduced-motion: reduce) {
-        .session-info-popover,
-        .session-info-popover::after {
-          animation: none;
-        }
+      .session-info-identity,
+      .session-info-metric-card {
+        min-width: 0;
+        overflow: hidden;
+      }
+      .session-info-title,
+      .session-info-section-title {
+        margin: 0;
+        color: var(--text);
+        font-weight: 700;
+      }
+      .session-info-title {
+        margin-bottom: 12px;
+        font-size: 13px;
+      }
+      .session-info-section-title {
+        margin-bottom: 8px;
+        font-size: 12px;
+      }
+      .session-info-identity-list,
+      .session-info-metric-list {
+        margin: 0;
+      }
+      .session-info-identity-row {
+        display: grid;
+        grid-template-columns: 44px minmax(0, 1fr) 26px;
+        gap: 8px;
+        align-items: start;
+        padding: 7px 0;
+      }
+      .session-info-identity-row dt,
+      .session-info-metric-row dt {
+        min-width: 0;
+        color: var(--text-dim);
+        overflow-wrap: anywhere;
+      }
+      .session-info-identity-row dd {
+        min-width: 0;
+        margin: 0;
+        overflow-wrap: anywhere;
+      }
+      .session-info-copy {
+        display: inline-flex;
+        width: 24px;
+        height: 24px;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: transparent;
+        color: var(--text-dim);
+        cursor: pointer;
+      }
+      .session-info-copy:hover,
+      .session-info-copy[data-copied] {
+        background: var(--bg-hover);
+        color: var(--accent);
+      }
+      .session-info-metrics {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        align-items: start;
+        min-width: 0;
+      }
+      .session-info-metric-card {
+        padding: 11px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-card);
+        background: var(--bg-subtle);
+      }
+      .session-info-metric-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) max-content;
+        gap: 8px;
+        padding: 3px 0;
+      }
+      .session-info-metric-row dd {
+        margin: 0;
+        color: var(--text);
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+        white-space: nowrap;
+      }
+      .session-info-empty {
+        color: var(--text-muted);
+        font-size: 12px;
+        font-style: italic;
+      }
+      @media (max-width: 680px) {
+        .session-info-popover { padding: 14px; }
+      }
+      @media (max-width: 420px) {
+        .session-info-metrics { grid-template-columns: 1fr; }
       }
       @media (max-width: 640px) {
         .sidebar-overlay-backdrop.sidebar-mobile-pending {
@@ -1224,15 +1290,16 @@ export function AppShell() {
             <div data-top-panel className="dropdown-surface" style={{
               position: "fixed",
               top: topPanelPos.top,
-              // Right-aligned, width auto based on content — prevents cut-off and lets the window resize with its content
-              right: 12,
+              right: isMobile ? 8 : 12,
               left: "auto",
-              width: "auto",
-              minWidth: 360,
-              maxWidth: "min(560px, calc(100vw - 24px))",
+              width: activeTopPanel === "session"
+                ? "min(720px, calc(100vw - 24px))"
+                : "min(560px, calc(100vw - 24px))",
+              minWidth: 0,
               maxHeight: `min(70vh, calc(100dvh - ${topPanelPos.top}px - 12px))`,
               overflowY: "auto",
               overflowX: "hidden",
+              boxSizing: "border-box",
               zIndex: 500,
             }}>
               {activeTopPanel === "system" && (
@@ -1265,12 +1332,7 @@ export function AppShell() {
                 </div>
               )}
               {activeTopPanel === "session" && (
-                <div className="session-info-popover" style={{
-                  background: "var(--bg-panel)",
-                  borderBottom: "1px solid var(--border)",
-                  boxShadow: "var(--shadow-pop)",
-                  padding: "12px 16px",
-                }}>
+                <div className="session-info-popover">
                   {sessionStats ? (() => {
                     const sessionRows = [
                       ...(sessionStats.sessionName ? [{ label: t("appShell.statName"), value: sessionStats.sessionName, copyField: null }] : []),
@@ -1298,122 +1360,66 @@ export function AppShell() {
                       ...(ctx?.contextWindow ? [[t("appShell.statContext"), `${ctx.percent !== null ? formatPercent(ctx.percent) : "?"} / ${formatCompactNumber(ctx.contextWindow)}`]] : []),
                       ...(sessionStats.cost > 0 ? [[t("appShell.statCost"), `$${sessionStats.cost.toFixed(4)}`]] : []),
                     ];
-                    const section = (
-                      title: string,
-                      sectionRows: string[][],
-                      valueAlign: "left" | "right" = "left",
-                      compact = false,
-                    ) => (
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text)", marginBottom: 6 }}>{title}</div>
-                          <div style={{
-                            display: "grid",
-                            gridTemplateColumns: compact ? "max-content max-content" : "auto minmax(0, 1fr)",
-                            columnGap: compact ? 14 : 12,
-                            rowGap: 4,
-                            justifyContent: compact ? "start" : undefined,
-                          }}>
-                            {sectionRows.map(([label, value]) => (
-                              <div key={`${title}:${label}`} style={{ display: "contents" }}>
-                                <div style={{ color: "var(--text-dim)", whiteSpace: "nowrap" }}>{label}</div>
-                                <div style={{
-                                  color: "var(--text-muted)",
-                                  minWidth: 0,
-                                  overflowWrap: compact ? "normal" : "anywhere",
-                                  textAlign: valueAlign,
-                                  whiteSpace: valueAlign === "right" ? "nowrap" : "normal",
-                                }}>{value}</div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
+                    const metricCard = (title: string, sectionRows: string[][]) => (
+                      <section className="session-info-metric-card">
+                        <h3 className="session-info-section-title">{title}</h3>
+                        <dl className="session-info-metric-list">
+                          {sectionRows.map(([label, value]) => (
+                            <div key={`${title}:${label}`} className="session-info-metric-row">
+                              <dt>{label}</dt>
+                              <dd>{value}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </section>
+                    );
                     const copyButton = (field: SessionCopyField, value: string) => {
                       const copied = copiedSessionField === field;
+                      const label = copied
+                        ? t("appShell.copied")
+                        : field === "file"
+                          ? t("appShell.copyFilePath")
+                          : t("appShell.copySessionId");
                       return (
                         <button
                           type="button"
-                          title={copied ? t("appShell.copied") : field === "file" ? t("appShell.copyFilePath") : t("appShell.copySessionId")}
+                          className="session-info-copy ui-focus-ring"
+                          data-copied={copied || undefined}
+                          title={label}
+                          aria-label={label}
                           onClick={() => handleCopySessionField(field, value)}
-                          style={{
-                            alignSelf: "start",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: 22,
-                            height: 22,
-                            marginTop: -2,
-                            color: copied ? "var(--accent)" : "var(--text-dim)",
-                            background: "transparent",
-                            border: "1px solid var(--border)",
-                            borderRadius: 4,
-                            cursor: "pointer",
-                            flex: "0 0 auto",
-                            transition: "color var(--dur-fast) var(--ease-out-warm), border-color var(--dur-fast) var(--ease-out-warm), background var(--dur-fast) var(--ease-out-warm)",
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.color = "var(--accent)";
-                            e.currentTarget.style.borderColor = "var(--accent)";
-                            e.currentTarget.style.background = "var(--bg-hover)";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.color = copied ? "var(--accent)" : "var(--text-dim)";
-                            e.currentTarget.style.borderColor = "var(--border)";
-                            e.currentTarget.style.background = "transparent";
-                          }}
                         >
-                          {copied ? (
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                              <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                          ) : (
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                            </svg>
-                          )}
+                          {copied
+                            ? <Check size={13} strokeWidth={2} aria-hidden="true" />
+                            : <Copy size={13} strokeWidth={1.8} aria-hidden="true" />}
                         </button>
                       );
                     };
-                    const sessionInfoSection = (
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text)", marginBottom: 6 }}>{t("appShell.sectionSessionInfo")}</div>
-                        <div style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr) auto", columnGap: 12, rowGap: 8, alignItems: "start" }}>
-                          {sessionRows.map((row) => (
-                            <div key={`session-info:${row.label}`} style={{ display: "contents" }}>
-                              <div style={{ color: "var(--text-dim)", whiteSpace: "nowrap" }}>{row.label}</div>
-                              <div style={{
-                                color: "var(--text-muted)",
-                                minWidth: 0,
-                                overflowWrap: "anywhere",
-                                wordBreak: "break-word",
-                                whiteSpace: "normal",
-                              }}>{row.value}</div>
-                              <div>{row.copyField ? copyButton(row.copyField, row.value) : null}</div>
-                            </div>
-                          ))}
+
+                    return (
+                      <div className="session-info-layout">
+                        <section className="session-info-identity">
+                          <h2 className="session-info-title">{t("appShell.sectionSessionInfo")}</h2>
+                          <dl className="session-info-identity-list">
+                            {sessionRows.map((row) => (
+                              <div key={`session-info:${row.label}`} className="session-info-identity-row">
+                                <dt>{row.label}</dt>
+                                <dd>{row.value}</dd>
+                                {row.copyField
+                                  ? copyButton(row.copyField, row.value)
+                                  : <span aria-hidden="true" />}
+                              </div>
+                            ))}
+                          </dl>
+                        </section>
+                        <div className="session-info-metrics">
+                          {metricCard(t("appShell.sectionMessages"), messageRows)}
+                          {metricCard(t("appShell.sectionTokens"), [...tokenRows, ...extraTokenRows])}
                         </div>
                       </div>
                     );
-
-                    return (
-                      <div style={{
-                        display: "grid",
-                        gridTemplateColumns: isMobile
-                          ? "1fr"
-                          : "minmax(300px, 1.7fr) minmax(120px, 0.55fr) minmax(160px, 0.75fr)",
-                        gap: isMobile ? 16 : 24,
-                        fontSize: 12,
-                        lineHeight: 1.5,
-                        fontFamily: "var(--font-mono)",
-                      }}>
-                        {sessionInfoSection}
-                        {section(t("appShell.sectionMessages"), messageRows)}
-                        {section(t("appShell.sectionTokens"), [...tokenRows, ...extraTokenRows], "right", true)}
-                      </div>
-                    );
                   })() : (
-                    <div style={{ fontSize: 12, color: "var(--text-muted)", fontStyle: "italic" }}>
+                    <div className="session-info-empty">
                       {t("appShell.sessionInfoLoadHint")}
                     </div>
                   )}
