@@ -70,7 +70,7 @@ export function SafeMarkdownBody({ children, className, ...props }: ComponentPro
   );
 }
 
-function loadThinkingContent(sessionId: string, entryId: string, blockIndex: number): Promise<string> {
+function loadThinkingContent(sessionId: string, entryId: string, blockIndex: number, signal?: AbortSignal): Promise<string> {
   const key = `${sessionId}:${entryId}:${blockIndex}`;
   const cached = thinkingContentCache.get(key);
   if (cached) {
@@ -81,6 +81,7 @@ function loadThinkingContent(sessionId: string, entryId: string, blockIndex: num
 
   const request = fetch(
     `/api/sessions/${encodeURIComponent(sessionId)}/entries/${encodeURIComponent(entryId)}/thinking?blockIndex=${blockIndex}`,
+    signal ? { signal } : undefined,
   ).then(async (response) => {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json() as { thinking?: unknown };
@@ -650,13 +651,17 @@ const ThinkingBlock = memo(function ThinkingBlock({ block, duration, sessionId, 
     // Already have content or in-flight
     if (content !== null || loading || error) return;
     if (!isVisible && !expanded) return;
+    const controller = new AbortController();
     setLoading(true);
-    void loadThinkingContent(sessionId, entryId, blockIndex)
-      .then((text) => setContent(text))
-      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
+    void loadThinkingContent(sessionId, entryId, blockIndex, controller.signal)
+      .then((text) => { if (!controller.signal.aborted) setContent(text); })
+      .catch((err) => {
+        if (controller.signal.aborted) return;
+        setError(err instanceof Error ? err.message : String(err));
+      })
       .finally(() => setLoading(false));
+    return () => controller.abort();
   }, [block.deferred, blockIndex, content, entryId, error, expanded, isVisible, loading, sessionId]);
-
   // When the underlying entry changes, drop cached deferred content
   useEffect(() => {
     // Use a layout-like reset that does not fight the fetch above:

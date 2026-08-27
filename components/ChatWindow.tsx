@@ -5,6 +5,7 @@ import { ChevronDown, Folder } from "lucide-react";
 import type { AgentMessage, AssistantContentBlock, AssistantMessage, BashExecutionMessage, CustomMessage, ExtensionUiRequest, SessionInfo, SessionTreeNode, ToolResultMessage, ToolCallContent } from "@/lib/types";
 import { translate, useI18n } from "@/lib/i18n";
 import { countToolCallBlocks, getDisplayableAssistantBlocks, splitFinalAssistantBlocks } from "@/lib/message-display";
+import { getToolFilePath } from "@/lib/tool-display";
 import { MessageView } from "./MessageView";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { ExtensionDialog } from "./ExtensionDialog";
@@ -173,13 +174,6 @@ function getAssistantUsage(msg: AgentMessage): { totalTokens?: number; input?: n
   const m = msg as AssistantMessage;
   return m.usage as { totalTokens?: number; input?: number; output?: number; cost?: { total?: number } } | undefined;
 }
-function getToolFilePath(input: Record<string, unknown>): string | null {
-  const p = input.path;
-  if (typeof p === "string" && p) return p;
-  const fp = input.file_path;
-  if (typeof fp === "string" && fp) return fp;
-  return null;
-}
 function getToolCallsFromMessage(msg: AgentMessage): ToolCallContent[] {
   if (msg.role !== "assistant") return [];
   const content = (msg as AssistantMessage).content;
@@ -191,6 +185,7 @@ function ProcessDetailsGroup({ messageCount, toolCallCount, durationSeconds, tot
   const { t, tn } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const parts = [t("chatWindow.processDetails"), tn("chatWindow.messageCount", messageCount)];
+  if (toolCallCount > 0) parts.push(tn("chatWindow.toolCallCount", toolCallCount));
   if (durationSeconds != null && durationSeconds > 0) parts.push(t("chatWindow.durationSeconds", { seconds: durationSeconds }));
   if (totalTokens != null && totalTokens > 0) {
     const tok = totalTokens >= 1000 ? `${(totalTokens / 1000).toFixed(totalTokens >= 10000 ? 0 : 1).replace(/\.0$/, "")}k` : String(totalTokens);

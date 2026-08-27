@@ -65,3 +65,11 @@ export function getToolDisplay(toolName: string): ToolDisplay {
   if (key.includes("task")) return { iconName: "Bot", varName: "--tool-task" };
   return { iconName: "Wrench", varName: "--tool-generic" };
 }
+
+export function getToolFilePath(input: Record<string, unknown>): string | null {
+  const p = input.path;
+  if (typeof p === "string" && p) return p;
+  const fp = input.file_path;
+  if (typeof fp === "string" && fp) return fp;
+  return null;
+}
