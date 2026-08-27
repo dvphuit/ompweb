@@ -186,7 +186,7 @@ function ProcessDetailsGroup({ messageCount, toolCallCount, durationSeconds, tot
   const [expanded, setExpanded] = useState(false);
   const parts = [t("chatWindow.processDetails"), tn("chatWindow.messageCount", messageCount)];
   if (toolCallCount > 0) parts.push(tn("chatWindow.toolCallCount", toolCallCount));
-  if (durationSeconds != null && durationSeconds > 0) parts.push(t("chatWindow.durationSeconds", { seconds: durationSeconds }));
+  if (durationSeconds != null && durationSeconds > 0) parts.push(t("messageView.durationSeconds", { seconds: durationSeconds }));
   if (totalTokens != null && totalTokens > 0) {
     const tok = totalTokens >= 1000 ? `${(totalTokens / 1000).toFixed(totalTokens >= 10000 ? 0 : 1).replace(/\.0$/, "")}k` : String(totalTokens);
     parts.push(`${tok} tok`);
