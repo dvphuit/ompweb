@@ -52,11 +52,26 @@ function isPathInside(candidate: string, root: string): boolean {
   return filePath === rootPath || filePath.startsWith(`${rootPath}/`);
 }
 
+export function isLikelyFilePath(str: string | undefined): boolean {
+  if (!str || typeof str !== "string") return false;
+  const trimmed = str.trim();
+  if (trimmed.length === 0 || trimmed.length > 260) return false;
+  if (/[<>\"'`|\s]/.test(trimmed)) return false;
+  if (trimmed.startsWith("#") || trimmed.startsWith("?")) return false;
+
+  const isWellKnownName = /^(Dockerfile|Makefile|README(\.md)?|LICENSE|CHANGELOG(\.md)?|\.[a-zA-Z0-9._-]+)$/i.test(trimmed);
+  const hasValidExtension = /\.[a-zA-Z0-9]{1,12}(:\d+(:\d+)?)?$/.test(trimmed);
+  const hasPathSlash = trimmed.includes("/") && /^[a-zA-Z0-9._~/-]+$/.test(trimmed);
+
+  return isWellKnownName || (hasValidExtension && (hasPathSlash || /^[a-zA-Z0-9._-]+\.[a-zA-Z0-9]+(:\d+)?$/.test(trimmed)));
+}
+
 function looksLikeRelativeFileHref(href: string): boolean {
-  if (href.startsWith("#") || href.startsWith("?")) return false;
+  if (!href || href.startsWith("#") || href.startsWith("?")) return false;
+  if (/[<>\"'`|\s]/.test(href)) return false;
   if (href.startsWith("./") || href.startsWith("../")) return true;
-  if (href.includes("/")) return true;
-  return /(^|\/)\.?[^/]+\.[^/.]+$/.test(href);
+  if (href.includes("/") && /^[a-zA-Z0-9._~/-]+$/.test(href)) return true;
+  return /(^|\/)\.?[a-zA-Z0-9_-]+\.[a-zA-Z0-9.]+$/.test(href);
 }
 
 function fileUrlToPath(href: string): string | null {

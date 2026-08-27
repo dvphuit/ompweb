@@ -2004,6 +2004,9 @@ function ProjectRow({
     <section className="sidebar-project" data-active={isActive ? "true" : "false"} style={{ marginBottom: 12 }}>
       <div
         className="sidebar-project-header"
+        data-context-menu="project"
+        data-project-path={project.path}
+        data-project-name={label}
         draggable={!aliasEditing}
         onDragStart={(event) => { event.dataTransfer.setData("text/plain", project.path); event.dataTransfer.effectAllowed = "move"; onDragPathChange(project.path); }}
         onDragOver={(event) => { if (isDragTarget) { event.preventDefault(); event.dataTransfer.dropEffect = "move"; } }}
@@ -2886,7 +2889,12 @@ const SessionItem = memo(function SessionItem({
 
   return (
     <div
- onClick={confirmArchive || confirmDelete || renaming ? undefined : onClick}
+      data-context-menu="session"
+      data-session-id={session.id}
+      data-session-name={session.name ?? ""}
+      data-session-cwd={session.cwd}
+      data-session-has-children={hasChildren ? "true" : "false"}
+      onClick={confirmArchive || confirmDelete || renaming ? undefined : onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setFocusWithin(true)}

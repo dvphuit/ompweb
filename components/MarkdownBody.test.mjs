@@ -92,3 +92,17 @@ test("does not normalize escaped delimiters or link destinations", () => {
   assert.equal(normalizeDisplayMath(escaped), escaped);
   assert.equal(normalizeDisplayMath(link), link);
 });
+
+test("renders inline file paths as clickable file pills", () => {
+  const html = renderMarkdown("Check `components/ChatInput.tsx` for changes.");
+
+  assert.match(html, /<button [^>]*class="markdown-file-pill"/);
+  assert.match(html, /components\/ChatInput\.tsx/);
+});
+
+test("renders regular inline code as standard code tag", () => {
+  const html = renderMarkdown("Run `npm test` and use `<X />` button.");
+
+  assert.match(html, /<code [^>]*class="markdown-inline-code">npm test<\/code>/);
+  assert.match(html, /<code [^>]*class="markdown-inline-code">&lt;X \/&gt;<\/code>/);
+});

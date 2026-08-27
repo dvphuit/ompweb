@@ -231,6 +231,11 @@ function TreeNode({
   return (
     <div>
       <div
+        data-context-menu="file"
+        data-file-path={node.fullPath}
+        data-file-name={node.name}
+        data-file-is-dir={node.isDir ? "true" : "false"}
+        data-file-relative={getRelativeFilePath(node.fullPath, cwd)}
         onClick={handleClick}
         onKeyDown={handleKeyDown}
         onMouseEnter={() => setHovered(true)}
@@ -439,6 +444,11 @@ function ChangedListRow({
   const gitStatus = status;
   return (
     <div
+      data-context-menu="file"
+      data-file-path={status.filePath}
+      data-file-name={fileName}
+      data-file-is-dir="false"
+      data-file-relative={getRelativeFilePath(status.filePath, cwd)}
       onClick={() => onOpenFile(status.filePath, fileName)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useCallback, useEffect, useImperativeHandle, forwardRef, memo, KeyboardEvent } from "react";
-import { ChevronDown, ListChecks, Search, Shrink, Sparkles, Target, Zap } from "lucide-react";
+import { ChevronDown, ListChecks, Search, Shrink, Sparkles, Target, X, Zap } from "lucide-react";
 import { getSubmitDuringRunBehavior } from "@/lib/composer-prefs";
 import type { BuiltinSlashCommandResult, CompactResultInfo, QueuedMessages, SlashCommandInfo } from "@/hooks/useAgentSession";
 import type { ActiveGoal, ActivePlan } from "@/lib/web-mode-state";
@@ -95,6 +95,7 @@ interface Props {
   /** Session working directory — enables the @ file autocomplete menu */
   cwd?: string | null;
   activeGoal?: ActiveGoal | null;
+  onClearGoal?: () => void;
   activePlan?: ActivePlan | null;
   advisorEnabled?: boolean;
   /** Toggle the per-chat advisor (composer icon + /advisor command). */
@@ -326,7 +327,7 @@ export function ModelErrorBanner({ error }: { error?: string | null }) {
   );
 }
 
-function ComposerModeStatus({ goal, plan }: { goal?: ActiveGoal | null; plan?: ActivePlan | null }) {
+function ComposerModeStatus({ goal, plan, onClearGoal }: { goal?: ActiveGoal | null; plan?: ActivePlan | null; onClearGoal?: () => void }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -343,29 +344,66 @@ function ComposerModeStatus({ goal, plan }: { goal?: ActiveGoal | null; plan?: A
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
       {goal && (
-        <button
-          type="button"
-          aria-expanded={expanded}
-          onClick={() => setExpanded((value) => !value)}
-          title={expanded ? t("chatInput.collapseGoal") : t("chatInput.expandGoal")}
-          style={{
-            display: "flex", alignItems: expanded ? "flex-start" : "center", gap: 8,
-            width: "100%", padding: "6px 9px",
-            border: "1px solid color-mix(in srgb, var(--accent) 32%, var(--border))",
-            borderRadius: "var(--radius-control)",
-            background: "color-mix(in srgb, var(--accent) 7%, var(--bg-panel))",
-            color: "var(--text)", cursor: "pointer", textAlign: "left",
-            transition: "background var(--dur-fast) var(--ease-out-warm), border-color var(--dur-fast) var(--ease-out-warm)",
-          }}
-        >
-          <Target size={14} strokeWidth={2} style={{ flexShrink: 0, marginTop: expanded ? 1 : 0, color: "var(--accent)" }} aria-hidden="true" />
-          <span style={{ flexShrink: 0, color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-            {t("chatInput.goalActive")} · {formatGoalElapsed(now - goal.startedAt)}
-          </span>
-          <span style={{ minWidth: 0, flex: 1, overflow: expanded ? "visible" : "hidden", textOverflow: expanded ? undefined : "ellipsis", whiteSpace: expanded ? "pre-wrap" : "nowrap", fontSize: 12, lineHeight: 1.4 }}>
-            {goal.objective}
-          </span>
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%" }}>
+          <button
+            type="button"
+            aria-expanded={expanded}
+            onClick={() => setExpanded((value) => !value)}
+            title={expanded ? t("chatInput.collapseGoal") : t("chatInput.expandGoal")}
+            style={{
+              display: "flex", alignItems: expanded ? "flex-start" : "center", gap: 8,
+              flex: 1, minWidth: 0, padding: "6px 9px",
+              border: "1px solid color-mix(in srgb, var(--accent) 32%, var(--border))",
+              borderRadius: "var(--radius-control)",
+              background: "color-mix(in srgb, var(--accent) 7%, var(--bg-panel))",
+              color: "var(--text)", cursor: "pointer", textAlign: "left",
+              transition: "background var(--dur-fast) var(--ease-out-warm), border-color var(--dur-fast) var(--ease-out-warm)",
+            }}
+          >
+            <Target size={14} strokeWidth={2} style={{ flexShrink: 0, marginTop: expanded ? 1 : 0, color: "var(--accent)" }} aria-hidden="true" />
+            <span style={{ flexShrink: 0, color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              {t("chatInput.goalActive")} · {formatGoalElapsed(now - goal.startedAt)}
+            </span>
+            <span style={{ minWidth: 0, flex: 1, overflow: expanded ? "visible" : "hidden", textOverflow: expanded ? undefined : "ellipsis", whiteSpace: expanded ? "pre-wrap" : "nowrap", fontSize: 12, lineHeight: 1.4 }}>
+              {goal.objective}
+            </span>
+          </button>
+          {onClearGoal && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClearGoal();
+              }}
+              title={t("chatInput.clearGoal")}
+              aria-label={t("chatInput.clearGoal")}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 28,
+                height: 28,
+                flexShrink: 0,
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-control)",
+                background: "var(--bg-panel)",
+                color: "var(--text-muted)",
+                cursor: "pointer",
+                transition: "background var(--dur-fast) var(--ease-out-warm), color var(--dur-fast) var(--ease-out-warm)",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "var(--bg-hover)";
+                e.currentTarget.style.color = "var(--text)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "var(--bg-panel)";
+                e.currentTarget.style.color = "var(--text-muted)";
+              }}
+            >
+              <X size={13} strokeWidth={2} />
+            </button>
+          )}
+        </div>
       )}
       {plan && (
         <div role="status" aria-live="polite" style={{ display: "flex", alignItems: "center", gap: 7, padding: "5px 9px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-panel)", color: "var(--text-muted)", fontSize: 12 }}>
@@ -395,6 +433,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   draftKey,
   cwd,
   activeGoal,
+  onClearGoal,
   activePlan,
   advisorEnabled,
   onAdvisorChange,
@@ -1481,7 +1520,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
       />
       <div style={{ maxWidth: CHAT_COLUMN_MAX_WIDTH, margin: "0 auto" }}>
         <ModelErrorBanner error={modelError} />
-        <ComposerModeStatus goal={activeGoal} plan={activePlan} />
+        <ComposerModeStatus goal={activeGoal} plan={activePlan} onClearGoal={onClearGoal} />
         {/* Retry banner */}
         {retryInfo && (
           <div style={{

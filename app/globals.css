@@ -383,7 +383,7 @@ pre, code {
 /* react-markdown output styles */
 .markdown-body {
   font-size: 14px;
-  line-height: 1.65;
+  line-height: 1.68;
   color: var(--text);
   word-break: break-word;
 }
@@ -392,21 +392,21 @@ pre, code {
 .markdown-body h1, .markdown-body h2, .markdown-body h3,
 .markdown-body h4, .markdown-body h5, .markdown-body h6 {
   font-family: var(--font-sans);
-  font-weight: 600;
+  font-weight: 650;
   color: var(--text);
   line-height: 1.35;
   letter-spacing: -0.012em;
 }
 /* Compact headings, kept close to the content they introduce */
-.markdown-body h1 { font-size: 1.25em; margin: 16px 0 8px; }
-.markdown-body h2 { font-size: 1.12em; margin: 14px 0 6px; }
-.markdown-body h3 { font-size: 1em; margin: 10px 0 4px; color: color-mix(in srgb, var(--text) 90%, var(--text-muted)); }
+.markdown-body h1 { font-size: 1.25em; margin: 18px 0 8px; }
+.markdown-body h2 { font-size: 1.15em; margin: 15px 0 6px; }
+.markdown-body h3 { font-size: 1.02em; margin: 12px 0 4px; color: color-mix(in srgb, var(--text) 92%, var(--text-muted)); }
 .markdown-body ul, .markdown-body ol {
   padding-left: 22px;
   margin: 6px 0 10px;
   list-style-position: outside;
 }
-.markdown-body li { margin: 2px 0; padding-left: 2px; }
+.markdown-body li { margin: 2.5px 0; padding-left: 2px; }
 .markdown-body li > ul, .markdown-body li > ol { margin: 2px 0 4px; }
 .markdown-body ul > li { list-style-type: disc; }
 .markdown-body ol > li { list-style-type: decimal; }
@@ -416,8 +416,8 @@ pre, code {
   font-weight: 600;
 }
 .markdown-body strong {
-  color: color-mix(in srgb, var(--text) 88%, var(--accent));
-  font-weight: 700;
+  color: var(--text);
+  font-weight: 650;
 }
 .markdown-body em { color: var(--text-muted); }
 .markdown-body a {
@@ -436,13 +436,63 @@ pre, code {
   border-radius: 6px;
 }
 .markdown-body .markdown-inline-code {
-  background: color-mix(in srgb, var(--bg-panel) 62%, var(--bg));
-  border-radius: 5px;
+  display: inline-block;
+  background: color-mix(in srgb, var(--bg-panel) 75%, var(--bg));
+  border-radius: 4px;
   padding: 1px 5px;
+  margin: 0 1.5px;
   color: var(--text);
   font-family: var(--font-mono);
-  font-size: 0.92em;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 60%, transparent);
+  font-size: 0.88em;
+  line-height: 1.35;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 70%, transparent);
+  vertical-align: baseline;
+}
+
+/* Interactive file pill in markdown output */
+.markdown-file-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 2px;
+  padding: 1px 6px;
+  vertical-align: baseline;
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-panel));
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: 5px;
+  color: var(--accent-strong);
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  font-weight: 550;
+  line-height: 1.35;
+  cursor: pointer;
+  text-decoration: none;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
+  user-select: text;
+  transition: background-color var(--dur-fast) var(--ease-out-warm),
+              border-color var(--dur-fast) var(--ease-out-warm),
+              color var(--dur-fast) var(--ease-out-warm),
+              box-shadow var(--dur-fast) var(--ease-out-warm);
+}
+
+.markdown-file-pill:hover {
+  background: color-mix(in srgb, var(--accent) 16%, var(--bg-panel));
+  border-color: var(--accent);
+  color: var(--accent-hover);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.markdown-file-pill:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.markdown-file-pill-icon {
+  flex-shrink: 0;
+  opacity: 0.85;
+  color: var(--accent);
 }
 .markdown-body .contains-task-list {
   padding-left: 0;
@@ -2443,4 +2493,125 @@ html.dark .dropdown-surface :is(select, option) {
     flex-wrap: wrap;
     padding-bottom: max(10px, env(safe-area-inset-bottom)) !important;
   }
+}
+
+/* Desktop Context Menu */
+.desktop-context-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: transparent;
+}
+
+.desktop-context-menu {
+  position: fixed;
+  z-index: 99999;
+  min-width: 190px;
+  max-width: 320px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-pop);
+  padding: 4px;
+  color: var(--text);
+  font-size: 13px;
+  user-select: none;
+  box-sizing: border-box;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  animation: ui-scale-in var(--dur-fast) var(--ease-out-warm) both;
+}
+
+.desktop-context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12.5px;
+  line-height: 1.2;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: background-color var(--dur-fast) var(--ease-out-warm), color var(--dur-fast) var(--ease-out-warm);
+}
+
+.desktop-context-menu-item:hover,
+.desktop-context-menu-item:focus-visible,
+.desktop-context-menu-item[data-highlighted="true"] {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.desktop-context-menu-item[data-danger="true"]:hover,
+.desktop-context-menu-item[data-danger="true"]:focus-visible,
+.desktop-context-menu-item[data-danger="true"][data-highlighted="true"] {
+  background: rgba(220, 38, 38, 0.12);
+  color: var(--status-error);
+}
+
+.desktop-context-menu-item:disabled,
+.desktop-context-menu-item[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: transparent !important;
+  color: var(--text-dim) !important;
+}
+
+.desktop-context-menu-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.desktop-context-menu-item:hover .desktop-context-menu-icon,
+.desktop-context-menu-item[data-highlighted="true"] .desktop-context-menu-icon {
+  color: var(--accent);
+}
+
+.desktop-context-menu-item[data-danger="true"]:hover .desktop-context-menu-icon,
+.desktop-context-menu-item[data-danger="true"][data-highlighted="true"] .desktop-context-menu-icon {
+  color: var(--status-error);
+}
+
+.desktop-context-menu-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-context-menu-shortcut {
+  margin-left: auto;
+  padding-left: 12px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.desktop-context-menu-separator {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--border);
+}
+
+.desktop-context-menu-submenu-arrow {
+  margin-left: auto;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
 }

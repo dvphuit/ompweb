@@ -262,6 +262,10 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
     >
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", maxWidth: "85%", minWidth: 0 }}>
         <div
+          data-context-menu="message"
+          data-message-entry-id={entryId}
+          data-message-role="user"
+          data-message-content={content}
           className="chat-message-card"
           style={{
             maxWidth: "100%",
@@ -655,7 +659,11 @@ function BlockView({ block, toolResults, isStreaming, streamingDuration, toolCal
 // skip their ReactMarkdown re-parse and only the actively growing block
 // re-renders per frame.
 const TextBlock = memo(function TextBlock({ block, isStreaming, cwd, onOpenFile }: { block: TextContent; isStreaming?: boolean; cwd?: string; onOpenFile?: (filePath: string) => void }) {
-  return <SafeMarkdownBody isStreaming={isStreaming} cwd={cwd} onOpenFile={onOpenFile}>{block.text}</SafeMarkdownBody>;
+  return (
+    <div data-context-menu="message" data-message-content={block.text}>
+      <SafeMarkdownBody isStreaming={isStreaming} cwd={cwd} onOpenFile={onOpenFile}>{block.text}</SafeMarkdownBody>
+    </div>
+  );
 }, (prev, next) => (
   prev.block.text === next.block.text
   && prev.isStreaming === next.isStreaming

@@ -1047,7 +1047,15 @@ function TextFileViewer({ filePath, cwd, sourceSessionId, onOpenFile, onMentionL
   const breadcrumbFile = pathSepIndex >= 0 ? fullRelativePath.slice(pathSepIndex + 1) : fullRelativePath;
 
   return (
-    <div className="file-viewer-shell" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+    <div
+      className="file-viewer-shell"
+      data-context-menu="file"
+      data-file-path={filePath}
+      data-file-name={breadcrumbFile}
+      data-file-relative={fullRelativePath}
+      data-file-is-dir="false"
+      style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}
+    >
       <div
         className="file-viewer-toolbar"
         style={{
@@ -1180,7 +1188,7 @@ function TextFileViewer({ filePath, cwd, sourceSessionId, onOpenFile, onMentionL
               remarkPlugins={markdownPlugins.remarkPlugins}
               rehypePlugins={markdownPlugins.rehypePlugins}
               components={{
-                code: markdownCodeRenderer({ defaultPreview: true }),
+                code: markdownCodeRenderer({ defaultPreview: true, cwd: markdownDirectory, onOpenFile }),
                 pre({ children }) {
                   // Render the code block directly — CodeBlock provides its own wrapping.
                   // For non-mermaid blocks, pass through to default pre rendering.

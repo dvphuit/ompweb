@@ -59,7 +59,10 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
         return (
           <div
             key={tab.id}
+            data-context-menu="tab"
             data-tab-id={tab.id}
+            data-file-path={tab.filePath}
+            data-tab-label={tab.label}
             className="tabbar-tab ui-focus-ring"
             onClick={() => onSelectTab(tab.id)}
             role="tab"

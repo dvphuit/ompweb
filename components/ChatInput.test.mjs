@@ -79,6 +79,7 @@ test("renders goal, planning, and advisor indicators at the composer", () => {
       modelList: [{ provider: "test", modelId: "model", id: "model", name: "Test model" }],
       modelNames: {},
       activeGoal: { objective: "Ship the active goal bar", startedAt: 0 },
+      onClearGoal() {},
       activePlan: { objective: "Plan the implementation" },
       advisorEnabled: true,
       onAdvisorChange() {},
@@ -90,6 +91,7 @@ test("renders goal, planning, and advisor indicators at the composer", () => {
   // The per-chat advisor toggle renders pressed with its disable title.
   assert.match(html, /aria-pressed="true"/);
   assert.match(html, /title="(Disable advisor for this chat|chatInput\.advisorDisableTitle|Advisor: [^"]*)"/);
+  assert.match(html, /(Finish goal|chatInput\.clearGoal)/);
 });
 
 test("renders the compact toolbar action", () => {

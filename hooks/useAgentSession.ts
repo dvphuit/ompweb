@@ -785,6 +785,14 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     }
     setActiveGoal(parseActiveGoal(sessionStorage.getItem(`omp-web:goal:${sid}`)));
   }, [session?.id]);
+  const handleClearGoal = useCallback(() => {
+    setActiveGoal(null);
+    const sid = sessionIdRef.current;
+    if (sid) {
+      sessionStorage.removeItem(`omp-web:goal:${sid}`);
+    }
+  }, []);
+
 
   // A plan request is in progress only for its current agent turn.
   useEffect(() => {
@@ -2844,6 +2852,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
             return { handled: true, retainInput: true };
           }
           if (commandName === "goal") {
+            const trimmed = args.trim().toLowerCase();
+            if (trimmed === "clear" || trimmed === "done" || trimmed === "finish" || trimmed === "remove" || trimmed === "off") {
+              handleClearGoal();
+              return complete({ handled: true });
+            }
             const goal = createActiveGoal(args);
             setActiveGoal(goal);
             const activeSessionId = sessionIdRef.current;
@@ -2860,7 +2873,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         setIsCompacting(false);
       }
     }
-  }, [addNotice, advisorEnabled, ensureNewSession, handleSend, isCompacting, loadModels, loadSession, loadSlashCommands, promoteNewSession, onSessionStatsPanelOpen]);
+  }, [addNotice, advisorEnabled, ensureNewSession, handleClearGoal, handleSend, isCompacting, loadModels, loadSession, loadSlashCommands, promoteNewSession, onSessionStatsPanelOpen]);
 
   // Queued (undelivered) messages live in the queue panel only; the chat gets
   // the real user message when pi delivers it (user message_end event). An
@@ -3239,6 +3252,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     advisorActive: advisorActiveAt > 0, advisorEnabled, handleAdvisorChange,
     subagents, subagentEvents, subagentTranscriptVersions, activeSubagentCount, currentTodoPhase, todoPhases,
     activeGoal, activePlan,
+    handleClearGoal,
     isNew,
     // Refs
     sessionIdRef, messagesEndRef, scrollContainerRef,

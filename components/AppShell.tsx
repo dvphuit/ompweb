@@ -30,6 +30,7 @@ import type { SettingsTab } from "./SettingsTabs";
 import { SettingsConfig } from "./SettingsConfig";
 import { ArchiveBrowser } from "./ArchiveBrowser";
 import { publishSessionsChanged } from "@/lib/session-change-bus";
+import { ContextMenuProvider } from "./ContextMenuContext";
 // The settings shell is part of the app bundle so opening it does not fetch or compile a modal chunk. The file viewer remains on demand.
 const FileViewer = dynamic(() => import("./FileViewer").then((m) => m.FileViewer), {
   ssr: false,
@@ -775,6 +776,114 @@ export function AppShell() {
       "noopener,noreferrer",
     );
   }, [selectedSession]);
+  const handleCloseOtherTabs = useCallback((tabId: string) => {
+    setFileTabs((prev) => prev.filter((t) => t.id === tabId));
+    setActiveFileTabId(tabId);
+  }, []);
+
+  const handleCloseTabsToRight = useCallback((tabId: string) => {
+    setFileTabs((prev) => {
+      const idx = prev.findIndex((t) => t.id === tabId);
+      if (idx === -1) return prev;
+      const next = prev.slice(0, idx + 1);
+      setActiveFileTabId((cur) => (next.some((t) => t.id === cur) ? cur : tabId));
+      return next;
+    });
+  }, []);
+
+  const handleCloseAllTabs = useCallback(() => {
+    setFileTabs([]);
+    setRightPanelOpen(false);
+    setActiveFileTabId(null);
+  }, []);
+
+  const handleQuoteInChat = useCallback((text: string) => {
+    const quoted = text
+      .split("\n")
+      .map((line) => `> ${line}`)
+      .join("\n");
+    chatInputRef.current?.insertText(`${quoted}\n\n`);
+  }, []);
+
+  const handleForkSession = useCallback(async (sessionId: string, entryId?: string) => {
+    const targetId = sessionId || selectedSession?.id;
+    if (!targetId) return;
+    try {
+      const res = await fetch(`/api/sessions/${encodeURIComponent(targetId)}/fork`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(entryId ? { entryId } : {}),
+      });
+      if (!res.ok) throw new Error("Fork failed");
+      const data = await res.json() as { id?: string; session?: SessionInfo };
+      if (data.session) {
+        handleSelectSession(data.session);
+      } else if (data.id) {
+        router.replace(`?session=${encodeURIComponent(data.id)}`, { scroll: false });
+      }
+    } catch {
+      toast.error(t("sessionSidebar.forkFailed"));
+    }
+  }, [selectedSession?.id, handleSelectSession, router, t]);
+  const handleRenameSession = useCallback(async (sessionId: string, currentName: string) => {
+    const newName = window.prompt(t("sessionSidebar.rename") || "Enter new session name:", currentName);
+    if (newName === null || newName.trim() === currentName) return;
+    try {
+      const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName.trim() }),
+      });
+      if (!res.ok) throw new Error("Rename failed");
+      setRefreshKey((k) => k + 1);
+    } catch {
+      toast.error(t("sessionSidebar.renameFailed") || "Rename failed");
+    }
+  }, [t]);
+
+
+  const handleArchiveSession = useCallback(async (sessionId: string) => {
+    try {
+      const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/archive`, { method: "POST" });
+      if (!response.ok) throw new Error("Session archive failed");
+      handleSessionDeleted(sessionId);
+    } catch {
+      toast.error(t("sessionSidebar.archiveFailed"));
+    }
+  }, [handleSessionDeleted, t]);
+
+  const handleDeleteSession = useCallback(async (sessionId: string) => {
+    try {
+      const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE" });
+      if (!response.ok) throw new Error("Session deletion failed");
+      handleSessionDeleted(sessionId);
+    } catch {
+      toast.error(t("sessionSidebar.deleteFailed"));
+    }
+  }, [handleSessionDeleted, t]);
+
+  const handleExportSession = useCallback((sessionId: string) => {
+    window.open(`/api/sessions/${encodeURIComponent(sessionId)}/export?inline=1`, "_blank", "noopener,noreferrer");
+  }, []);
+
+  const handleOpenCommandPalette = useCallback(() => {
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }));
+  }, []);
+
+  const handleHideProject = useCallback(async (projectPath: string) => {
+    try {
+      const res = await fetch("/api/projects", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: projectPath }),
+      });
+      if (res.ok) {
+        setRefreshKey((k) => k + 1);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // Show chat area if a session is selected, or if we have a cwd to start a new session in
   const effectiveNewSessionCwd = newSessionCwd ?? (selectedSession === null && activeCwd ? activeCwd : null);
@@ -831,6 +940,31 @@ export function AppShell() {
   return (
     <>
     <ToastProvider>
+    <ContextMenuProvider
+      actions={{
+        onNewSession: (cwd) => handleNewSession(`new-${Date.now()}`, cwd || activeCwd || ""),
+        onOpenCommandPalette: handleOpenCommandPalette,
+        onToggleSidebar: handleSidebarToggle,
+        onOpenSettings: (tab) => setSettingsTab((tab as SettingsTab) || "general"),
+        onSelectSession: (sessionId) => {
+          router.replace(`?session=${encodeURIComponent(sessionId)}`, { scroll: false });
+        },
+        onRenameSession: handleRenameSession,
+        onForkSession: handleForkSession,
+        onArchiveSession: handleArchiveSession,
+        onDeleteSession: handleDeleteSession,
+        onExportSession: handleExportSession,
+        onOpenFile: (filePath, fileName) => handleOpenFile(filePath, fileName || getFileName(filePath)),
+        onCloseTab: handleCloseFileTab,
+        onCloseOtherTabs: handleCloseOtherTabs,
+        onCloseTabsToRight: handleCloseTabsToRight,
+        onCloseAllTabs: handleCloseAllTabs,
+        onInsertMention: (text) => chatInputRef.current?.insertText(text),
+        onQuoteInChat: handleQuoteInChat,
+        onHideProject: handleHideProject,
+        activeCwd,
+      }}
+    >
     <style>{`
       .session-info-popover {
         position: relative;
@@ -1594,6 +1728,7 @@ export function AppShell() {
         onRestored={handleArchiveRestored}
       />
     )}
+    </ContextMenuProvider>
     </ToastProvider>
     </>
   );

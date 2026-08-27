@@ -76,7 +76,7 @@ export function MarkdownBody({ children, className, isStreaming, cwd, onOpenFile
       });
 
     return {
-    code: markdownCodeRenderer({ isStreaming, inlineClassName: "markdown-inline-code" }),
+    code: markdownCodeRenderer({ isStreaming, inlineClassName: "markdown-inline-code", cwd, onOpenFile }),
     pre({ children }) {
       return <>{children}</>;
     },

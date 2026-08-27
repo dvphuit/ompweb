@@ -260,7 +260,7 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, headerAction, isS
   }, [HighlightedCode, isStreaming]);
 
   return (
-    <div className="markdown-code-block">
+    <div className="markdown-code-block" data-context-menu="code-block" data-code-content={code} data-code-language={lang}>
       <div className="markdown-code-header">
         <span className="markdown-code-lang">{lang || "text"}</span>
         <div className="markdown-code-actions">
