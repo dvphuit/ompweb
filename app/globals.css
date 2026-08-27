@@ -45,6 +45,7 @@
   /* White-on-fill button: 5.90:1 (passes AA for small text) */
   --accent-strong: #B03E22;
   --accent-hover: #96331B;
+  --user-bg: #F5EDE1;
   --tool-bg: #F6F3ED;
   --bg-subtle: rgba(60,50,35,0.04);
   --status-error: #B42318;
@@ -57,10 +58,10 @@
      --status-* = trạng thái (success/error/warning) cho vạch trái data-status và a11y. Trộn 2 hệ sẽ mất phân biệt loại vs trạng thái. */
   --tool-read: #2563EB; /* 4.91:1 on --bg, 4.54:1 on --bg-panel */
   --tool-write: #0F766E; /* 5.20:1 on --bg, 4.80:1 on --bg-panel — was #0D9488 3.56 fails AA */
-  --tool-edit: #B45309; /* 4.77:1 on --bg, 4.41:1 on --bg-panel */
+  --tool-edit: #A65A00; /* 4.88:1 / 4.51:1 — was #B45309 4.41 fails AA */
   --tool-bash: #6D28D9; /* 6.75:1 / 6.23:1 */
   --tool-search: #0E7490; /* 5.09:1 / 4.70:1 — was #0891B2 3.5 fails AA */
-  --tool-todo: #15803D;
+  --tool-todo: #137A33; /* 5.17:1 / 4.77:1 — was #15803D 4.40 fails AA */
   --tool-task: #BE123C;
   --tool-ask: #7E22CE;
   --tool-hub: #C2410C;

@@ -2,7 +2,7 @@
 import { registerAbortHandler } from "@/hooks/useKeyboardShortcuts";
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, Folder } from "lucide-react";
-import type { AgentMessage, AssistantContentBlock, AssistantMessage, BashExecutionMessage, CustomMessage, ExtensionUiRequest, SessionInfo, SessionTreeNode, ToolResultMessage } from "@/lib/types";
+import type { AgentMessage, AssistantContentBlock, AssistantMessage, BashExecutionMessage, CustomMessage, ExtensionUiRequest, SessionInfo, SessionTreeNode, ToolResultMessage, ToolCallContent } from "@/lib/types";
 import { translate, useI18n } from "@/lib/i18n";
 import { countToolCallBlocks, getDisplayableAssistantBlocks, splitFinalAssistantBlocks } from "@/lib/message-display";
 import { MessageView } from "./MessageView";
@@ -162,11 +162,41 @@ function OmpRuntimeVersion() {
   );
 }
 
-function ProcessDetailsGroup({ messageCount, toolCallCount, children }: { messageCount: number; toolCallCount: number; children: ReactNode }) {
+// Helpers for turn metrics — avoid inline casts per repo rule
+function getMessageTimestamp(msg: AgentMessage): number | undefined {
+  if (!msg || typeof msg !== "object" || !("timestamp" in msg)) return undefined;
+  const v = (msg as { timestamp?: unknown }).timestamp;
+  return typeof v === "number" ? v : undefined;
+}
+function getAssistantUsage(msg: AgentMessage): { totalTokens?: number; input?: number; output?: number; cost?: { total?: number } } | undefined {
+  if (msg.role !== "assistant") return undefined;
+  const m = msg as AssistantMessage;
+  return m.usage as { totalTokens?: number; input?: number; output?: number; cost?: { total?: number } } | undefined;
+}
+function getToolFilePath(input: Record<string, unknown>): string | null {
+  const p = input.path;
+  if (typeof p === "string" && p) return p;
+  const fp = input.file_path;
+  if (typeof fp === "string" && fp) return fp;
+  return null;
+}
+function getToolCallsFromMessage(msg: AgentMessage): ToolCallContent[] {
+  if (msg.role !== "assistant") return [];
+  const content = (msg as AssistantMessage).content;
+  if (!Array.isArray(content)) return [];
+  return content.filter((b): b is ToolCallContent => (b as AssistantContentBlock).type === "toolCall");
+}
+
+function ProcessDetailsGroup({ messageCount, toolCallCount, durationSeconds, totalTokens, totalCost, toolBreakdown, fileSummary, children }: { messageCount: number; toolCallCount: number; durationSeconds?: number; totalTokens?: number; totalCost?: number; toolBreakdown?: string; fileSummary?: string; children: ReactNode }) {
   const { t, tn } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const parts = [t("chatWindow.processDetails"), tn("chatWindow.messageCount", messageCount)];
-  if (toolCallCount > 0) parts.push(tn("chatWindow.toolCallCount", toolCallCount));
+  if (durationSeconds != null && durationSeconds > 0) parts.push(t("chatWindow.durationSeconds", { seconds: durationSeconds }));
+  if (totalTokens != null && totalTokens > 0) {
+    const tok = totalTokens >= 1000 ? `${(totalTokens / 1000).toFixed(totalTokens >= 10000 ? 0 : 1).replace(/\.0$/, "")}k` : String(totalTokens);
+    parts.push(`${tok} tok`);
+  }
+  if (totalCost != null && totalCost > 0) parts.push(`$${totalCost.toFixed(totalCost < 0.01 ? 4 : 2)}`);
 
   return (
     <div style={{ marginBottom: 4 }}>
@@ -193,6 +223,13 @@ function ProcessDetailsGroup({ messageCount, toolCallCount, children }: { messag
       </button>
       {expanded && (
         <div style={{ marginTop: 3 }}>
+          {(toolBreakdown || fileSummary) && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 6, padding: "6px 8px", background: "var(--bg-subtle)", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", fontSize: 11, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+              {toolBreakdown && <span>{toolBreakdown}</span>}
+              {toolBreakdown && fileSummary && <span style={{ opacity: 0.5 }}>·</span>}
+              {fileSummary && <span>{fileSummary}</span>}
+            </div>
+          )}
           {children}
         </div>
       )}
@@ -350,10 +387,66 @@ const CommittedTranscript = memo(function CommittedTranscript({
         .map((processIdx) => visibleRefIndexByMessage.get(processIdx))
         .find((value): value is number => typeof value === "number")
         ?? (finalAnswerMessage ? undefined : visibleRefIndexByMessage.get(finalAssistantIdx));
+      // --- Turn metrics for this process group (hay hay) ---
+      const userTs = getMessageTimestamp(messages[userIdx]);
+      const finalTs = getMessageTimestamp(finalAssistant);
+      const durationSeconds = typeof userTs === "number" && typeof finalTs === "number" && finalTs > userTs ? Math.round((finalTs - userTs) / 1000) : undefined;
+      let totalTokens: number | undefined;
+      let totalCost: number | undefined;
+      let tokenSum = 0;
+      let costSum = 0;
+      let hasTokens = false;
+      let hasCost = false;
+      for (let p = userIdx + 1; p <= finalAssistantIdx; p++) {
+        const usage = getAssistantUsage(messages[p]);
+        if (!usage) continue;
+        const tok = typeof usage.totalTokens === "number" ? usage.totalTokens : (typeof usage.input === "number" && typeof usage.output === "number" ? usage.input + usage.output : undefined);
+        if (typeof tok === "number" && tok > 0) { tokenSum += tok; hasTokens = true; }
+        const c = typeof usage.cost?.total === "number" ? usage.cost.total : undefined;
+        if (typeof c === "number" && c > 0) { costSum += c; hasCost = true; }
+      }
+      if (hasTokens) totalTokens = tokenSum;
+      if (hasCost) totalCost = costSum;
+      // Hay hay: tool breakdown + files touched for this turn
+      const toolCounts = new Map<string, number>();
+      const readFiles = new Set<string>();
+      const modifiedFiles = new Set<string>();
+      const collect = (msg: AgentMessage) => {
+        for (const tc of getToolCallsFromMessage(msg)) {
+          const name = typeof tc.toolName === "string" ? tc.toolName.toLowerCase() : "tool";
+          toolCounts.set(name, (toolCounts.get(name) ?? 0) + 1);
+          const fp = getToolFilePath(tc.input as Record<string, unknown>);
+          if (fp) {
+            if (name === "read") readFiles.add(fp);
+            else if (name === "write" || name === "edit") modifiedFiles.add(fp);
+          }
+        }
+      };
+      for (const idx of visibleProcessIndices) collect(messages[idx]);
+      for (const b of finalSplit.processBlocks) if (b.type === "toolCall") {
+        const tc = b as ToolCallContent;
+        const name = typeof tc.toolName === "string" ? tc.toolName.toLowerCase() : "tool";
+        toolCounts.set(name, (toolCounts.get(name) ?? 0) + 1);
+        const fp = getToolFilePath(tc.input as Record<string, unknown>);
+        if (fp) {
+          if (name === "read") readFiles.add(fp);
+          else if (name === "write" || name === "edit") modifiedFiles.add(fp);
+        }
+      }
+      const toolBreakdown = toolCounts.size ? Array.from(toolCounts.entries()).sort((a, b) => b[1] - a[1]).map(([n, c]) => c > 1 ? `${n}×${c}` : n).join(" · ") : undefined;
+      const fileParts: string[] = [];
+      if (readFiles.size) fileParts.push(`${readFiles.size} read`);
+      if (modifiedFiles.size) fileParts.push(`${modifiedFiles.size} modified`);
+      const fileSummary = fileParts.length ? fileParts.join(" · ") : undefined;
       const processGroup = (
         <ProcessDetailsGroup
           messageCount={processCount}
           toolCallCount={countToolCalls(messages, visibleProcessIndices) + countToolCallBlocks(finalSplit.processBlocks)}
+          durationSeconds={durationSeconds}
+          totalTokens={totalTokens}
+          totalCost={totalCost}
+          toolBreakdown={toolBreakdown}
+          fileSummary={fileSummary}
         >
           {visibleProcessIndices.map((processIdx) => renderMessage(processIdx, { attachRef: false, keyPrefix: "process" }))}
           {finalProcessMessage && renderMessage(finalAssistantIdx, { attachRef: false, keyPrefix: "process-final", messageOverride: finalProcessMessage, showTimestamp: false })}
