@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Web UI for the oh-my-pi (omp) coding agent",
     start_url: "/",
     display: "standalone",
-    background_color: "#FAF9F6",
-    theme_color: "#FAF9F6",
+    background_color: "#09090B",
+    theme_color: "#09090B",
     icons: [{ src: "/icon.png", sizes: "512x512", type: "image/png" }],
   };
 }

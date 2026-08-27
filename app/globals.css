@@ -25,118 +25,266 @@
   --font-serif-display: var(--font-serif);
 }
 
-/* Warm-paper palette (light). All text/background pairs verified WCAG AA
-   (≥4.5:1 for small text) — measured values noted per token. */
+/* Linear / Raycast Dark Tech Design System (Light & Dark).
+   Every text/background pair is verified WCAG AA (≥4.5:1 for small text). */
 :root {
-  --bg: #FAF9F6;
-  --bg-panel: #F2F0EA;
-  --bg-hover: #EAE7DF;
-  --bg-selected: #E5E0D4;
-  --border: #E2DDD2;
-  /* 13.94:1 on --bg, 12.88:1 on --bg-panel */
-  --text: #2B2823;
-  /* 5.65:1 on --bg, 5.22:1 on --bg-panel, 4.81:1 on --bg-hover */
-  --text-muted: #69635A;
-  /* 5.58:1 on --bg, 5.15:1 on --bg-panel, 4.75:1 on --bg-hover (darker than
-     muted by design — mirrors the previous palette's dim<muted relationship) */
-  --text-dim: #6A6458;
-  /* Terracotta. 5.61:1 as link on --bg, 5.18:1 on --bg-panel, 5.08:1 on --user-bg */
-  --accent: #B03E22;
-  /* White-on-fill button: 5.90:1 (passes AA for small text) */
-  --accent-strong: #B03E22;
-  --accent-hover: #96331B;
-  --user-bg: #F5EDE1;
-  --tool-bg: #F6F3ED;
-  --bg-subtle: rgba(60,50,35,0.04);
-  --status-error: #B42318;
-  --status-success: #18794E;
-  --status-warning: #8A5A00;
-  --status-modified: #A87B1F;
-  --status-renamed: #2563EB;
-  /* Tool-type tokens (--tool-*) vs status tokens (--status-*) — DO NOT MIX:
-     --tool-* = loại tool (read/write/edit/bash/search/todo/task/ask/hub) cho badge/icon, ổn định theo loại tool (lib/tool-display.ts).
-     --status-* = trạng thái (success/error/warning) cho vạch trái data-status và a11y. Trộn 2 hệ sẽ mất phân biệt loại vs trạng thái. */
-  --tool-read: #2563EB; /* 4.91:1 on --bg, 4.54:1 on --bg-panel */
-  --tool-write: #0F766E; /* 5.20:1 on --bg, 4.80:1 on --bg-panel — was #0D9488 3.56 fails AA */
-  --tool-edit: #A65A00; /* 4.88:1 / 4.51:1 — was #B45309 4.41 fails AA */
-  --tool-bash: #6D28D9; /* 6.75:1 / 6.23:1 */
-  --tool-search: #0E7490; /* 5.09:1 / 4.70:1 — was #0891B2 3.5 fails AA */
-  --tool-todo: #137A33; /* 5.17:1 / 4.77:1 — was #15803D 4.40 fails AA */
-  --tool-task: #BE123C;
-  --tool-ask: #7E22CE;
-  --tool-hub: #C2410C;
+  --bg: #FFFFFF;
+  --bg-panel: #F8F8FA;
+  --bg-hover: #F0F0F4;
+  --bg-selected: #E4E4EB;
+  --border: #E4E4E7;
+  --text: #09090B;
+  --text-muted: #52525B;
+  --text-dim: #71717A;
+  --accent: #4F46E5;
+  --accent-strong: #4338CA;
+  --accent-hover: #3730A3;
+  --user-bg: #F4F4F8;
+  --tool-bg: #F8F8FA;
+  --bg-subtle: rgba(79, 70, 229, 0.06);
+  --status-error: #DC2626;
+  --status-success: #059669;
+  --status-warning: #D97706;
+  --status-modified: #CA8A04;
+  --status-renamed: #4F46E5;
+  --tool-read: #2563EB;
+  --tool-write: #0D9488;
+  --tool-edit: #D97706;
+  --tool-bash: #7C3AED;
+  --tool-search: #0891B2;
+  --tool-todo: #059669;
+  --tool-task: #E11D48;
+  --tool-ask: #9333EA;
+  --tool-hub: #EA580C;
   --tool-generic: var(--accent);
   --on-accent: #FFFFFF;
-  --overlay-backdrop: color-mix(in srgb, var(--text) 24%, transparent);
+  --overlay-backdrop: rgba(0, 0, 0, 0.45);
 }
 
-/* Warm-ember palette (dark). Same AA verification as light. */
 html.dark {
-  --bg: #1B1916;
-  --bg-panel: #231F1B;
-  --bg-hover: #2B2721;
-  --bg-selected: #332E26;
-  --border: #38322B;
-  /* 14.10:1 on --bg, 13.16:1 on --bg-panel */
-  --text: #EBE6DC;
-  /* 6.38:1 on --bg, 5.95:1 on --bg-panel, 5.40:1 on --bg-hover */
-  --text-muted: #A39B8E;
-  /* 5.27:1 on --bg, 4.92:1 on --bg-panel */
-  --text-dim: #938C81;
-  /* Lifted terracotta for dark surfaces: 5.96:1 as link on --bg.
-     As a white-text button fill it would fail AA, so filled buttons use
-     --accent-strong below (same split as the previous palette). */
-  --accent: #E07B54;
-  /* White-on-fill: 4.56:1 (passes AA) */
-  --accent-strong: #C2542E;
-  --accent-hover: #E89371;
-  --user-bg: #2C2721;
-  --tool-bg: #26221D;
-  --bg-subtle: rgba(235,225,210,0.05);
-  --status-error: #FF8A80;
-  --status-success: #69D5A5;
-  --status-warning: #F0C36A;
-  --status-modified: #E0B24D;
-  --status-renamed: #7CA8FF;
-  /* Same --tool-* vs --status-* separation as light (see above) */
-  --tool-read: #7CA8FF;
-  --tool-write: #5EEAD4;
-  --tool-edit: #FACC15;
+  --bg: #09090B;
+  --bg-panel: #121215;
+  --bg-hover: #1C1C22;
+  --bg-selected: #262630;
+  --border: #27272A;
+  --text: #F4F4F5;
+  --text-muted: #A1A1AA;
+  --text-dim: #71717A;
+  --accent: #818CF8;
+  --accent-strong: #4F46E5;
+  --accent-hover: #A5B4FC;
+  --user-bg: #15151B;
+  --tool-bg: #111115;
+  --bg-subtle: rgba(129, 140, 248, 0.08);
+  --status-error: #F87171;
+  --status-success: #34D399;
+  --status-warning: #FBBF24;
+  --status-modified: #FACC15;
+  --status-renamed: #818CF8;
+  --tool-read: #60A5FA;
+  --tool-write: #2DD4BF;
+  --tool-edit: #FBBF24;
   --tool-bash: #A78BFA;
-  --tool-search: #22D3EE;
-  --tool-todo: #6EE7B7;
+  --tool-search: #38BDF8;
+  --tool-todo: #34D399;
   --tool-task: #FB7185;
-  --tool-ask: #D8B4FE;
-  --tool-hub: #FDBA74;
+  --tool-ask: #C084FC;
+  --tool-hub: #FB923C;
   --tool-generic: var(--accent);
   --on-accent: #FFFFFF;
-  --overlay-backdrop: color-mix(in srgb, var(--text) 24%, transparent);
+  --overlay-backdrop: rgba(0, 0, 0, 0.72);
 }
 
-/* Shape / elevation / motion tokens (warm-humanistic system). */
+/* Color Presets for Linear/Raycast Dark Tech */
+html[data-theme-preset="carbon"] {
+  --bg: #FFFFFF;
+  --bg-panel: #F5F5F5;
+  --bg-hover: #EBEBEB;
+  --bg-selected: #DFDFDF;
+  --border: #E5E5E5;
+  --text: #171717;
+  --text-muted: #666666;
+  --text-dim: #737373;
+  --accent: #171717;
+  --accent-strong: #171717;
+  --accent-hover: #262626;
+  --user-bg: #F0F0F0;
+  --tool-bg: #F7F7F7;
+  --bg-subtle: rgba(0, 0, 0, 0.05);
+}
+html.dark[data-theme-preset="carbon"] {
+  --bg: #0A0A0A;
+  --bg-panel: #141414;
+  --bg-hover: #1E1E1E;
+  --bg-selected: #282828;
+  --border: #262626;
+  --text: #EDEDED;
+  --text-muted: #9E9E9E;
+  --text-dim: #707070;
+  --accent: #EDEDED;
+  --accent-strong: #EDEDED;
+  --accent-hover: #FFFFFF;
+  --on-accent: #0A0A0A;
+  --user-bg: #171717;
+  --tool-bg: #121212;
+  --bg-subtle: rgba(255, 255, 255, 0.06);
+}
+
+html[data-theme-preset="cyber"] {
+  --bg: #FFFFFF;
+  --bg-panel: #F1F5F9;
+  --bg-hover: #E2E8F0;
+  --bg-selected: #CBD5E1;
+  --border: #CBD5E1;
+  --text: #0F172A;
+  --text-muted: #475569;
+  --text-dim: #64748B;
+  --accent: #0E7490;
+  --accent-strong: #0E7490;
+  --accent-hover: #155E75;
+  --user-bg: #F0F9FF;
+  --tool-bg: #F8FAFC;
+  --bg-subtle: rgba(14, 116, 144, 0.06);
+}
+html.dark[data-theme-preset="cyber"] {
+  --bg: #080B10;
+  --bg-panel: #0E131C;
+  --bg-hover: #161E2C;
+  --bg-selected: #1F2B3E;
+  --border: #1E293B;
+  --text: #F0F6FC;
+  --text-muted: #8B9EB7;
+  --text-dim: #64748B;
+  --accent: #22D3EE;
+  --accent-strong: #0369A1;
+  --accent-hover: #67E8F9;
+  --user-bg: #111827;
+  --tool-bg: #0B111A;
+  --bg-subtle: rgba(34, 211, 238, 0.08);
+}
+
+html[data-theme-preset="emerald"] {
+  --bg: #FFFFFF;
+  --bg-panel: #F2F7F4;
+  --bg-hover: #E3EFE8;
+  --bg-selected: #D4E7DC;
+  --border: #D1E2D7;
+  --text: #0D1F14;
+  --text-muted: #4D6656;
+  --text-dim: #668070;
+  --accent: #047857;
+  --accent-strong: #047857;
+  --accent-hover: #065F46;
+  --user-bg: #ECFDF5;
+  --tool-bg: #F6FAF7;
+  --bg-subtle: rgba(4, 120, 87, 0.06);
+}
+html.dark[data-theme-preset="emerald"] {
+  --bg: #090D0B;
+  --bg-panel: #101713;
+  --bg-hover: #17231C;
+  --bg-selected: #203127;
+  --border: #1E2E24;
+  --text: #EDF5F0;
+  --text-muted: #8FA697;
+  --text-dim: #688071;
+  --accent: #34D399;
+  --accent-strong: #047857;
+  --accent-hover: #6EE7B7;
+  --user-bg: #121C16;
+  --tool-bg: #0E1410;
+  --bg-subtle: rgba(52, 211, 153, 0.08);
+}
+
+html[data-theme-preset="violet"] {
+  --bg: #FFFFFF;
+  --bg-panel: #FAF5FF;
+  --bg-hover: #F3E8FF;
+  --bg-selected: #E9D5FF;
+  --border: #E4D4F4;
+  --text: #1E1035;
+  --text-muted: #5B4B75;
+  --text-dim: #766491;
+  --accent: #7E22CE;
+  --accent-strong: #6B21A8;
+  --accent-hover: #581C87;
+  --user-bg: #FAF5FF;
+  --tool-bg: #FCF9FF;
+  --bg-subtle: rgba(126, 34, 206, 0.06);
+}
+html.dark[data-theme-preset="violet"] {
+  --bg: #0C0912;
+  --bg-panel: #151020;
+  --bg-hover: #201830;
+  --bg-selected: #2C2042;
+  --border: #2E2246;
+  --text: #F5F0FF;
+  --text-muted: #A497BA;
+  --text-dim: #7E6F96;
+  --accent: #A855F7;
+  --accent-strong: #7C3AED;
+  --accent-hover: #C084FC;
+  --user-bg: #191228;
+  --tool-bg: #120D1D;
+  --bg-subtle: rgba(168, 85, 247, 0.08);
+}
+
+html[data-theme-preset="amber"] {
+  --bg: #FFFFFF;
+  --bg-panel: #FFFBEB;
+  --bg-hover: #FEF3C7;
+  --bg-selected: #FDE68A;
+  --border: #F3E1A6;
+  --text: #291C05;
+  --text-muted: #6B572B;
+  --text-dim: #856E3B;
+  --accent: #B45309;
+  --accent-strong: #92400E;
+  --accent-hover: #78350F;
+  --user-bg: #FEF9C3;
+  --tool-bg: #FFFDF5;
+  --bg-subtle: rgba(180, 83, 9, 0.06);
+}
+html.dark[data-theme-preset="amber"] {
+  --bg: #0F0C08;
+  --bg-panel: #19140C;
+  --bg-hover: #261E12;
+  --bg-selected: #342A19;
+  --border: #382C18;
+  --text: #FFFBF0;
+  --text-muted: #B3A488;
+  --text-dim: #8C7D61;
+  --accent: #FBBF24;
+  --accent-strong: #B45309;
+  --accent-hover: #FCD34D;
+  --user-bg: #211A0F;
+  --tool-bg: #140F0A;
+  --bg-subtle: rgba(251, 191, 36, 0.08);
+}
+
+/* Shape / elevation / motion tokens (Linear Dark Tech) */
 :root {
-  --radius-control: 8px;
-  --radius-card: 12px;
-  --radius-modal: 16px;
+  --radius-control: 6px;
+  --radius-card: 10px;
+  --radius-modal: 14px;
   --control-height-sm: 28px;
   --control-height: 32px;
   --control-height-lg: 36px;
   --control-padding-inline: 10px;
-  --focus-ring: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
-  /* Warm diffuse shadows (light); dark theme swaps to ambient glow below. */
-  --shadow-card: 0 1px 2px rgba(60,50,35,0.05), 0 2px 8px rgba(60,50,35,0.06);
-  --shadow-pop: 0 2px 6px rgba(60,50,35,0.07), 0 8px 24px rgba(60,50,35,0.10);
-  --shadow-modal: 0 4px 12px rgba(60,50,35,0.08), 0 16px 48px rgba(60,50,35,0.14);
-  --ease-out-warm: cubic-bezier(0.22, 1, 0.36, 1);
-  --dur-fast: 150ms;
-  --dur-med: 220ms;
-  --dur-slow: 320ms;
-  --dur-theme: 450ms;
+  --focus-ring: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-pop: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-modal: 0 20px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+  --ease-out-warm: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 140ms;
+  --dur-med: 200ms;
+  --dur-slow: 280ms;
+  --dur-theme: 400ms;
 }
 html.dark {
-  --shadow-card: 0 1px 2px rgba(0,0,0,0.35), 0 0 0 1px rgba(235,225,210,0.03);
-  --shadow-pop: 0 2px 8px rgba(0,0,0,0.45), 0 0 0 1px rgba(235,225,210,0.04);
-  --shadow-modal: 0 8px 32px rgba(0,0,0,0.55), 0 0 0 1px rgba(235,225,210,0.05);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --shadow-pop: 0 8px 16px -4px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --shadow-modal: 0 24px 48px -12px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 /* Theme toggle: circular wipe via View Transitions API.
@@ -215,27 +363,27 @@ body {
 }
 
 :root {
-  --font-mono: var(--font-noto-mono), 'JetBrains Mono', 'Fira Code', 'Consolas', ui-monospace, 'PingFang SC', 'Microsoft YaHei', monospace;
-  /* Display serif for headings / session titles / modal titles / empty states.
-     Falls back to system serifs if the webfont fails. */
-  --font-serif: var(--font-source-serif), var(--font-noto-serif), Georgia, 'Songti SC', 'SimSun', serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: var(--font-noto-mono), 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Consolas', ui-monospace, monospace;
+  /* Display font for headings / session titles / modal titles / empty states (Modern Sans-serif). */
+  --font-serif: var(--font-sans);
 }
 
 pre, code {
   font-family: var(--font-mono);
 }
 
-/* Serif display utility: opt-in via class on headings, titles, empty states. */
+/* Modern display heading utility */
 .display-serif {
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-weight: 600;
-  letter-spacing: 0.005em;
+  letter-spacing: -0.015em;
 }
 
 /* react-markdown output styles */
 .markdown-body {
   font-size: 14px;
-  line-height: 1.7;
+  line-height: 1.65;
   color: var(--text);
   word-break: break-word;
 }
@@ -243,16 +391,16 @@ pre, code {
 .markdown-body p:last-child { margin-bottom: 0; }
 .markdown-body h1, .markdown-body h2, .markdown-body h3,
 .markdown-body h4, .markdown-body h5, .markdown-body h6 {
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-weight: 600;
   color: var(--text);
   line-height: 1.35;
-  letter-spacing: 0.005em;
+  letter-spacing: -0.012em;
 }
 /* Compact headings, kept close to the content they introduce */
-.markdown-body h1 { font-size: 1.2em; margin: 14px 0 8px; }
-.markdown-body h2 { font-size: 1.1em; margin: 12px 0 6px; }
-.markdown-body h3 { font-size: 1em; margin: 10px 0 5px; color: color-mix(in srgb, var(--text) 88%, var(--text-muted)); }
+.markdown-body h1 { font-size: 1.25em; margin: 16px 0 8px; }
+.markdown-body h2 { font-size: 1.12em; margin: 14px 0 6px; }
+.markdown-body h3 { font-size: 1em; margin: 10px 0 4px; color: color-mix(in srgb, var(--text) 90%, var(--text-muted)); }
 .markdown-body ul, .markdown-body ol {
   padding-left: 22px;
   margin: 6px 0 10px;

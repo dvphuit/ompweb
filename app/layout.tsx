@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Noto_Sans_Mono, Noto_Serif_SC, Source_Serif_4 } from "next/font/google";
+import { Inter, Noto_Sans_Mono } from "next/font/google";
 import "./globals.css";
 
 const notoSansMono = Noto_Sans_Mono({
@@ -8,24 +8,11 @@ const notoSansMono = Noto_Sans_Mono({
   display: "swap",
 });
 
-// Display serif pair for the warm-humanistic heading voice: Source Serif 4
-// covers latin, Noto Serif SC covers CJK. Both expose CSS variables consumed
-// by --font-serif in globals.css.
-const sourceSerif = Source_Serif_4({
-  subsets: ["latin"],
-  variable: "--font-source-serif",
+const inter = Inter({
+  subsets: ["latin", "cyrillic", "vietnamese"],
+  variable: "--font-sans",
   display: "swap",
 });
-
-const notoSerifSC = Noto_Serif_SC({
-  // CJK glyphs are served via unicode-range slices regardless of subset;
-  // "latin" satisfies next/font's preloading requirement.
-  subsets: ["latin"],
-  weight: ["600", "700"],
-  variable: "--font-noto-serif",
-  display: "swap",
-});
-
 export const metadata: Metadata = {
   title: "omp web",
   description: "Web UI for the oh-my-pi (omp) coding agent",
@@ -48,8 +35,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#FAF9F6" },
-    { media: "(prefers-color-scheme: dark)", color: "#1B1916" },
+    { media: "(prefers-color-scheme: light)", color: "#FFFFFF" },
+    { media: "(prefers-color-scheme: dark)", color: "#09090B" },
   ],
 };
 
@@ -59,14 +46,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" translate="no" className={`${notoSansMono.variable} ${sourceSerif.variable} ${notoSerifSC.variable} notranslate`} suppressHydrationWarning>
+    <html lang="en" translate="no" className={`${notoSansMono.variable} ${inter.variable} notranslate`} suppressHydrationWarning>
       <head>
         <meta name="google" content="notranslate" />
-        {/* Pre-hydration: apply stored theme before first paint to avoid a flash
-            of the wrong theme. Matches html.dark selector in globals.css. */}
+        {/* Pre-hydration: apply stored appearance and color preset before first
+            paint. This mirrors the selectors in globals.css. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem("omp-theme"),d=matchMedia("(prefers-color-scheme: dark)").matches;if(t==="dark"||(t!=="light"&&t!=="dark"&&d))document.documentElement.classList.add("dark")}catch(e){}})();`,
+            __html: `(function(){try{var e=document.documentElement,t=localStorage.getItem("omp-theme"),p=localStorage.getItem("omp-theme-preset"),d=matchMedia("(prefers-color-scheme: dark)").matches,a=["obsidian","carbon","cyber","emerald","violet","amber"],m={"ember":"obsidian","graphite":"carbon","ocean":"cyber","forest":"emerald","rose":"violet","amber":"amber"};if(t==="dark"||(t!=="light"&&t!=="dark"&&d))e.classList.add("dark");if(p&&m[p])p=m[p];e.dataset.themePreset=a.indexOf(p)>-1?p:"obsidian"}catch(e){}})();`,
           }}
         />
         <script

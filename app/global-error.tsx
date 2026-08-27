@@ -30,14 +30,14 @@ export default function GlobalError({
             gap: "1rem",
             fontFamily: "system-ui, -apple-system, sans-serif",
             textAlign: "center",
-            color: "#2B2823",
-            background: "#FAF9F6",
+            color: "#F4F4F5",
+            background: "#09090B",
           }}
         >
-          <h2 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 600, fontFamily: "Georgia, 'Songti SC', serif" }}>
+          <h2 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 600 }}>
             Something went wrong
           </h2>
-          <p style={{ margin: 0, color: "#69635A", maxWidth: "28rem", fontSize: "0.875rem", lineHeight: 1.6 }}>
+          <p style={{ margin: 0, color: "#A1A1AA", maxWidth: "28rem", fontSize: "0.875rem", lineHeight: 1.6 }}>
             An unexpected error occurred. Try reloading the page.
           </p>
           <button
@@ -48,8 +48,8 @@ export default function GlobalError({
               fontSize: "0.875rem",
               fontWeight: 500,
               border: "none",
-              borderRadius: "8px",
-              background: "#B03E22",
+              borderRadius: "6px",
+              background: "#4F46E5",
               color: "#fff",
               cursor: "pointer",
             }}

@@ -3,8 +3,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useTransition, cloneElement, isValidElement, type ReactElement, type ReactNode } from "react";
 import { getSubmitDuringRunBehavior, setSubmitDuringRunBehavior, type SubmitDuringRunBehavior } from "@/lib/composer-prefs";
 import dynamic from "next/dynamic";
-import { Copy, ExternalLink, RefreshCw, RotateCcw, Search, AlertCircle } from "lucide-react";
+import { Copy, ExternalLink, RefreshCw, RotateCcw, Search, AlertCircle, Check } from "lucide-react";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { THEME_PRESETS, useTheme, type ThemePreference, type ThemePreset } from "@/hooks/useTheme";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/primitives";
 import { SettingsTabs, type SettingsTab, SETTINGS_CATEGORIES, getNormalizedActive } from "./SettingsTabs";
 import { useI18n } from "@/lib/i18n";
@@ -113,6 +114,8 @@ type SettingIndexEntry = {
 
 const SETTING_INDEX: SettingIndexEntry[] = [
   // Interface & Behavior
+  { id: "appearance", tab: "general", sectionKey: "settingsConfig.interfaceBehavior", labelKey: "settingsConfig.appearance", descKey: "settingsConfig.appearanceDesc", fallbackSection: "Interface & Behavior", fallbackLabel: "Appearance", fallbackDesc: "Choose system, light, or dark appearance.", scope: "UI" },
+  { id: "color-theme", tab: "general", sectionKey: "settingsConfig.interfaceBehavior", labelKey: "settingsConfig.colorTheme", descKey: "settingsConfig.colorThemeDesc", fallbackSection: "Interface & Behavior", fallbackLabel: "Color theme", fallbackDesc: "Choose a color preset independently from appearance.", scope: "UI" },
   { id: "keep-tool-calls-collapsed", tab: "general", sectionKey: "settingsConfig.interfaceBehavior", labelKey: "settingsConfig.keepToolCallsCollapsed", descKey: "settingsConfig.keepToolCallsCollapsedDesc", fallbackSection: "Interface & Behavior", fallbackLabel: "Keep tool calls collapsed", fallbackDesc: "Show only compact headers while tools execute.", scope: "UI" },
   { id: "completion-sound", tab: "general", sectionKey: "settingsConfig.interfaceBehavior", labelKey: "settingsConfig.completionSound", descKey: "settingsConfig.completionSoundDesc", fallbackSection: "Interface & Behavior", fallbackLabel: "Completion sound", fallbackDesc: "Play a tone when the agent completes a run.", scope: "UI" },
   { id: "message-during-active-run", tab: "general", sectionKey: "settingsConfig.interfaceBehavior", labelKey: "settingsConfig.messageDuringActiveRun", descKey: "settingsConfig.messageDuringActiveRunDesc", fallbackSection: "Interface & Behavior", fallbackLabel: "Message during active run", fallbackDesc: "What composer does on submit while agent runs. Steer interrupts; Queue follow-up delivers after finish.", scope: "UI" },
@@ -327,6 +330,153 @@ function NativeSetting({ label, description, scope, searchId, children }: { labe
     </div>
   );
 }
+function ThemePresetSetting({
+  preset,
+  onSelectPreset,
+}: {
+  preset: ThemePreset;
+  onSelectPreset: (preset: ThemePreset, origin?: { x: number; y: number }) => void;
+}) {
+  const { t } = useI18n();
+  const { theme } = useTheme();
+  const isMobile = useIsMobile();
+  const ref = useRef<HTMLDivElement>(null);
+  const highlightId = useContext(SettingsHighlightContext);
+  const highlighted = highlightId === "color-theme";
+
+  useEffect(() => {
+    if (highlighted && ref.current) {
+      ref.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [highlighted]);
+
+  const activePreset = THEME_PRESETS.find((item) => item.id === preset) ?? THEME_PRESETS[0];
+
+  return (
+    <div
+      ref={ref}
+      data-search-id="color-theme"
+      role="group"
+      aria-labelledby="setting-label-color-theme"
+      aria-describedby="setting-desc-color-theme"
+      style={{
+        minWidth: 0,
+        padding: "12px 14px",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius-card)",
+        background: "var(--bg-panel)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+        transition: "box-shadow var(--dur-fast), border-color var(--dur-fast)",
+        ...(highlighted ? { borderColor: "var(--accent)", boxShadow: "0 0 0 2px var(--accent)" } : {}),
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span id="setting-label-color-theme" style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text)" }}>
+              {t("settingsConfig.colorTheme")}
+            </span>
+            <span style={chipStyle}>{t("settingsConfig.chipUI")}</span>
+          </div>
+          <span id="setting-desc-color-theme" style={{ color: "var(--text-muted)", fontSize: 11, lineHeight: 1.45 }}>
+            {t("settingsConfig.colorThemeDesc")}
+          </span>
+        </div>
+        <span
+          style={{
+            flexShrink: 0,
+            padding: "2px 8px",
+            borderRadius: 999,
+            background: "var(--bg-selected)",
+            color: "var(--text-muted)",
+            fontSize: 11,
+            fontFamily: "var(--font-mono)",
+            fontWeight: 500,
+          }}
+        >
+          {activePreset.name}
+        </span>
+      </div>
+
+      <div
+        role="radiogroup"
+        aria-labelledby="setting-label-color-theme"
+        style={{
+          display: "grid",
+          gridTemplateColumns: isMobile ? "repeat(2, minmax(0, 1fr))" : "repeat(3, minmax(0, 1fr))",
+          gap: 8,
+          marginTop: 2,
+        }}
+      >
+        {THEME_PRESETS.map((item) => {
+          const colors = item.preview[theme];
+          const selected = item.id === preset;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              aria-label={item.name}
+              className="ui-focus-ring"
+              onClick={(event) => {
+                const rect = event.currentTarget.getBoundingClientRect();
+                onSelectPreset(item.id, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+              }}
+              style={{
+                position: "relative",
+                display: "grid",
+                gridTemplateColumns: "36px minmax(0, 1fr) 16px",
+                alignItems: "center",
+                gap: 8,
+                minWidth: 0,
+                height: 44,
+                padding: "4px 8px 4px 6px",
+                border: "1px solid",
+                borderColor: selected ? "var(--accent)" : "var(--border)",
+                borderRadius: "var(--radius-control)",
+                background: "var(--bg)",
+                color: "var(--text)",
+                cursor: "pointer",
+                textAlign: "left",
+                boxShadow: selected ? "inset 0 0 0 1px var(--accent), var(--shadow-card)" : "none",
+                transition: "border-color var(--dur-fast) var(--ease-out-warm), box-shadow var(--dur-fast) var(--ease-out-warm)",
+              }}
+            >
+              <span
+                style={{
+                  position: "relative",
+                  width: 36,
+                  height: 32,
+                  overflow: "hidden",
+                  border: "1px solid color-mix(in srgb, var(--border) 90%, transparent)",
+                  borderRadius: 5,
+                  background: colors.bg,
+                  boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.06)",
+                  flexShrink: 0,
+                }}
+                aria-hidden="true"
+              >
+                <span style={{ position: "absolute", inset: "0 auto 0 0", width: 10, background: colors.panel }} />
+                <span style={{ position: "absolute", top: 6, left: 14, width: 14, height: 2.5, borderRadius: 1.5, background: colors.text }} />
+                <span style={{ position: "absolute", right: 4, bottom: 5, width: 10, height: 6, borderRadius: 2.5, background: colors.accent }} />
+              </span>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, fontWeight: 600 }}>
+                {item.name}
+              </span>
+              <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--accent)", height: 16 }}>
+                {selected ? <Check size={14} strokeWidth={2.5} aria-hidden="true" /> : null}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 
 export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCallsDefaultCollapsedChange, cwd, sessionId, onModelsSaved, onPluginsReloaded, onOmpUpdateAvailabilityChange, onSelectTab, onClose }: {
   activeTab: SettingsTab;
@@ -342,6 +492,7 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
 }) {
   const isMobile = useIsMobile();
   const { t } = useI18n();
+  const { preference, preset, setTheme, setPreset } = useTheme();
   const workspaceReady = cwd !== null;
   const [searchQuery, setSearchQuery] = useState("");
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -595,6 +746,18 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
                   <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>{t("settingsConfig.interfaceBehavior")}</h3>
                   <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--text-muted)" }}>{t("settingsConfig.interfaceBehaviorDesc")}</p>
                 </div>
+                <NativeSetting searchId="appearance" label={t("settingsConfig.appearance")} description={t("settingsConfig.appearanceDesc")} scope="UI">
+                  <select
+                    style={nativeSelectStyle}
+                    value={preference}
+                    onChange={(event) => setTheme(event.target.value as ThemePreference)}
+                  >
+                    <option value="system" style={nativeOptionStyle}>{t("settingsConfig.appearanceSystem")}</option>
+                    <option value="light" style={nativeOptionStyle}>{t("settingsConfig.appearanceLight")}</option>
+                    <option value="dark" style={nativeOptionStyle}>{t("settingsConfig.appearanceDark")}</option>
+                  </select>
+                </NativeSetting>
+                <ThemePresetSetting preset={preset} onSelectPreset={setPreset} />
                 <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))", gap: 10 }}>
                   <NativeSetting searchId="keep-tool-calls-collapsed" label={t("settingsConfig.keepToolCallsCollapsed")} description={t("settingsConfig.keepToolCallsCollapsedDesc")} scope="UI">
                     <ToggleSwitch checked={toolCallsDefaultCollapsed} onChange={onToolCallsDefaultCollapsedChange} />
