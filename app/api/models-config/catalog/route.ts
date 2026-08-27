@@ -28,7 +28,23 @@ async function fetchCatalog(): Promise<ModelCatalogEntry[]> {
     headers: { Accept: "application/json" },
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
-  if (!response.ok) throw new Error(`models.dev returned HTTP ${response.status}`);
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    let detail = text.slice(0, 500).trim();
+    if (text) {
+      try {
+        const parsed = JSON.parse(text) as { error?: unknown; message?: unknown };
+        const msg = typeof parsed.error === "string" ? parsed.error : typeof parsed.message === "string" ? parsed.message : null;
+        if (msg) detail = msg.slice(0, 500);
+      } catch {}
+    }
+    if (response.status === 429) {
+      const retryAfter = response.headers.get("Retry-After") ?? response.headers.get("retry-after");
+      if (retryAfter) detail = `${detail} (Retry-After: ${retryAfter}s)`.trim() || `Rate limited. Retry after ${retryAfter}s`;
+      if (!detail) detail = `Too many requests. Retry after ${retryAfter ?? "60"}s`;
+    }
+    throw new Error(detail ? `models.dev returned HTTP ${response.status}: ${detail}` : `models.dev returned HTTP ${response.status}`);
+  }
   const entries = flattenModelsDevCatalog(await response.json());
   if (entries.length === 0) throw new Error("models.dev returned an empty catalog");
   return entries;

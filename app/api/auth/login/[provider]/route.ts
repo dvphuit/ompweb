@@ -1,9 +1,11 @@
 import { homedir } from "os";
+import { parseJsonWithinLimit, RequestBodyTooLargeError } from "@/lib/bounded-form-data";
 import { invalidateModelsCache } from "@/lib/models-cache";
 import { enableProvider } from "@/lib/omp/model-roles";
 import { RpcProcess, type RpcFrame } from "@/lib/omp/rpc-process";
 import { disposeUtilityRpc } from "@/lib/omp/rpc-utility";
 
+const MAX_LOGIN_REQUEST_BYTES = 16 * 1024;
 export const dynamic = "force-dynamic";
 
 /**
@@ -42,7 +44,15 @@ export async function POST(
   { params }: { params: Promise<{ provider: string }> }
 ) {
   const { provider } = await params;
-  const { token, code } = (await req.json()) as { token?: string; code?: string };
+  let body: { token?: unknown; code?: unknown };
+  try {
+    body = await parseJsonWithinLimit(req, MAX_LOGIN_REQUEST_BYTES);
+  } catch (error) {
+    const status = error instanceof RequestBodyTooLargeError ? 413 : 400;
+    return Response.json({ error: status === 413 ? "Login request is too large" : "Invalid JSON request body", code: status === 413 ? "request_too_large" : "invalid_json" }, { status });
+  }
+  const token = typeof body.token === "string" ? body.token : "";
+  const code = typeof body.code === "string" ? body.code : "";
 
   if (!token || !code) {
     return Response.json({ error: "token and code required", code: "login_token_code_required" }, { status: 400 });
@@ -51,10 +61,6 @@ export async function POST(
   if (!pending) {
     return Response.json({ error: "No pending login for token", code: "login_no_pending" }, { status: 404 });
   }
-  // Exact provider association: the registry records the provider a token was
-  // created for. A prefix check on the token alone is unsafe because provider
-  // ids may share prefixes (e.g. "openai" vs "openai-codex"), which would let
-  // a token for one provider be submitted against another provider's route.
   if (pending.provider !== provider) {
     return Response.json({ error: "Token does not match provider", code: "login_token_mismatch" }, { status: 400 });
   }

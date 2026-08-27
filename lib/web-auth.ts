@@ -2,6 +2,52 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypt
 
 export const OMP_WEB_SESSION_COOKIE = "omp_web_session";
 export const OMP_WEB_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
+const WEB_AUTH_FAILURE_WINDOW_MS = 15 * 60 * 1000;
+const WEB_AUTH_MAX_FAILURES = 5;
+const WEB_AUTH_LOCK_MS = 60 * 1000;
+
+interface WebAuthLimiterState {
+  failures: number[];
+  lockedUntil: number;
+}
+
+declare global {
+  var __ompWebAuthLimiter: WebAuthLimiterState | undefined;
+}
+
+function getWebAuthLimiter(): WebAuthLimiterState {
+  return globalThis.__ompWebAuthLimiter ??= { failures: [], lockedUntil: 0 };
+}
+
+function pruneFailures(now: number): WebAuthLimiterState {
+  const limiter = getWebAuthLimiter();
+  limiter.failures = limiter.failures.filter((timestamp) => now - timestamp < WEB_AUTH_FAILURE_WINDOW_MS);
+  if (limiter.lockedUntil <= now) limiter.lockedUntil = 0;
+  return limiter;
+}
+
+/** Process-wide limiter: ompweb is a local, single-user service by default. */
+export function checkWebAuthRateLimit(now = Date.now()): { allowed: boolean; retryAfterSeconds?: number } {
+  const limiter = pruneFailures(now);
+  if (limiter.lockedUntil > now) {
+    return { allowed: false, retryAfterSeconds: Math.max(1, Math.ceil((limiter.lockedUntil - now) / 1000)) };
+  }
+  return { allowed: true };
+}
+
+export function recordWebAuthFailure(now = Date.now()): { retryAfterSeconds?: number } {
+  const limiter = pruneFailures(now);
+  limiter.failures.push(now);
+  if (limiter.failures.length >= WEB_AUTH_MAX_FAILURES) {
+    limiter.lockedUntil = now + WEB_AUTH_LOCK_MS;
+    return { retryAfterSeconds: Math.ceil(WEB_AUTH_LOCK_MS / 1000) };
+  }
+  return {};
+}
+
+export function clearWebAuthFailures(): void {
+  globalThis.__ompWebAuthLimiter = { failures: [], lockedUntil: 0 };
+}
 
 function hash(value: string): Buffer {
   return createHash("sha256").update(value, "utf8").digest();

@@ -43,7 +43,6 @@ interface Props {
   explorerRefreshing?: boolean;
   onExplorerRefreshDone?: () => void;
   onAtMention?: (relativePath: string, isDir: boolean) => void;
-  onAtMentions?: (relativePaths: string[]) => void;
   /** Opens the app settings (pinned sidebar footer row). */
   onOpenSettings?: () => void;
   /** True when an omp/ompweb update is available — shows a badge on the gear. */
@@ -235,7 +234,7 @@ function SidebarIconButton({
       aria-pressed={active}
       style={{
         display: "flex", alignItems: "center", justifyContent: "center",
-        width: 26, height: 26, padding: 0, flexShrink: 0, lineHeight: 0,
+        width: 32, height: 32, padding: 0, flexShrink: 0, lineHeight: 0,
         background: active || hovered ? "var(--bg-hover)" : "none",
         border: "none",
         borderRadius: "var(--radius-control)",
@@ -551,7 +550,7 @@ function OmpWebTitle() {
     </button>
   );
 }
-export function SessionSidebar({ selectedSessionId, optimisticSession, onSelectSession, onNewSession, initialSessionId, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, explorerRefreshKey, onExplorerRefresh, explorerRefreshing, onExplorerRefreshDone, onAtMention, onAtMentions, onOpenSettings, onOpenArchive, updateAvailable }: Props) {
+export function SessionSidebar({ selectedSessionId, optimisticSession, onSelectSession, onNewSession, initialSessionId, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, explorerRefreshKey, onExplorerRefresh, explorerRefreshing, onExplorerRefreshDone, onAtMention, onOpenSettings, onOpenArchive, updateAvailable }: Props) {
   const { t } = useI18n();
   const [allSessions, setAllSessions] = useState<SessionInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1810,7 +1809,7 @@ export function SessionSidebar({ selectedSessionId, optimisticSession, onSelectS
                 title={t("sessionSidebar.refreshExplorer")}
                 style={{
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  width: 26, height: 26, padding: 0, marginRight: 6,
+                  width: 32, height: 32, padding: 0, marginRight: 6,
                   background: "none",
                   border: "none",
                   color: explorerRefreshing ? "var(--accent)" : "var(--text-dim)",
@@ -2193,7 +2192,7 @@ function ProjectRow({
             title={t("commandPalette.actions")}
             aria-expanded={actionMenuOpen}
             aria-haspopup="menu"
-            style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, padding: 0, border: "none", borderRadius: "var(--radius-control)", background: actionMenuOpen ? "var(--bg-selected)" : "transparent", color: "var(--text-dim)", cursor: removeBusy ? "default" : "pointer", opacity: removeBusy ? 0.5 : 1, lineHeight: 0, transition: SIDEBAR_BUTTON_TRANSITION }}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, padding: 0, border: "none", borderRadius: "var(--radius-control)", background: actionMenuOpen ? "var(--bg-selected)" : "transparent", color: "var(--text-dim)", cursor: removeBusy ? "default" : "pointer", opacity: removeBusy ? 0.5 : 1, lineHeight: 0, transition: SIDEBAR_BUTTON_TRANSITION }}
             onMouseEnter={(e) => {
               if (removeBusy) return;
               e.currentTarget.style.color = "var(--text)";
@@ -2240,8 +2239,8 @@ function ProjectRow({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              width: 24,
-              height: 24,
+              width: 32,
+              height: 32,
               padding: 0,
               border: "none",
               borderRadius: "var(--radius-control)",

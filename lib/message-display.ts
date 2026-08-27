@@ -1,29 +1,22 @@
 import type { AssistantContentBlock, AssistantMessage, ThinkingContent, ToolCallContent } from "./types";
 
-interface DisplayOptions {
-  isStreaming?: boolean;
-}
-
-export function isEmptyThinkingBlock(block: AssistantContentBlock, _options: DisplayOptions = {}): block is ThinkingContent {
+export function isEmptyThinkingBlock(block: AssistantContentBlock): block is ThinkingContent {
   return block.type === "thinking" && !block.deferred && block.thinking.trim() === "";
 }
 
-export function getDisplayableAssistantBlocks(
-  message: AssistantMessage,
-  options: DisplayOptions = {},
-): AssistantContentBlock[] {
-  return (message.content ?? []).filter((block) => !isEmptyThinkingBlock(block, options));
+export function getDisplayableAssistantBlocks(message: AssistantMessage): AssistantContentBlock[] {
+  return (message.content ?? []).filter((block) => !isEmptyThinkingBlock(block));
 }
 
 function isFinalAnswerBlock(block: AssistantContentBlock): boolean {
   return block.type === "text" || block.type === "image";
 }
 
-export function splitFinalAssistantBlocks(
-  message: AssistantMessage,
-  options: DisplayOptions = {},
-): { answerBlocks: AssistantContentBlock[]; processBlocks: AssistantContentBlock[] } {
-  const blocks = getDisplayableAssistantBlocks(message, options);
+export function splitFinalAssistantBlocks(message: AssistantMessage): {
+  answerBlocks: AssistantContentBlock[];
+  processBlocks: AssistantContentBlock[];
+} {
+  const blocks = getDisplayableAssistantBlocks(message);
   const lastProcessIndex = blocks.findLastIndex((block) => !isFinalAnswerBlock(block));
   if (lastProcessIndex === -1) {
     return { answerBlocks: blocks, processBlocks: [] };

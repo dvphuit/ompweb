@@ -19,7 +19,7 @@ import { formatApiError } from "@/lib/i18n/api-error";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { copyText } from "@/lib/clipboard";
 import { getFileName } from "@/lib/file-paths";
-import { buildAtMentionText, buildFileAtMentionsText, buildFileLineMentionText } from "@/lib/file-fuzzy";
+import { buildAtMentionText, buildFileLineMentionText } from "@/lib/file-fuzzy";
 import { getInitialNavigation } from "@/lib/initial-navigation";
 import { comparableProjectPath } from "@/lib/comparable-path";
 import { showCompletionNotification } from "@/lib/browser-notifications";
@@ -463,11 +463,6 @@ export function AppShell() {
     chatInputRef.current?.insertText(buildAtMentionText(relativePath, isDir));
   }, []);
 
-  const handleAtMentions = useCallback((relativePaths: string[]) => {
-    const mentions = buildFileAtMentionsText(relativePaths);
-    if (mentions) chatInputRef.current?.insertText(mentions);
-  }, []);
-
   const handleFileLineMention = useCallback((relativePath: string, startLine: number, endLine: number) => {
     chatInputRef.current?.insertText(buildFileLineMentionText(relativePath, startLine, endLine));
   }, []);
@@ -826,7 +821,6 @@ export function AppShell() {
         explorerRefreshing={explorerRefreshing}
         onExplorerRefreshDone={handleExplorerRefreshDone}
         onAtMention={handleAtMention}
-        onAtMentions={handleAtMentions}
         onOpenSettings={() => setSettingsTab("general")}
         onOpenArchive={() => setArchiveBrowserOpen(true)}
         updateAvailable={appUpdateAvailable || ompUpdateAvailable}

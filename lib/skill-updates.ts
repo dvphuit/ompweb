@@ -39,8 +39,8 @@ interface SnapshotResponse {
 }
 
 class HttpError extends Error {
-  constructor(readonly status: number) {
-    super(`HTTP ${status}`);
+  constructor(readonly status: number, bodyDetail?: string) {
+    super(bodyDetail ? `HTTP ${status}: ${bodyDetail.slice(0, 500)}` : `HTTP ${status}`);
   }
 }
 
@@ -113,7 +113,34 @@ async function fetchJson(
     headers,
     signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
   });
-  if (!response.ok) throw new HttpError(response.status);
+  if (!response.ok) {
+    // Surface server's error body for 429/rate-limit so UI shows Retry-After/detail.
+    const text = await response.text().catch(() => "");
+    let detail = text.slice(0, 500).trim();
+    // Ignore empty JSON objects like "{}" that carry no useful message
+    if (detail === "{}" || detail === "[]") detail = "";
+    if (text) {
+      try {
+        const parsed = JSON.parse(text) as { error?: unknown; message?: unknown };
+        const parsedMsg =
+          typeof parsed.error === "string"
+            ? parsed.error
+            : typeof parsed.message === "string"
+              ? parsed.message
+              : null;
+        if (parsedMsg) detail = parsedMsg.slice(0, 500);
+        else if (detail === "{}" || detail === "[]") detail = "";
+      } catch {
+        // keep raw text slice
+      }
+    }
+    // Include Retry-After header for 429
+    if (response.status === 429) {
+      const retryAfter = response.headers.get("Retry-After") ?? response.headers.get("retry-after");
+      if (retryAfter && !detail.includes(retryAfter)) detail = `${detail} (Retry-After: ${retryAfter}s)`.trim();
+    }
+    throw new HttpError(response.status, detail || undefined);
+  }
   return response.json();
 }
 

@@ -1,7 +1,7 @@
 import { execFileSync } from "child_process";
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, statSync, unlinkSync, writeFileSync } from "fs";
 import { homedir } from "os";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "path";
+import { basename, isAbsolute, join, relative, resolve, sep } from "path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { isRecord } from "../type-guards";
 import { resolveOmpBin } from "./omp-cli";
@@ -230,7 +230,13 @@ export function getAgentFilePath(scopeDir: string, name: string): string {
 function sameAgentPath(left: string, right: string): boolean {
   const a = resolve(left);
   const b = resolve(right);
-  return process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
+  if (a === b) return true;
+  if (!existsSync(a) || !existsSync(b)) return false;
+  try {
+    return realpathSync(a) === realpathSync(b);
+  } catch {
+    return process.platform === "win32" && a.toLowerCase() === b.toLowerCase();
+  }
 }
 
 export function validateAgentFileReference(scopeDir: string, name: string): void {
@@ -241,23 +247,10 @@ export function validateAgentFileReference(scopeDir: string, name: string): void
 
 function secureScopeDir(scopeDir: string): string {
   const resolved = resolve(scopeDir);
-  let current = resolved;
-  while (true) {
-    try {
-      const stat = lstatSync(current);
-      if (stat.isSymbolicLink()) throw new Error("agent scope path may not contain a symbolic link");
-      if (current === resolved && !stat.isDirectory()) throw new Error("agent scope path is not a directory");
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-    }
-    const parent = dirname(current);
-    if (parent === current) break;
-    current = parent;
-  }
   mkdirSync(resolved, { recursive: true });
   const stat = lstatSync(resolved);
   if (stat.isSymbolicLink() || !stat.isDirectory()) throw new Error("agent scope directory is not a regular directory");
-  return resolved;
+  return realpathSync(resolved);
 }
 
 export function writeAgent(scopeDir: string, name: string, payload: AgentPayload, previousName?: string): { path: string } {
@@ -280,9 +273,6 @@ export function writeAgent(scopeDir: string, name: string, payload: AgentPayload
       // The new form remains writable even if an old file cannot be parsed.
     }
   }
-  // These are the fields represented by the compact editor and therefore
-  // intentionally replaced when omitted or changed. Other OMP frontmatter
-  // (prewalk/advisor/output/blocking and unknown extensions) is preserved.
   for (const field of ["name", "description", "model", "tools", "thinkingLevel", "spawns"] as const) delete preserved[field];
   const frontmatter: Record<string, unknown> = { ...preserved, name, description: payload.description.trim() };
   for (const field of ["model", "tools", "thinkingLevel", "spawns", "prewalk", "advisor", "output", "blocking", "enabled"] as const) {
@@ -296,9 +286,6 @@ export function writeAgent(scopeDir: string, name: string, payload: AgentPayload
   writeFileSync(tmpPath, serialized, { encoding: "utf8", flag: "wx" });
   let displacedPath: string | undefined;
   try {
-    // Windows cannot replace an existing file with renameSync, including a
-    // case-only rename (Scout.md -> scout.md). Move the old file aside first
-    // so updates and case-only renames remain atomic from the caller's view.
     if (process.platform === "win32" && replacesPreviousPath && existsSync(filePath)) {
       displacedPath = `${filePath}.${process.pid}.${Date.now()}.old`;
       renameSync(filePath, displacedPath);
@@ -310,9 +297,7 @@ export function writeAgent(scopeDir: string, name: string, payload: AgentPayload
     throw error;
   }
   if (displacedPath && existsSync(displacedPath)) unlinkSync(displacedPath);
-  if (previousPath && !replacesPreviousPath && existsSync(previousPath)) {
-    unlinkSync(previousPath);
-  }
+  if (previousPath && !replacesPreviousPath && existsSync(previousPath)) unlinkSync(previousPath);
   return { path: filePath };
 }
 

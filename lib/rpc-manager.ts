@@ -43,6 +43,7 @@ const RESTARTING_MESSAGE = "This session is restarting — retry in a moment.";
 const BASH_EXCLUDE_MESSAGE =
   "omp cannot run a shell command with its output excluded from the model context (`!!`): the RPC bash command has no exclusion option, so the output would silently enter the context anyway. Run it with a single `!` to share the output with the model, or use a terminal outside omp web.";
 
+
 /**
  * Failure raised by omp-web itself (not by omp) carrying a stable snake_case
  * code. API routes forward `{ error, code }` so the client dictionary can
@@ -932,7 +933,17 @@ export class AgentSessionWrapper {
 
       case "set_model": {
         const { provider, modelId } = command as { provider: string; modelId: string };
-        const model = await this.proc.sendCommand<OmpModel>({ type: "set_model", provider, modelId });
+        let model: OmpModel;
+        try {
+          model = await this.proc.sendCommand<OmpModel>({ type: "set_model", provider, modelId });
+        } catch (error) {
+          // models.yml is loaded once per child. The global catalog may already
+          // contain a newly added model while an older idle session still has a
+          // stale registry; refresh that child once, then retry the same command.
+          if (!(error instanceof RpcCommandError) || !/model not found/i.test(error.message) || this.isRunning()) throw error;
+          await this.restart();
+          model = await this.proc.sendCommand<OmpModel>({ type: "set_model", provider, modelId });
+        }
         invalidateModelsCache();
         invalidateSessionListCache();
         return { id: model.id, provider: model.provider };

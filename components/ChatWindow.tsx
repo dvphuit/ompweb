@@ -545,6 +545,10 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
     modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemPromptLoaderChange, onSessionStatsPanelOpen,
     onOpenFile,
   });
+  const [selectedSubagent, setSelectedSubagent] = useState<SubagentInfo | null>(null);
+  useEffect(() => {
+    setSelectedSubagent(null);
+  }, [session?.id, newSessionCwd]);
   const sessionBusy = agentRunning || bashRunning;
   const modelCapacity = useMemo(() => {
     if (!displayModelValue) return null;
@@ -672,8 +676,7 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
         if (el) el.scrollTop = el.scrollHeight;
       });
     }
-  }, [sessionKeyForPaging]);
-  const [selectedSubagent, setSelectedSubagent] = useState<SubagentInfo | null>(null);
+  }, [sessionKeyForPaging, scrollContainerRef]);
   // True while the viewport is at/near the conversation bottom. Drives the
   // anchored render window in CommittedTranscript.
   const [nearBottom, setNearBottom] = useState(true);

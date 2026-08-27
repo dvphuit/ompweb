@@ -230,8 +230,10 @@ export function validateProjectPath(cwd: string): string {
   } catch {
     throw new ProjectPathError("directory_not_found", `Directory does not exist: ${cwd}`);
   }
-  if (!stat.isDirectory()) {
-    throw new ProjectPathError("not_a_directory", `Path is not a directory: ${cwd}`);
+  if (!stat.isDirectory()) throw new ProjectPathError("not_a_directory", `Path is not a directory: ${cwd}`);
+  try {
+    return realpathSync(normalized);
+  } catch {
+    throw new ProjectPathError("directory_not_found", `Directory does not exist: ${cwd}`);
   }
-  return normalized;
 }

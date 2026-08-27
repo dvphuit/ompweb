@@ -18,7 +18,7 @@ function getRequestOrigin(request: Request): string | null {
 
 function isLoopbackHostname(hostname: string): boolean {
   const h = hostname.toLowerCase();
-  return h === "localhost" || h === "127.0.0.1" || h === "::1" || h === "[::1]" || h === "0.0.0.0" || h === "[::]";
+  return h === "localhost" || h === "127.0.0.1" || h === "::1" || h === "[::1]";
 }
 
 function originsMatch(a: string, b: string): boolean {

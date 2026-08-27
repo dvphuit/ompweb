@@ -57,7 +57,23 @@ function parseSearchOutput(raw: string): SkillSearchResult[] {
 async function searchSkillsApi(query: string, limit: number): Promise<SkillSearchResult[]> {
   const url = `${SEARCH_API_BASE}/api/search?q=${encodeURIComponent(query)}&limit=${limit}`;
   const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(`skills.sh search failed: HTTP ${res.status}`);
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    let detail = text.slice(0, 500).trim();
+    if (text) {
+      try {
+        const parsed = JSON.parse(text) as { error?: unknown; message?: unknown };
+        const msg = typeof parsed.error === "string" ? parsed.error : typeof parsed.message === "string" ? parsed.message : null;
+        if (msg) detail = msg.slice(0, 500);
+      } catch {}
+    }
+    if (res.status === 429) {
+      const retryAfter = res.headers.get("Retry-After") ?? res.headers.get("retry-after");
+      if (retryAfter) detail = `${detail} (Retry-After: ${retryAfter}s)`.trim() || `Rate limited. Retry after ${retryAfter}s`;
+      if (!detail) detail = `Too many requests. Retry after ${retryAfter ?? "60"}s`;
+    }
+    throw new Error(detail ? `skills.sh search failed: HTTP ${res.status}: ${detail}` : `skills.sh search failed: HTTP ${res.status}`);
+  }
 
   const data = (await res.json()) as SkillsApiResponse;
   return (data.skills ?? [])

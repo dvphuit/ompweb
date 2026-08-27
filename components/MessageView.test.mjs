@@ -105,10 +105,26 @@ test("tool operations render as compact timeline rows", () => {
   }));
 
   assert.match(html, /data-activity-operation="true"/);
-  assert.match(html, /activity-row-indicator/);
+  assert.match(html, /tool-icon-badge/);
   assert.match(html, /activity-row-duration/);
   assert.doesNotMatch(html, /border-radius:7px/);
 });
+test("thinking content renders only inside the expanded body", () => {
+  const thinking = "Inspecting auth boundaries before applying the fix";
+  const html = renderToStaticMarkup(React.createElement(MessageView, {
+    isStreaming: true,
+    message: {
+      role: "assistant",
+      content: [{ type: "thinking", thinking }],
+    },
+  }));
+
+  assert.equal((html.match(new RegExp(thinking, "g")) ?? []).length, 1);
+  assert.match(html, /activity-row-preview"><\/span>/);
+  assert.match(html, /thinking-text/);
+});
+
+
 test("task tool results render a per-subagent summary panel", () => {
   const html = renderToStaticMarkup(React.createElement(TaskResultPanel, {
     details: {

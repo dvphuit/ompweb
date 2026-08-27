@@ -2,8 +2,10 @@
 
 import { LockKeyhole } from "lucide-react";
 import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export function LoginForm() {
+  const router = useRouter();
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -22,7 +24,8 @@ export function LoginForm() {
         setError("Incorrect password. Please try again.");
         return;
       }
-      window.location.assign("/");
+      router.push("/");
+      router.refresh();
     } catch {
       setError("Could not sign in. Please check your connection and try again.");
     } finally {

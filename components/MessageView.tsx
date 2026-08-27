@@ -31,6 +31,32 @@ import type {
 
 const MAX_THINKING_CACHE_ENTRIES = 100;
 const thinkingContentCache = new Map<string, Promise<string>>();
+
+function shouldLoadDeferredThinking({
+  deferred,
+  sessionId,
+  entryId,
+  content,
+  error,
+  isVisible,
+  expanded,
+}: {
+  deferred?: boolean;
+  sessionId?: string;
+  entryId?: string;
+  content: string | null;
+  error: string | null;
+  isVisible: boolean;
+  expanded: boolean;
+}): boolean {
+  return !!deferred
+    && !!sessionId
+    && !!entryId
+    && content === null
+    && error === null
+    && (isVisible || expanded);
+}
+
 const MAX_MARKDOWN_CHARS = 100_000;
 
 // Cap the user "sent" bubble's height so an abnormally long message does not
@@ -420,7 +446,7 @@ function AssistantMessageView({
   const time = showTimestamp ? formatTime(message.timestamp, locale) : null;
   const blockItems = (message.content ?? [])
     .map((block, originalIndex) => ({ block, originalIndex }))
-    .filter(({ block }) => !isEmptyThinkingBlock(block, { isStreaming }));
+    .filter(({ block }) => !isEmptyThinkingBlock(block));
   const blocks = blockItems.map(({ block }) => block);
   const hasActivityBlocks = blocks.some((block) => block.type === "thinking" || block.type === "toolCall");
   const blockItemsRef = useRef(blockItems);
@@ -719,59 +745,54 @@ const ThinkingBlock = memo(function ThinkingBlock({ block, duration, sessionId, 
     return () => observer.disconnect();
   }, [block.deferred, sessionId, entryId, blockIndex]);
 
-  // Auto-fetch deferred thinking so the block is not empty when collapsed
-  // and does not stay blank after streaming ends (streamingMessage is
-  // replaced by a deferred placeholder from the session file). Fetch
-  // eagerly when visible/expanded instead of on mount for all rows.
+  // Auto-fetch deferred thinking once the row is near the viewport or opened.
+  // Loading state is deliberately not a dependency: toggling it would clean up
+  // and abort the request that just started, leaving the row in a retry loop.
   useEffect(() => {
-    // streamingMessage has no entryId – inline thinking there
-    if (!block.deferred) return;
-    if (!sessionId || !entryId) return;
-    // Already have content or in-flight
-    if (content !== null || loading || error) return;
-    if (!isVisible && !expanded) return;
+    if (!shouldLoadDeferredThinking({
+      deferred: block.deferred,
+      sessionId,
+      entryId,
+      content,
+      error,
+      isVisible,
+      expanded,
+    })) return;
+
     const controller = new AbortController();
     setLoading(true);
-    void loadThinkingContent(sessionId, entryId, blockIndex, controller.signal)
-      .then((text) => { if (!controller.signal.aborted) setContent(text); })
-      .catch((err) => {
-        if (controller.signal.aborted) return;
-        setError(err instanceof Error ? err.message : String(err));
+    void loadThinkingContent(sessionId!, entryId!, blockIndex, controller.signal)
+      .then((text) => {
+        if (!controller.signal.aborted) setContent(text);
       })
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (!controller.signal.aborted) {
+          setError(err instanceof Error ? err.message : String(err));
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
     return () => controller.abort();
-  }, [block.deferred, blockIndex, content, entryId, error, expanded, isVisible, loading, sessionId]);
-  // When the underlying entry changes, drop cached deferred content
+  }, [block.deferred, blockIndex, content, entryId, error, expanded, isVisible, sessionId]);
+
+  // When the underlying entry changes, drop cached deferred content.
   useEffect(() => {
-    // Use a layout-like reset that does not fight the fetch above:
-    // only clear when identity actually differs from cached content's key
     setContent(null);
     setError(null);
     setIsVisible(false);
-    // don't force loading false here – let the fetch effect drive it
+    setLoading(false);
   }, [sessionId, entryId, blockIndex, block.deferred]);
 
   const handleOpenChange = (nextOpen: boolean) => {
     setExpanded(nextOpen);
     setUserToggled(true);
-    if (!nextOpen || !block.deferred || content !== null || loading) return;
-    if (!sessionId || !entryId) {
+    if (nextOpen && block.deferred && (!sessionId || !entryId)) {
       setError(t("messageView.thinkingUnavailable"));
-      return;
     }
-    setLoading(true);
-    setError(null);
-    void loadThinkingContent(sessionId, entryId, blockIndex)
-      .then((text) => setContent(text))
-      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
-      .finally(() => setLoading(false));
   };
 
   const rawThinking = block.deferred ? (content ?? "") : (block.thinking ?? "");
-  const preview = useMemo(() => {
-    const src = rawThinking.trim().replace(/\s+/g, " ");
-    return src.length > 220 ? src.slice(0, 220) : src;
-  }, [rawThinking]);
   const hasContent = rawThinking.trim().length > 0;
   const isDeferredPending = !!block.deferred && content === null;
   const isActive = !!isStreaming;
@@ -816,20 +837,7 @@ const ThinkingBlock = memo(function ThinkingBlock({ block, duration, sessionId, 
               </span>
             )}
           </span>
-          <span className="activity-row-preview" title={preview || undefined}>
-            {!preview && (loading || isActive || isDeferredPending) ? (
-              <span className="thinking-preview-loading">{t("messageView.loadingThinking")}</span>
-            ) : (
-              <>
-                {preview}
-                {isActive && !expanded && hasContent && (
-                  <span className="thinking-caret" aria-hidden>
-                    ▌
-                  </span>
-                )}
-              </>
-            )}
-          </span>
+          <span className="activity-row-preview" />
           {displayDuration !== undefined && (
             <span className="activity-row-duration">{t("messageView.durationSeconds", { seconds: displayDuration })}</span>
           )}
