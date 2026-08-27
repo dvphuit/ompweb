@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useState, useRef, useEffect, useMemo, useCallback, type ComponentProps } from "react";
-import { Copy, Check, GitFork, CornerUpLeft, ChevronRight, ChevronDown, Brain, EyeOff, CircleAlert, LoaderCircle } from "lucide-react";
+import { Copy, Check, GitFork, CornerUpLeft, ChevronRight, ChevronDown, Brain, EyeOff, LoaderCircle, FileText, FilePlus, Pencil, Terminal, Search, FolderSearch, ListTodo, Bot, MessageCircleQuestion, Plug, Wrench } from "lucide-react";
 import { MarkdownBody } from "./MarkdownBody";
 import { ClickableImage } from "./ImageLightbox";
 import { translate, useI18n, type Locale } from "@/lib/i18n";
@@ -13,6 +13,7 @@ import { SubagentStatusIcon } from "./SubagentStatusIcon";
 import { formatCost, formatDuration, formatTokens, shortModel } from "@/lib/subagent-format";
 import { parseUnifiedPatch, type SplitDiffCell } from "@/lib/patch";
 import { formatCompactNumber } from "@/lib/format";
+import { getToolDisplay } from "@/lib/tool-display";
 import type {
   AgentMessage,
   UserMessage,
@@ -610,15 +611,68 @@ const ThinkingBlock = memo(function ThinkingBlock({ block, duration, sessionId, 
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
+
+  // Only fetch deferred thinking when the row is near viewport or expanded —
+  // avoids N+1 fetches for long histories (deferThinking creates many
+  // placeholders). Mirrors ChatWindow's LOAD_MORE pattern.
+  useEffect(() => {
+    if (!block.deferred) return;
+    const el = containerRef.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setIsVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "400px 0px", threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [block.deferred, sessionId, entryId, blockIndex]);
+
+  // Auto-fetch deferred thinking so the block is not empty when collapsed
+  // and does not stay blank after streaming ends (streamingMessage is
+  // replaced by a deferred placeholder from the session file). Fetch
+  // eagerly when visible/expanded instead of on mount for all rows.
+  useEffect(() => {
+    // streamingMessage has no entryId – inline thinking there
+    if (!block.deferred) return;
+    if (!sessionId || !entryId) return;
+    // Already have content or in-flight
+    if (content !== null || loading || error) return;
+    if (!isVisible && !expanded) return;
+    setLoading(true);
+    void loadThinkingContent(sessionId, entryId, blockIndex)
+      .then((text) => setContent(text))
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
+      .finally(() => setLoading(false));
+  }, [block.deferred, blockIndex, content, entryId, error, expanded, isVisible, loading, sessionId]);
+
+  // When the underlying entry changes, drop cached deferred content
+  useEffect(() => {
+    // Use a layout-like reset that does not fight the fetch above:
+    // only clear when identity actually differs from cached content's key
+    setContent(null);
+    setError(null);
+    setIsVisible(false);
+    // don't force loading false here – let the fetch effect drive it
+  }, [sessionId, entryId, blockIndex, block.deferred]);
 
   const handleOpenChange = (nextOpen: boolean) => {
     setExpanded(nextOpen);
-    if (!nextOpen || !block.deferred || content !== null) return;
+    if (!nextOpen || !block.deferred || content !== null || loading) return;
     if (!sessionId || !entryId) {
       setError(t("messageView.thinkingUnavailable"));
       return;
     }
-
     setLoading(true);
     setError(null);
     void loadThinkingContent(sessionId, entryId, blockIndex)
@@ -627,15 +681,20 @@ const ThinkingBlock = memo(function ThinkingBlock({ block, duration, sessionId, 
       .finally(() => setLoading(false));
   };
 
+  const previewSource = block.deferred ? (content ?? "") : (block.thinking ?? "");
+  // Keep full normalized text; let CSS (text-overflow: ellipsis, white-space: nowrap)
+  // handle truncation to avoid cutting grapheme/CJK in JS. Previously slice(0,100).
+  const preview = previewSource.trim().replace(/\s+/g, " ");
+
   return (
-    <div className="activity-row" data-activity-operation="true">
+    <div ref={containerRef} className="activity-row" data-activity-operation="true">
       <Collapsible open={expanded} onOpenChange={handleOpenChange}>
         <CollapsibleTrigger className="activity-row-trigger">
           <span className="activity-row-indicator" aria-hidden>
             <Brain size={12} strokeWidth={1.8} />
           </span>
           <span className="activity-row-tool">{t("messageView.thinking")}</span>
-          <span className="activity-row-preview" />
+          <span className="activity-row-preview" title={preview || undefined}>{loading && !preview ? t("messageView.loadingThinking") : preview}</span>
           {duration !== undefined && (
             <span className="activity-row-duration">{t("messageView.durationSeconds", { seconds: duration })}</span>
           )}
@@ -663,7 +722,7 @@ const ThinkingBlock = memo(function ThinkingBlock({ block, duration, sessionId, 
               }}
             >
               <pre className="tool-call-output-text">
-                {loading ? t("messageView.loadingThinking") : error ?? (block.deferred ? content : block.thinking)}
+                {loading ? t("messageView.loadingThinking") : error ?? (block.deferred ? (content ?? "") : block.thinking)}
               </pre>
             </div>
           </div>
@@ -680,6 +739,19 @@ const ThinkingBlock = memo(function ThinkingBlock({ block, duration, sessionId, 
   && prev.blockIndex === next.blockIndex
 ));
 
+const TOOL_ICONS = {
+  FileText,
+  FilePlus,
+  Pencil,
+  Terminal,
+  Search,
+  FolderSearch,
+  ListTodo,
+  Bot,
+  MessageCircleQuestion,
+  Plug,
+  Wrench,
+} as const;
 
 const ToolCallBlock = memo(function ToolCallBlock({ block, result, duration, isStreaming, defaultCollapsed = true }: { block: ToolCallContent; result?: ToolResultMessage; duration?: number; isStreaming?: boolean; defaultCollapsed?: boolean }) {
   const { t } = useI18n();
@@ -697,15 +769,25 @@ const ToolCallBlock = memo(function ToolCallBlock({ block, result, duration, isS
   const resultDiff = expanded && result && !isError ? getResultDiff(result) : null;
   const resultMeta = getToolResultMeta(result);
   const command = formatToolCommand(block);
+  const display = getToolDisplay(block.toolName);
+  const ToolIcon = TOOL_ICONS[display.iconName];
+  const status: "success" | "error" | "running" = isError ? "error" : result ? "success" : "running";
+  const statusLabel = status === "error" ? "Failed" : status === "success" ? "Completed" : "Running";
 
   return (
-    <div className="activity-row" data-activity-operation="true">
+    <div className="activity-row" data-activity-operation="true" data-status={status} style={{ ["--tool-color" as unknown as string]: isError ? "var(--status-error)" : `var(${display.varName})` } as React.CSSProperties}>
       <Collapsible open={expanded} onOpenChange={setExpanded}>
-        <CollapsibleTrigger className="activity-row-trigger">
-          <span className={`activity-row-indicator${isError ? " activity-row-indicator-error" : ""}`} aria-hidden>
-            {isError ? <CircleAlert size={12} strokeWidth={1.8} /> : result ? <Check size={12} strokeWidth={2} /> : <LoaderCircle size={12} strokeWidth={1.8} className="activity-row-spinner" />}
+        <CollapsibleTrigger className="activity-row-trigger" aria-label={`${block.toolName} ${statusLabel}`}>
+          <span className="tool-icon-badge" aria-hidden>
+            <ToolIcon size={11} strokeWidth={1.9} />
           </span>
+          {!result && !isError ? (
+            <span className="activity-row-indicator" aria-hidden>
+              <LoaderCircle size={12} strokeWidth={1.8} className="activity-row-spinner" />
+            </span>
+          ) : null}
           <span className={`activity-row-tool${isError ? " activity-row-tool-error" : ""}`}>{block.toolName}</span>
+          <span className="sr-only">{statusLabel}</span>
           <span className="activity-row-preview">{getToolPreview(block)}</span>
           {duration !== undefined && (
             <span className="activity-row-duration">{t("messageView.durationSeconds", { seconds: duration })}</span>

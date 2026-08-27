@@ -5,7 +5,13 @@ interface DisplayOptions {
 }
 
 export function isEmptyThinkingBlock(block: AssistantContentBlock, options: DisplayOptions = {}): block is ThinkingContent {
-  return block.type === "thinking" && !block.deferred && !options.isStreaming && block.thinking.trim() === "";
+  // Hide empty thinking in both streaming and non-streaming: an empty
+  // `thinking:""` placeholder is stored by omp for every assistant turn and
+  // should not produce a visible row — during streaming it appears as an
+  // empty "Thinking" header then vanishes after, which flashes. Deferred
+  // blocks (large thinking offloaded to the sidecar file) are never empty.
+  void options;
+  return block.type === "thinking" && !block.deferred && block.thinking.trim() === "";
 }
 
 export function getDisplayableAssistantBlocks(

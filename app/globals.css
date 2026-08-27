@@ -45,7 +45,6 @@
   /* White-on-fill button: 5.90:1 (passes AA for small text) */
   --accent-strong: #B03E22;
   --accent-hover: #96331B;
-  --user-bg: #F5EDE1;
   --tool-bg: #F6F3ED;
   --bg-subtle: rgba(60,50,35,0.04);
   --status-error: #B42318;
@@ -53,6 +52,19 @@
   --status-warning: #8A5A00;
   --status-modified: #A87B1F;
   --status-renamed: #2563EB;
+  /* Tool-type tokens (--tool-*) vs status tokens (--status-*) — DO NOT MIX:
+     --tool-* = loại tool (read/write/edit/bash/search/todo/task/ask/hub) cho badge/icon, ổn định theo loại tool (lib/tool-display.ts).
+     --status-* = trạng thái (success/error/warning) cho vạch trái data-status và a11y. Trộn 2 hệ sẽ mất phân biệt loại vs trạng thái. */
+  --tool-read: #2563EB; /* 4.91:1 on --bg, 4.54:1 on --bg-panel */
+  --tool-write: #0F766E; /* 5.20:1 on --bg, 4.80:1 on --bg-panel — was #0D9488 3.56 fails AA */
+  --tool-edit: #B45309; /* 4.77:1 on --bg, 4.41:1 on --bg-panel */
+  --tool-bash: #6D28D9; /* 6.75:1 / 6.23:1 */
+  --tool-search: #0E7490; /* 5.09:1 / 4.70:1 — was #0891B2 3.5 fails AA */
+  --tool-todo: #15803D;
+  --tool-task: #BE123C;
+  --tool-ask: #7E22CE;
+  --tool-hub: #C2410C;
+  --tool-generic: var(--accent);
   --on-accent: #FFFFFF;
   --overlay-backdrop: color-mix(in srgb, var(--text) 24%, transparent);
 }
@@ -85,6 +97,17 @@ html.dark {
   --status-warning: #F0C36A;
   --status-modified: #E0B24D;
   --status-renamed: #7CA8FF;
+  /* Same --tool-* vs --status-* separation as light (see above) */
+  --tool-read: #7CA8FF;
+  --tool-write: #5EEAD4;
+  --tool-edit: #FACC15;
+  --tool-bash: #A78BFA;
+  --tool-search: #22D3EE;
+  --tool-todo: #6EE7B7;
+  --tool-task: #FB7185;
+  --tool-ask: #D8B4FE;
+  --tool-hub: #FDBA74;
+  --tool-generic: var(--accent);
   --on-accent: #FFFFFF;
   --overlay-backdrop: color-mix(in srgb, var(--text) 24%, transparent);
 }
@@ -1853,10 +1876,9 @@ html.dark .dropdown-surface :is(select, option) {
   align-items: center;
   justify-content: center;
   width: 14px;
-  color: var(--status-success);
+  color: var(--tool-color, var(--text-dim));
   flex: 0 0 14px;
 }
-.activity-row-indicator-error,
 .activity-row-tool-error {
   color: var(--status-error);
 }
@@ -1864,9 +1886,48 @@ html.dark .dropdown-surface :is(select, option) {
   animation: activity-row-spin 900ms linear infinite;
 }
 .activity-row-tool {
-  color: var(--accent);
+  color: var(--tool-color, var(--accent));
   font-weight: 650;
   flex: 0 0 auto;
+}
+.tool-icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--tool-color, var(--accent)) 14%, var(--bg-panel));
+  border: 1px solid color-mix(in srgb, var(--tool-color, var(--accent)) 20%, transparent);
+  color: var(--tool-color, var(--accent));
+  flex: 0 0 18px;
+}
+/* Status left border — non-color-only cue for success/error/running */
+.activity-row {
+  border-left: 2px solid transparent;
+  padding-left: 6px;
+  margin-left: -8px;
+}
+.activity-row[data-status="success"] {
+  border-left-color: color-mix(in srgb, var(--status-success) 55%, transparent);
+}
+.activity-row[data-status="error"] {
+  border-left-color: var(--status-error);
+}
+.activity-row[data-status="running"] {
+  border-left-color: color-mix(in srgb, var(--status-warning) 60%, transparent);
+}
+/* Visually hidden but screen-reader accessible */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 .activity-row-preview {
   min-width: 0;
@@ -1907,7 +1968,7 @@ html.dark .dropdown-surface :is(select, option) {
   max-width: 760px;
   margin: 3px 0 4px 21px;
   overflow: hidden;
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--tool-color, var(--border)) 22%, var(--border));
   border-radius: var(--radius-control);
   background: var(--bg-subtle);
 }
@@ -1924,7 +1985,7 @@ html.dark .dropdown-surface :is(select, option) {
   line-height: 1.35;
 }
 .tool-call-command-prompt {
-  color: var(--accent);
+  color: var(--tool-color, var(--accent));
   flex: 0 0 auto;
 }
 .tool-call-command code {
