@@ -574,7 +574,7 @@ function BlockView({ block, toolResults, isStreaming, streamingDuration, toolCal
     return <TextBlock block={block as TextContent} isStreaming={isStreaming} cwd={cwd} onOpenFile={onOpenFile} />;
   }
   if (block.type === "thinking") {
-    return <ThinkingBlock block={block as ThinkingContent} duration={streamingDuration} sessionId={sessionId} entryId={entryId} blockIndex={blockIndex} />;
+    return <ThinkingBlock block={block as ThinkingContent} duration={streamingDuration} sessionId={sessionId} entryId={entryId} blockIndex={blockIndex} isStreaming={isStreaming} />;
   }
   if (block.type === "toolCall") {
     const tc = block as ToolCallContent;
@@ -599,12 +599,13 @@ const TextBlock = memo(function TextBlock({ block, isStreaming, cwd, onOpenFile 
   && prev.onOpenFile === next.onOpenFile
 ));
 
-const ThinkingBlock = memo(function ThinkingBlock({ block, duration, sessionId, entryId, blockIndex }: {
+const ThinkingBlock = memo(function ThinkingBlock({ block, duration, sessionId, entryId, blockIndex, isStreaming }: {
   block: ThinkingContent;
   duration?: number;
   sessionId?: string;
   entryId?: string;
   blockIndex: number;
+  isStreaming?: boolean;
 }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
@@ -694,7 +695,7 @@ const ThinkingBlock = memo(function ThinkingBlock({ block, duration, sessionId, 
             <Brain size={12} strokeWidth={1.8} />
           </span>
           <span className="activity-row-tool">{t("messageView.thinking")}</span>
-          <span className="activity-row-preview" title={preview || undefined}>{loading && !preview ? t("messageView.loadingThinking") : preview}</span>
+          <span className="activity-row-preview" title={preview || undefined}>{!preview && (loading || isStreaming) ? t("messageView.loadingThinking") : preview}</span>
           {duration !== undefined && (
             <span className="activity-row-duration">{t("messageView.durationSeconds", { seconds: duration })}</span>
           )}
@@ -722,7 +723,7 @@ const ThinkingBlock = memo(function ThinkingBlock({ block, duration, sessionId, 
               }}
             >
               <pre className="tool-call-output-text">
-                {loading ? t("messageView.loadingThinking") : error ?? (block.deferred ? (content ?? "") : block.thinking)}
+                {loading || (isStreaming && !previewSource.trim()) ? t("messageView.loadingThinking") : error ?? (block.deferred ? (content ?? "") : block.thinking)}
               </pre>
             </div>
           </div>
@@ -737,8 +738,8 @@ const ThinkingBlock = memo(function ThinkingBlock({ block, duration, sessionId, 
   && prev.sessionId === next.sessionId
   && prev.entryId === next.entryId
   && prev.blockIndex === next.blockIndex
+  && prev.isStreaming === next.isStreaming
 ));
-
 const TOOL_ICONS = {
   FileText,
   FilePlus,
