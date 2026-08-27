@@ -15,5 +15,8 @@ export async function resolveSessionPathOr404(
 
 /** Uniform JSON error body used by most API routes. */
 export function apiErrorResponse(error: unknown, status = 500): NextResponse {
-  return NextResponse.json({ error: String(error) }, { status });
+  // Don't leak internal stacks/paths to the browser — log server-side and return generic.
+  console.error("[api]", error);
+  const message = status >= 500 ? "Internal server error" : String(error);
+  return NextResponse.json({ error: message }, { status });
 }

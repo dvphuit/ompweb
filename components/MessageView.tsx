@@ -430,6 +430,11 @@ function AssistantMessageView({
   // Streaming-based timing for thinking blocks
   const blockStartTimesRef = useRef<Map<number, number>>(new Map());
   const [streamingDurations, setStreamingDurations] = useState<Map<number, number>>(new Map());
+  // New assistant turn → old start times are stale (originalIndex 0/1 collides across messages)
+  useEffect(() => {
+    blockStartTimesRef.current.clear();
+    setStreamingDurations(new Map());
+  }, [entryId, message.timestamp]);
 
   // Thinking duration derived from file timestamps: time from prev message end to this message end
   // This is the total generation time (thinking + any text before first tool call)
@@ -476,6 +481,8 @@ function AssistantMessageView({
       });
 
       // When a non-last block has a successor already started, finalise its duration
+      // plus keep a live elapsed ticker for the active trailing block so the header
+      // shows "Thinking… 3s" while streaming instead of remaining blank.
       setStreamingDurations((prev: Map<number, number>) => {
         let changed = false;
         const next = new Map(prev);
@@ -487,6 +494,17 @@ function AssistantMessageView({
             const nextStart = blockStartTimesRef.current.get(nextOriginalIndex) ?? now;
             next.set(originalIndex, Math.round((nextStart - start) / 1000));
             changed = true;
+          }
+        }
+        if (items.length > 0) {
+          const lastIdx = items[items.length - 1].originalIndex;
+          const start = blockStartTimesRef.current.get(lastIdx);
+          if (start != null) {
+            const live = Math.round((now - start) / 1000);
+            if (next.get(lastIdx) !== live) {
+              next.set(lastIdx, live);
+              changed = true;
+            }
           }
         }
         return changed ? next : prev;
@@ -556,9 +574,28 @@ function AssistantMessageView({
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-        {blockItems.map(({ block, originalIndex }) => (
-          <BlockView key={`${entryId ?? "stream"}-${originalIndex}`} block={block} toolResults={toolResults} isStreaming={isStreaming} streamingDuration={streamingDurations.get(originalIndex) ?? (block.type === "thinking" ? thinkingDurationFromFile : undefined)} toolCallDurations={toolCallDurations} cwd={cwd} onOpenFile={onOpenFile} sessionId={sessionId} entryId={entryId} blockIndex={originalIndex} toolCallsDefaultCollapsed={toolCallsDefaultCollapsed} />
-        ))}
+        {(() => {
+          const activeIndex = isStreaming && blockItems.length > 0 ? blockItems[blockItems.length - 1].originalIndex : undefined;
+          return blockItems.map(({ block, originalIndex }) => {
+            const isBlockStreaming = isStreaming && originalIndex === activeIndex;
+            return (
+              <BlockView
+                key={`${entryId ?? "stream"}-${originalIndex}`}
+                block={block}
+                toolResults={toolResults}
+                isStreaming={isBlockStreaming}
+                streamingDuration={streamingDurations.get(originalIndex) ?? (block.type === "thinking" ? thinkingDurationFromFile : undefined)}
+                toolCallDurations={toolCallDurations}
+                cwd={cwd}
+                onOpenFile={onOpenFile}
+                sessionId={sessionId}
+                entryId={entryId}
+                blockIndex={originalIndex}
+                toolCallsDefaultCollapsed={toolCallsDefaultCollapsed}
+              />
+            );
+          });
+        })()}
       </div>
 
       {time && !isStreaming && (
@@ -609,12 +646,54 @@ const ThinkingBlock = memo(function ThinkingBlock({ block, duration, sessionId, 
   isStreaming?: boolean;
 }) {
   const { t } = useI18n();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(!!isStreaming);
+  const [userToggled, setUserToggled] = useState(false);
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(false);
+  const prevStreamingRef = useRef<boolean>(!!isStreaming);
+  const streamStartRef = useRef<number | null>(null);
+  const [liveSeconds, setLiveSeconds] = useState(0);
+
+  // Auto-expand while streaming, auto-collapse shortly after (unless user interacted)
+  useEffect(() => {
+    const wasStreaming = prevStreamingRef.current;
+    const nowStreaming = !!isStreaming;
+    if (!wasStreaming && nowStreaming && !userToggled) {
+      setExpanded(true);
+    } else if (wasStreaming && !nowStreaming && !userToggled) {
+      const id = setTimeout(() => setExpanded(false), 700);
+      prevStreamingRef.current = nowStreaming;
+      return () => clearTimeout(id);
+    }
+    prevStreamingRef.current = nowStreaming;
+  }, [isStreaming, userToggled]);
+
+  // Live elapsed ticker while streaming (fallback when duration prop is not yet live)
+  useEffect(() => {
+    if (!isStreaming) {
+      streamStartRef.current = null;
+      setLiveSeconds(0);
+      return;
+    }
+    if (streamStartRef.current === null) streamStartRef.current = Date.now();
+    setLiveSeconds(Math.round((Date.now() - streamStartRef.current) / 1000));
+    const id = setInterval(() => {
+      if (streamStartRef.current == null) return;
+      setLiveSeconds(Math.round((Date.now() - streamStartRef.current) / 1000));
+    }, 500);
+    return () => clearInterval(id);
+  }, [isStreaming]);
+
+  // Reset user-toggle state and streaming baseline when identity changes
+  useEffect(() => {
+    setUserToggled(false);
+    streamStartRef.current = null;
+    setLiveSeconds(0);
+  }, [sessionId, entryId, blockIndex, block.deferred]);
 
   // Only fetch deferred thinking when the row is near viewport or expanded —
   // avoids N+1 fetches for long histories (deferThinking creates many
@@ -674,6 +753,7 @@ const ThinkingBlock = memo(function ThinkingBlock({ block, duration, sessionId, 
 
   const handleOpenChange = (nextOpen: boolean) => {
     setExpanded(nextOpen);
+    setUserToggled(true);
     if (!nextOpen || !block.deferred || content !== null || loading) return;
     if (!sessionId || !entryId) {
       setError(t("messageView.thinkingUnavailable"));
@@ -687,22 +767,71 @@ const ThinkingBlock = memo(function ThinkingBlock({ block, duration, sessionId, 
       .finally(() => setLoading(false));
   };
 
-  const previewSource = block.deferred ? (content ?? "") : (block.thinking ?? "");
-  // Keep full normalized text; let CSS (text-overflow: ellipsis, white-space: nowrap)
-  // handle truncation to avoid cutting grapheme/CJK in JS. Previously slice(0,100).
-  const preview = previewSource.trim().replace(/\s+/g, " ");
+  const rawThinking = block.deferred ? (content ?? "") : (block.thinking ?? "");
+  const preview = useMemo(() => {
+    const src = rawThinking.trim().replace(/\s+/g, " ");
+    return src.length > 220 ? src.slice(0, 220) : src;
+  }, [rawThinking]);
+  const hasContent = rawThinking.trim().length > 0;
+  const isDeferredPending = !!block.deferred && content === null;
+  const isActive = !!isStreaming;
+  const displayDuration = duration ?? (isActive ? (liveSeconds > 0 ? liveSeconds : undefined) : undefined);
+  const status: "running" | "success" | undefined = isActive ? "running" : (hasContent || block.deferred) ? "success" : undefined;
+
+  // Auto-scroll the expanded body to the bottom while streaming
+  useEffect(() => {
+    if (!isActive || !expanded) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const id = requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+    });
+    return () => cancelAnimationFrame(id);
+  }, [rawThinking, isActive, expanded]);
 
   return (
-    <div ref={containerRef} className="activity-row" data-activity-operation="true">
+    <div
+      ref={containerRef}
+      className={`activity-row thinking-block${isActive ? " thinking-streaming" : ""}${expanded ? " is-expanded" : ""}`}
+      data-activity-operation="true"
+      data-status={status}
+      style={{ ["--tool-color" as unknown as string]: "var(--tool-ask)" } as React.CSSProperties}
+    >
       <Collapsible open={expanded} onOpenChange={handleOpenChange}>
-        <CollapsibleTrigger className="activity-row-trigger">
-          <span className="activity-row-indicator" aria-hidden>
-            <Brain size={12} strokeWidth={1.8} />
+        <CollapsibleTrigger className="activity-row-trigger thinking-trigger" aria-label={`${t("messageView.thinking")} ${status ?? ""}`}>
+          <span className={`activity-row-indicator thinking-indicator${isActive ? " thinking-pulse" : ""}`} aria-hidden>
+            {isActive ? (
+              <LoaderCircle size={12} strokeWidth={1.8} className="activity-row-spinner" />
+            ) : (
+              <Brain size={12} strokeWidth={1.8} />
+            )}
           </span>
-          <span className="activity-row-tool">{t("messageView.thinking")}</span>
-          <span className="activity-row-preview" title={preview || undefined}>{!preview && (loading || isStreaming) ? t("messageView.loadingThinking") : preview}</span>
-          {duration !== undefined && (
-            <span className="activity-row-duration">{t("messageView.durationSeconds", { seconds: duration })}</span>
+          <span className="activity-row-tool thinking-label">
+            {t("messageView.thinking")}
+            {isActive && (
+              <span className="thinking-dots" aria-hidden>
+                <span>.</span>
+                <span>.</span>
+                <span>.</span>
+              </span>
+            )}
+          </span>
+          <span className="activity-row-preview" title={preview || undefined}>
+            {!preview && (loading || isActive || isDeferredPending) ? (
+              <span className="thinking-preview-loading">{t("messageView.loadingThinking")}</span>
+            ) : (
+              <>
+                {preview}
+                {isActive && !expanded && hasContent && (
+                  <span className="thinking-caret" aria-hidden>
+                    ▌
+                  </span>
+                )}
+              </>
+            )}
+          </span>
+          {displayDuration !== undefined && (
+            <span className="activity-row-duration">{t("messageView.durationSeconds", { seconds: displayDuration })}</span>
           )}
           <ChevronDown
             size={11}
@@ -716,20 +845,42 @@ const ThinkingBlock = memo(function ThinkingBlock({ block, duration, sessionId, 
           />
         </CollapsibleTrigger>
         {expanded && (
-          <div className="tool-call-details">
+          <div className="tool-call-details thinking-details">
             <div
-              className={`tool-call-output${error ? " tool-call-output-error" : ""}`}
+              ref={scrollRef}
+              className={`tool-call-output thinking-output${error ? " tool-call-output-error" : ""}${isActive ? " thinking-output-streaming" : ""}`}
               style={{
                 whiteSpace: "pre-wrap",
                 fontFamily: "var(--font-mono)",
                 fontSize: 10.5,
                 lineHeight: 1.45,
                 color: error ? "var(--status-error)" : "var(--text-muted)",
+                maxHeight: isActive ? 320 : 420,
+                overflow: "auto",
+                position: "relative",
               }}
             >
-              <pre className="tool-call-output-text">
-                {loading || (isStreaming && !previewSource.trim()) ? t("messageView.loadingThinking") : error ?? (block.deferred ? (content ?? "") : block.thinking)}
+              <pre className="tool-call-output-text thinking-text" aria-live={isActive ? "polite" : undefined} aria-busy={isActive}>
+                {loading || isDeferredPending || (isActive && !hasContent) ? (
+                  <span className="thinking-skeleton" aria-hidden>
+                    <span className="skeleton" style={{ display: "block", height: 10, width: "94%", marginBottom: 6, borderRadius: 4 }} />
+                    <span className="skeleton" style={{ display: "block", height: 10, width: "89%", marginBottom: 6, borderRadius: 4 }} />
+                    <span className="skeleton" style={{ display: "block", height: 10, width: "62%", borderRadius: 4 }} />
+                  </span>
+                ) : error ? (
+                  error
+                ) : (
+                  <>
+                    {rawThinking}
+                    {isActive && hasContent && (
+                      <span className="thinking-caret thinking-caret-inline" aria-hidden>
+                        ▌
+                      </span>
+                    )}
+                  </>
+                )}
               </pre>
+              {isActive && hasContent && rawThinking.length > 500 && <div className="thinking-fade" aria-hidden />}
             </div>
           </div>
         )}

@@ -1964,6 +1964,100 @@ html.dark .dropdown-surface :is(select, option) {
 @media (prefers-reduced-motion: reduce) {
   .activity-row-spinner { animation: none; }
 }
+/* Thinking block — streaming polish */
+.thinking-block {
+  --tool-color: var(--tool-ask);
+}
+.thinking-block[data-status="running"] {
+  border-left-color: color-mix(in srgb, var(--tool-ask) 55%, transparent);
+  background: color-mix(in srgb, var(--tool-ask) 5%, transparent);
+  border-radius: 6px;
+}
+.thinking-block[data-status="success"] {
+  border-left-color: color-mix(in srgb, var(--tool-ask) 28%, transparent);
+}
+.thinking-trigger:hover {
+  background: color-mix(in srgb, var(--tool-ask) 7%, transparent);
+  border-radius: 6px;
+}
+.thinking-indicator.thinking-pulse {
+  color: var(--tool-ask);
+}
+.thinking-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.thinking-dots {
+  display: inline-flex;
+  gap: 1px;
+  margin-left: 1px;
+}
+.thinking-dots span {
+  animation: thinking-dot-pulse 1.2s ease-in-out infinite;
+  opacity: 0.3;
+}
+.thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes thinking-dot-pulse {
+  0%, 80%, 100% { opacity: 0.3; }
+  40% { opacity: 1; }
+}
+.thinking-caret {
+  display: inline-block;
+  margin-left: 2px;
+  color: var(--tool-ask);
+  animation: thinking-caret-blink 1s step-end infinite;
+  font-weight: 300;
+}
+.thinking-caret-inline {
+  margin-left: 1px;
+}
+@keyframes thinking-caret-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+.thinking-output {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--tool-ask) 30%, var(--border)) transparent;
+}
+.thinking-output-streaming {
+  background: var(--bg);
+}
+.thinking-details {
+  border-color: color-mix(in srgb, var(--tool-ask) 18%, var(--border));
+  background: var(--bg-subtle);
+}
+.thinking-text {
+  position: relative;
+}
+.thinking-fade {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 18px;
+  margin-top: -18px;
+  background: linear-gradient(to bottom, transparent, var(--bg));
+  pointer-events: none;
+}
+.thinking-skeleton {
+  display: block;
+  padding: 2px 0;
+}
+.thinking-preview-loading {
+  color: var(--text-dim);
+  font-style: italic;
+  opacity: 0.9;
+}
+@media (prefers-reduced-motion: reduce) {
+  .thinking-dots span,
+  .thinking-caret,
+  .thinking-block .activity-row-spinner {
+    animation: none !important;
+  }
+  .thinking-dots span { opacity: 0.9; }
+}
 .tool-call-details {
   width: min(calc(100% - 21px), 760px);
   max-width: 760px;
