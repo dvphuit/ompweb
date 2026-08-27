@@ -179,6 +179,7 @@
   "chatInput.cmdGoal": "セッションの目標を設定する",
   "chatInput.cmdGoalArg": "[目標]",
   "chatInput.goalActive": "目標が有効",
+  "chatInput.goalCompleted": "目標が完了",
   "chatInput.expandGoal": "目標を展開",
   "chatInput.collapseGoal": "目標を折りたたむ",
   "chatInput.clearGoal": "目標を完了",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback, useMemo, type CSSProperties, type MouseEvent } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo, memo, type CSSProperties, type MouseEvent } from "react";
 import type { SyntaxHighlighterProps } from "react-syntax-highlighter";
 import {
   createSyntaxElement as renderSyntaxNode,
@@ -145,7 +145,7 @@ function getSelectedSourceLineRange(root: HTMLElement, selection: Selection | nu
   return { startLine, endLine };
 }
 
-function SourceCodeRenderer({ rows, stylesheet, useInlineStyles, wrapLines }: SourceCodeRendererProps) {
+const SourceCodeRenderer = memo(function SourceCodeRenderer({ rows, stylesheet, useInlineStyles, wrapLines }: SourceCodeRendererProps) {
   return rows.map((row, lineIndex) => {
     const children = row.children ?? [];
     const firstChildClasses = children[0]?.properties?.className;
@@ -186,7 +186,7 @@ function SourceCodeRenderer({ rows, stylesheet, useInlineStyles, wrapLines }: So
       </span>
     );
   });
-}
+});
 
 function getFileApiUrl(
   filePath: string,
@@ -273,47 +273,52 @@ function diffLines(patch: string): DiffLine[] {
   }));
 }
 
-function DiffView({ patch }: { patch: string }) {
+const DiffView = memo(function DiffView({ patch }: { patch: string }) {
   const { t, tn } = useI18n();
-  const diff = diffLines(patch);
+  const diff = useMemo(() => diffLines(patch), [patch]);
 
-  const hasChanges = diff.some((l) => l.type !== "unchanged");
+  const hasChanges = useMemo(() => diff.some((l) => l.type !== "unchanged"), [diff]);
+
+  const segments = useMemo(() => {
+    if (!hasChanges) return [];
+    // Render with context: show 3 lines around each change, collapse the rest
+    const CONTEXT = 3;
+    const changed = new Set(diff.flatMap((l, i) => (l.type !== "unchanged" ? [i] : [])));
+    const visible = new Set<number>();
+    for (const ci of changed) {
+      for (let j = Math.max(0, ci - CONTEXT); j <= Math.min(diff.length - 1, ci + CONTEXT); j++) {
+        visible.add(j);
+      }
+    }
+
+    const result: Array<{ hidden: true; count: number } | { hidden: false; lines: DiffLine[] }> = [];
+    let i = 0;
+    while (i < diff.length) {
+      if (visible.has(i)) {
+        const block: DiffLine[] = [];
+        while (i < diff.length && visible.has(i)) {
+          block.push(diff[i]);
+          i++;
+        }
+        result.push({ hidden: false, lines: block });
+      } else {
+        let count = 0;
+        while (i < diff.length && !visible.has(i)) {
+          count++;
+          i++;
+        }
+        result.push({ hidden: true, count });
+      }
+    }
+    return result;
+  }, [diff, hasChanges]);
+
   if (!hasChanges) {
     return (
       <div style={{ padding: "12px 16px", fontSize: 12, color: "var(--text-dim)", fontFamily: "var(--font-mono)" }}>
         {t("fileViewer.noChanges")}
       </div>
     );
-  }
-
-  // Render with context: show 3 lines around each change, collapse the rest
-  const CONTEXT = 3;
-  const changed = new Set(diff.flatMap((l, i) => (l.type !== "unchanged" ? [i] : [])));
-  const visible = new Set<number>();
-  for (const ci of changed) {
-    for (let j = Math.max(0, ci - CONTEXT); j <= Math.min(diff.length - 1, ci + CONTEXT); j++) {
-      visible.add(j);
-    }
-  }
-
-  const segments: Array<{ hidden: true; count: number } | { hidden: false; lines: DiffLine[] }> = [];
-  let i = 0;
-  while (i < diff.length) {
-    if (visible.has(i)) {
-      const block: DiffLine[] = [];
-      while (i < diff.length && visible.has(i)) {
-        block.push(diff[i]);
-        i++;
-      }
-      segments.push({ hidden: false, lines: block });
-    } else {
-      let count = 0;
-      while (i < diff.length && !visible.has(i)) {
-        count++;
-        i++;
-      }
-      segments.push({ hidden: true, count });
-    }
   }
 
   return (
@@ -327,7 +332,7 @@ function DiffView({ patch }: { patch: string }) {
     >
       {segments.map((seg, si) => {
         if (seg.hidden) {
-          const result = (
+          return (
             <div
               key={si}
               style={{
@@ -342,7 +347,6 @@ function DiffView({ patch }: { patch: string }) {
               {tn("fileViewer.unchangedLines", seg.count)}
             </div>
           );
-          return result;
         }
         const lines = seg.lines.map((line, li) => {
           const bg =
@@ -406,7 +410,7 @@ function DiffView({ patch }: { patch: string }) {
       })}
     </div>
   );
-}
+});
 
 function ImageViewer({ filePath, cwd, sourceSessionId }: Props) {
   const { t } = useI18n();
@@ -947,6 +951,67 @@ function TextFileViewer({ filePath, cwd, sourceSessionId, onOpenFile, onMentionL
   );
   const markdownPlugins = useMarkdownPlugins(markdownPreview);
 
+  const markdownComponents = useMemo(() => ({
+    code: markdownCodeRenderer({ defaultPreview: true, cwd: getFileDirectory(filePath), onOpenFile }),
+    pre({ children }: { children?: React.ReactNode }) {
+      // Render the code block directly — CodeBlock provides its own wrapping.
+      // For non-mermaid blocks, pass through to default pre rendering.
+      return <>{children}</>;
+    },
+    a({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { node?: unknown }) {
+      delete props.node;
+      const mdDir = getFileDirectory(filePath);
+      const linkedFile = onOpenFile
+        ? resolveLocalFileHref(href, mdDir, cwd ?? mdDir)
+        : null;
+      if (!linkedFile || !onOpenFile) {
+        return <a href={href} {...props}>{children}</a>;
+      }
+
+      const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
+        if (event.defaultPrevented || event.button !== 0) return;
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        onOpenFile(linkedFile);
+      };
+
+      return <a href={href} {...props} onClick={handleClick}>{children}</a>;
+    },
+    img({ src, alt, ...props }: React.ImgHTMLAttributes<HTMLImageElement> & { node?: unknown }) {
+      delete props.node;
+      const mdDir = getFileDirectory(filePath);
+      const imagePath = typeof src === "string"
+        ? resolveLocalFileHref(src, mdDir, cwd ?? mdDir)
+        : null;
+      const imageSrc = imagePath
+        ? getFileApiUrl(imagePath, "read", sourceSessionId)
+        : src;
+      // Dynamic local paths are served directly by the file API.
+      // eslint-disable-next-line @next/next/no-img-element
+      return <img src={imageSrc} alt={alt ?? ""} loading="lazy" {...props} />;
+    },
+  }), [filePath, cwd, onOpenFile, sourceSessionId]);
+
+  const renderSourceCode = useCallback(
+    (rendererProps: Parameters<NonNullable<SyntaxHighlighterProps["renderer"]>>[0]) => (
+      <SourceCodeRenderer {...rendererProps} wrapLines={wrapLines} />
+    ),
+    [wrapLines],
+  );
+
+  const lineCount = useMemo(() => {
+    if (!data?.content) return 0;
+    let count = 1;
+    for (let i = 0; i < data.content.length; i++) {
+      if (data.content.charCodeAt(i) === 10) count++;
+    }
+    return count;
+  }, [data]);
+
+  const metadata = useMemo(() => {
+    if (!data) return "";
+    return t("fileViewer.metadata", { language: data.language, lines: lineCount, size: formatSize(data.size) });
+  }, [data, lineCount, t]);
   useEffect(() => {
     const updateSelectedLineRange = () => {
       const root = contentRef.current;
@@ -1033,14 +1098,11 @@ function TextFileViewer({ filePath, cwd, sourceSessionId, onOpenFile, onMentionL
   const isHtml = data.language === "html";
   const isMarkdown = data.language === "markdown";
   const hasPreview = isHtml || isMarkdown;
-  const markdownDirectory = getFileDirectory(filePath);
-  const lines = data.content.split("\n");
   const displayModes: DisplayMode[] = [
     "source",
     ...(hasPreview ? ["preview" as const] : []),
     ...(hasGitDiff ? ["diff" as const] : []),
   ];
-  const metadata = t("fileViewer.metadata", { language: data.language, lines: lines.length, size: formatSize(data.size) });
   const fullRelativePath = getRelativeFilePath(filePath, cwd);
   const pathSepIndex = fullRelativePath.lastIndexOf("/");
   const breadcrumbDir = pathSepIndex >= 0 ? fullRelativePath.slice(0, pathSepIndex + 1) : "";
@@ -1187,44 +1249,7 @@ function TextFileViewer({ filePath, cwd, sourceSessionId, onOpenFile, onMentionL
             <ReactMarkdown
               remarkPlugins={markdownPlugins.remarkPlugins}
               rehypePlugins={markdownPlugins.rehypePlugins}
-              components={{
-                code: markdownCodeRenderer({ defaultPreview: true, cwd: markdownDirectory, onOpenFile }),
-                pre({ children }) {
-                  // Render the code block directly — CodeBlock provides its own wrapping.
-                  // For non-mermaid blocks, pass through to default pre rendering.
-                  return <>{children}</>;
-                },
-                a({ href, children, ...props }) {
-                  delete props.node;
-                  const linkedFile = onOpenFile
-                    ? resolveLocalFileHref(href, markdownDirectory, cwd ?? markdownDirectory)
-                    : null;
-                  if (!linkedFile || !onOpenFile) {
-                    return <a href={href} {...props}>{children}</a>;
-                  }
-
-                  const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
-                    if (event.defaultPrevented || event.button !== 0) return;
-                    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-                    event.preventDefault();
-                    onOpenFile(linkedFile);
-                  };
-
-                  return <a href={href} {...props} onClick={handleClick}>{children}</a>;
-                },
-                img({ src, alt, ...props }) {
-                  delete props.node;
-                  const imagePath = typeof src === "string"
-                    ? resolveLocalFileHref(src, markdownDirectory, cwd ?? markdownDirectory)
-                    : null;
-                  const imageSrc = imagePath
-                    ? getFileApiUrl(imagePath, "read", sourceSessionId)
-                    : src;
-                  // Dynamic local paths are served directly by the file API.
-                  // eslint-disable-next-line @next/next/no-img-element
-                  return <img src={imageSrc} alt={alt ?? ""} loading="lazy" {...props} />;
-                },
-              }}
+              components={markdownComponents}
             >
               {markdownPreview}
             </ReactMarkdown>
@@ -1255,9 +1280,7 @@ function TextFileViewer({ filePath, cwd, sourceSessionId, onOpenFile, onMentionL
                 overflowWrap: wrapLines ? "anywhere" : "normal",
               },
             }}
-            renderer={(rendererProps) => (
-              <SourceCodeRenderer {...rendererProps} wrapLines={wrapLines} />
-            )}
+            renderer={renderSourceCode}
             wrapLongLines={wrapLines}
           >
             {data.content}

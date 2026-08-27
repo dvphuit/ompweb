@@ -24,6 +24,8 @@ declare global {
   }
 }
 
+const NOOP_OPEN_FILE = () => {};
+
 interface Props {
   selectedSessionId: string | null;
   /** The active session can exist in memory before its JSONL file is flushed. */
@@ -1840,7 +1842,7 @@ export function SessionSidebar({ selectedSessionId, optimisticSession, onSelectS
             <div className="accordion-flow-inner" style={{ height: "100%", overflowY: "auto", overflowX: "hidden" }}>
               <FileExplorer
                 cwd={selectedCwd ?? selectedCwdProp!}
-                onOpenFile={onOpenFile ?? (() => {})}
+                onOpenFile={onOpenFile ?? NOOP_OPEN_FILE}
                 refreshKey={explorerKey}
                 onAtMention={onAtMention}
                 onRefreshDone={onExplorerRefreshDone}

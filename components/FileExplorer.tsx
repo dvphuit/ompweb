@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef, memo } from "react";
 import {
   AtSign,
   ChevronRight,
@@ -101,7 +101,7 @@ const GIT_STATUS_COLORS: Record<GitFileStatusKind, string> = {
 };
 
 
-function TreeNode({
+const TreeNode = memo(function TreeNode({
   node,
   depth,
   cwd,
@@ -139,8 +139,6 @@ function TreeNode({
   const [children, setChildren] = useState<FileNode[]>(node.children ?? []);
   const [loaded, setLoaded] = useState(node.loaded ?? false);
   const [loading, setLoading] = useState(false);
-  const [hovered, setHovered] = useState(false);
-  const [focused, setFocused] = useState(false);
 
   useEffect(() => {
     if (staticMode) {
@@ -238,30 +236,15 @@ function TreeNode({
         data-file-relative={getRelativeFilePath(node.fullPath, cwd)}
         onClick={handleClick}
         onKeyDown={handleKeyDown}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        onFocus={(e) => { if (e.target === e.currentTarget) setFocused(true); }}
-        onBlur={() => setFocused(false)}
         role="treeitem"
         tabIndex={0}
         aria-selected={highlighted}
         aria-expanded={node.isDir ? open : undefined}
         aria-label={node.isDir ? (node.name + " (folder" + (open ? ", expanded" : ", collapsed") + ")") : (node.name + " (file)")}
+        className="file-tree-row"
         style={{
-          position: "relative",
-          display: "flex",
-          alignItems: "center",
-          gap: 4,
           paddingLeft: 8 + depth * 14,
           paddingRight: 8,
-          height: 24,
-          cursor: "pointer",
-          background: hovered ? "var(--bg-hover)" : "transparent",
-          borderRadius: "var(--radius-control)",
-          userSelect: "none",
-          boxShadow: focused ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent)" : "none",
-          outline: "none",
-          transition: `background var(--dur-fast) var(--ease-out-warm)`,
         }}
       >
         {node.isDir && (
@@ -305,19 +288,11 @@ function TreeNode({
             style={{ width: 6, height: 6, flexShrink: 0, borderRadius: "50%", background: "var(--accent)" }}
           />
         )}
-        {!hovered && !node.isDir && gitStatus && (
+        {!node.isDir && gitStatus && (
           <span
+            className="file-tree-status-badge"
             title={`${t(GIT_STATUS_LABEL_KEYS[gitStatus.status])}${gitStatus.insertions !== undefined || gitStatus.deletions !== undefined ? ` (+${gitStatus.insertions ?? 0} -${gitStatus.deletions ?? 0})` : ""}`}
             aria-label={`${t(GIT_STATUS_LABEL_KEYS[gitStatus.status])}${gitStatus.insertions !== undefined || gitStatus.deletions !== undefined ? ` (+${gitStatus.insertions ?? 0} -${gitStatus.deletions ?? 0})` : ""}`}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 3,
-              flexShrink: 0,
-              fontFamily: "var(--font-mono)",
-              fontSize: 10,
-              fontWeight: 600,
-            }}
           >
             <span
               style={{
@@ -342,23 +317,17 @@ function TreeNode({
               )}
           </span>
         )}
-        {!hovered && containsGitChanges && (
+        {containsGitChanges && (
           <span
+            className="file-tree-changes-dot"
             title={t("fileExplorer.containsChangedFiles")}
             aria-label={t("fileExplorer.containsChangedFiles")}
-            style={{
-              width: 6,
-              height: 6,
-              flexShrink: 0,
-              borderRadius: "50%",
-              background: "var(--status-modified)",
-            }}
           />
         )}
         {loading && (
           <Loader2 size={10} strokeWidth={2} color="var(--text-dim)" style={{ animation: "spin 0.8s linear infinite", flexShrink: 0 }} aria-hidden="true" />
         )}
-        {onAtMention && hovered && (
+        {onAtMention && (
           <Tooltip content={mentionLabel}>
             <button
               onClick={(e) => {
@@ -366,27 +335,7 @@ function TreeNode({
                 onAtMention(getRelativeFilePath(node.fullPath, cwd), node.isDir);
               }}
               aria-label={mentionLabel}
-              style={{
-                position: "absolute",
-                right: 4,
-                top: "50%",
-                transform: "translateY(-50%)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 4,
-                padding: "0 8px",
-                height: 20,
-                background: "var(--bg-panel)",
-                border: "1px solid var(--border)",
-                borderRadius: "var(--radius-control)",
-                color: "var(--accent)",
-                cursor: "pointer",
-                fontSize: 11,
-                fontWeight: 600,
-                whiteSpace: "nowrap",
-                transition: `background var(--dur-fast) var(--ease-out-warm), color var(--dur-fast) var(--ease-out-warm)`,
-              }}
+              className="file-tree-mention-button"
             >
               <AtSign size={11} strokeWidth={2.2} aria-hidden="true" />
               {t("fileExplorer.mention")}
@@ -424,9 +373,8 @@ function TreeNode({
       )}
     </div>
   );
-}
-
-function ChangedListRow({
+});
+const ChangedListRow = memo(function ChangedListRow({
   status,
   cwd,
   onOpenFile,
@@ -438,7 +386,6 @@ function ChangedListRow({
   onAtMention?: (relativePath: string, isDir: boolean) => void;
 }) {
   const { t } = useI18n();
-  const [hovered, setHovered] = useState(false);
   const relative = getRelativeFilePath(status.filePath, cwd);
   const fileName = getFileName(status.filePath);
   const gitStatus = status;
@@ -448,10 +395,8 @@ function ChangedListRow({
       data-file-path={status.filePath}
       data-file-name={fileName}
       data-file-is-dir="false"
-      data-file-relative={getRelativeFilePath(status.filePath, cwd)}
+      data-file-relative={relative}
       onClick={() => onOpenFile(status.filePath, fileName)}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       role="treeitem"
       aria-selected={false}
       tabIndex={0}
@@ -461,19 +406,10 @@ function ChangedListRow({
           onOpenFile(status.filePath, fileName);
         }
       }}
+      className="file-tree-row"
       style={{
-        position: "relative",
-        display: "flex",
-        alignItems: "center",
-        gap: 4,
         paddingLeft: 8,
         paddingRight: 8,
-        height: 24,
-        cursor: "pointer",
-        background: hovered ? "var(--bg-hover)" : "transparent",
-        borderRadius: "var(--radius-control)",
-        userSelect: "none",
-        transition: `background var(--dur-fast) var(--ease-out-warm)`,
       }}
     >
       <span style={{ flexShrink: 0, display: "flex", alignItems: "center", color: "var(--text-dim)" }}>
@@ -493,15 +429,7 @@ function ChangedListRow({
         {relative}
       </span>
       <span
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 3,
-          flexShrink: 0,
-          fontFamily: "var(--font-mono)",
-          fontSize: 10,
-          fontWeight: 600,
-        }}
+        className="file-tree-status-badge"
       >
         <span
           title={t(GIT_STATUS_LABEL_KEYS[gitStatus.status])}
@@ -526,7 +454,7 @@ function ChangedListRow({
             </>
           )}
       </span>
-      {onAtMention && hovered && (
+      {onAtMention && (
         <Tooltip content={t("fileExplorer.insertPathIntoChat")}>
           <button
             onClick={(e) => {
@@ -534,26 +462,7 @@ function ChangedListRow({
               onAtMention(relative, false);
             }}
             aria-label={t("fileExplorer.insertPathIntoChat")}
-            style={{
-              position: "absolute",
-              right: 4,
-              top: "50%",
-              transform: "translateY(-50%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 4,
-              padding: "0 8px",
-              height: 20,
-              background: "var(--bg-panel)",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-control)",
-              color: "var(--accent)",
-              cursor: "pointer",
-              fontSize: 11,
-              fontWeight: 600,
-              whiteSpace: "nowrap",
-            }}
+            className="file-tree-mention-button"
           >
             <AtSign size={11} strokeWidth={2.2} aria-hidden="true" />
             {t("fileExplorer.mention")}
@@ -562,7 +471,7 @@ function ChangedListRow({
       )}
     </div>
   );
-}
+});
 
 export function FileExplorer({
   cwd,

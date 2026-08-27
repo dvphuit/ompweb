@@ -74,7 +74,7 @@ test("renders goal, planning, and advisor indicators at the composer", () => {
       onSend() {},
       onAbort() {},
       onModelChange() {},
-      isStreaming: false,
+      isStreaming: true,
       model: { provider: "test", modelId: "model" },
       modelList: [{ provider: "test", modelId: "model", id: "model", name: "Test model" }],
       modelNames: {},
@@ -87,10 +87,32 @@ test("renders goal, planning, and advisor indicators at the composer", () => {
   );
 
   assert.match(html, /Ship the active goal bar/);
+  assert.match(html, /(Goal active|chatInput\.goalActive)/);
   assert.match(html, /(Planning in progress|chatInput\.planningInProgress)/);
   // The per-chat advisor toggle renders pressed with its disable title.
   assert.match(html, /aria-pressed="true"/);
   assert.match(html, /title="(Disable advisor for this chat|chatInput\.advisorDisableTitle|Advisor: [^"]*)"/);
+  assert.match(html, /(Finish goal|chatInput\.clearGoal)/);
+});
+
+test("renders completed goal status when finished", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(ChatInput, {
+      onSend() {},
+      onAbort() {},
+      onModelChange() {},
+      isStreaming: false,
+      model: { provider: "test", modelId: "model" },
+      modelList: [{ provider: "test", modelId: "model", id: "model", name: "Test model" }],
+      modelNames: {},
+      activeGoal: { objective: "Ship the active goal bar", startedAt: 1000, completedAt: 61000 },
+      onClearGoal() {},
+    }),
+  );
+
+  assert.match(html, /Ship the active goal bar/);
+  assert.match(html, /(Goal completed|chatInput\.goalCompleted)/);
+  assert.match(html, /1m/);
   assert.match(html, /(Finish goal|chatInput\.clearGoal)/);
 });
 

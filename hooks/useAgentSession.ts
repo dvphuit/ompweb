@@ -654,7 +654,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [subagentEvents, setSubagentEvents] = useState<Record<string, SubagentActivityEvent[]>>({});
   const [subagentTranscriptVersions, setSubagentTranscriptVersions] = useState<Record<string, number>>({});
   const [todoPhases, setTodoPhases] = useState<TodoPhase[]>([]);
+  const todoPhasesRef = useRef<TodoPhase[]>([]);
   const [activeGoal, setActiveGoal] = useState<ActiveGoal | null>(null);
+  const activeGoalRef = useRef<ActiveGoal | null>(null);
   const [activePlan, setActivePlan] = useState<ActivePlan | null>(null);
   const [advisorActiveAt, setAdvisorActiveAt] = useState(0);
   // Advisor is a per-chat toggle (composer Sparkles + /advisor command), not a
@@ -781,18 +783,53 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     setActivePlan(null);
     if (!sid) {
       setActiveGoal(null);
+      activeGoalRef.current = null;
       return;
     }
-    setActiveGoal(parseActiveGoal(sessionStorage.getItem(`omp-web:goal:${sid}`)));
+    const loaded = parseActiveGoal(sessionStorage.getItem(`omp-web:goal:${sid}`));
+    setActiveGoal(loaded);
+    activeGoalRef.current = loaded;
   }, [session?.id]);
   const handleClearGoal = useCallback(() => {
     setActiveGoal(null);
+    activeGoalRef.current = null;
     const sid = sessionIdRef.current;
     if (sid) {
       sessionStorage.removeItem(`omp-web:goal:${sid}`);
     }
   }, []);
 
+  useEffect(() => {
+    activeGoalRef.current = activeGoal;
+  }, [activeGoal]);
+
+  useEffect(() => {
+    todoPhasesRef.current = todoPhases;
+  }, [todoPhases]);
+
+  // When all tasks in the todo plan are completed (or the agent finishes running
+  // the goal), mark the active goal as completed with a timestamp.
+  useEffect(() => {
+    if (!activeGoal || activeGoal.completedAt) return;
+    const hasPhases = todoPhases.length > 0;
+    const allTasksCompleted = hasPhases && todoPhases.every((phase) =>
+      (phase.tasks ?? []).every((task) =>
+        task.status === "completed" || task.status === "abandoned"
+      )
+    );
+    if (allTasksCompleted || (!agentRunning && hasPhases && allTasksCompleted)) {
+      const completedGoal: ActiveGoal = {
+        ...activeGoal,
+        completedAt: Date.now(),
+      };
+      setActiveGoal(completedGoal);
+      activeGoalRef.current = completedGoal;
+      const sid = sessionIdRef.current;
+      if (sid) {
+        sessionStorage.setItem(`omp-web:goal:${sid}`, JSON.stringify(completedGoal));
+      }
+    }
+  }, [todoPhases, agentRunning, activeGoal]);
 
   // A plan request is in progress only for its current agent turn.
   useEffect(() => {
@@ -1935,6 +1972,26 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         subagentRosterGenerationRef.current += 1;
         resetSubagentActivityState();
         dispatch({ type: "end" });
+        if (activeGoalRef.current && !activeGoalRef.current.completedAt) {
+          const phases = todoPhasesRef.current;
+          const hasPhases = phases.length > 0;
+          const allTasksCompleted = hasPhases && phases.every((phase) =>
+            (phase.tasks ?? []).every((task) =>
+              task.status === "completed" || task.status === "abandoned"
+            )
+          );
+          if (allTasksCompleted || !hasPhases) {
+            const completedGoal: ActiveGoal = {
+              ...activeGoalRef.current,
+              completedAt: Date.now(),
+            };
+            setActiveGoal(completedGoal);
+            activeGoalRef.current = completedGoal;
+            if (endedSid) {
+              sessionStorage.setItem(`omp-web:goal:${endedSid}`, JSON.stringify(completedGoal));
+            }
+          }
+        }
         if (endedSid) {
           void loadSession(endedSid, false, false, endedRunId);
           const endToken = beginAuthoritativeModelSync();
@@ -2845,12 +2902,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
               }),
             });
           }
-          if (commandName === "plan") setActivePlan({ objective: args });
-          const sent = await handleSend(expansion.prompt);
-          if (!sent) {
-            if (commandName === "plan") setActivePlan(null);
-            return { handled: true, retainInput: true };
-          }
           if (commandName === "goal") {
             const trimmed = args.trim().toLowerCase();
             if (trimmed === "clear" || trimmed === "done" || trimmed === "finish" || trimmed === "remove" || trimmed === "off") {
@@ -2859,8 +2910,16 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
             }
             const goal = createActiveGoal(args);
             setActiveGoal(goal);
+            activeGoalRef.current = goal;
             const activeSessionId = sessionIdRef.current;
             if (activeSessionId) sessionStorage.setItem(`omp-web:goal:${activeSessionId}`, JSON.stringify(goal));
+          }
+          if (commandName === "plan") setActivePlan({ objective: args });
+          const sent = await handleSend(expansion.prompt);
+          if (!sent) {
+            if (commandName === "plan") setActivePlan(null);
+            if (commandName === "goal") handleClearGoal();
+            return { handled: true, retainInput: true };
           }
           return { handled: true };
         }

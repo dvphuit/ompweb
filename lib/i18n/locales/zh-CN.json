@@ -179,6 +179,7 @@
   "chatInput.cmdGoal": "设定本次会话的目标",
   "chatInput.cmdGoalArg": "[目标]",
   "chatInput.goalActive": "目标进行中",
+  "chatInput.goalCompleted": "目标已完成",
   "chatInput.expandGoal": "展开当前目标",
   "chatInput.collapseGoal": "收起当前目标",
   "chatInput.clearGoal": "完成目标",

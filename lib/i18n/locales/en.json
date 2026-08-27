@@ -179,6 +179,7 @@
   "chatInput.cmdGoal": "Set the goal for this session",
   "chatInput.cmdGoalArg": "[goal]",
   "chatInput.goalActive": "Goal active",
+  "chatInput.goalCompleted": "Goal completed",
   "chatInput.expandGoal": "Expand active goal",
   "chatInput.collapseGoal": "Collapse active goal",
   "chatInput.clearGoal": "Finish goal",
