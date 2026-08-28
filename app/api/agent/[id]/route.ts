@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { readSessionHeader } from "@/lib/session-reader";
 import { apiErrorResponse, resolveSessionPathOr404 } from "@/lib/api-utils";
-import { startRpcSession, getRpcSession, resolveSpawnCwdResult, WebRpcError } from "@/lib/rpc-manager";
+import { startRpcSession, getRpcSession, getLiveRpcSessionState, resolveSpawnCwdResult, WebRpcError } from "@/lib/rpc-manager";
 import { RpcCommandError } from "@/lib/omp/rpc-process";
 import { parseJsonWithinLimit, RequestBodyTooLargeError } from "@/lib/bounded-form-data";
 
@@ -80,13 +80,7 @@ export async function GET(
   const { id } = await params;
 
   try {
-    const session = getRpcSession(id);
-    if (!session || !session.isAlive()) {
-      return NextResponse.json({ running: false });
-    }
-
-    const state = await session.send({ type: "get_state" });
-    return NextResponse.json({ running: true, state });
+    return NextResponse.json(await getLiveRpcSessionState(id));
   } catch (error) {
     return commandErrorResponse(error);
   }

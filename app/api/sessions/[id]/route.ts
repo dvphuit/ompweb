@@ -23,7 +23,7 @@ import {
 } from "@/lib/session-reader";
 import { apiErrorResponse, resolveSessionPathOr404 } from "@/lib/api-utils";
 import { sessionPathKey } from "@/lib/paths";
-import { getRpcSession } from "@/lib/rpc-manager";
+import { getRpcSession, getLiveRpcSessionState } from "@/lib/rpc-manager";
 
 // BranchNavigator still traverses recursively, so keep the response tree shallow.
 const MAX_PROJECTED_TREE_DEPTH = 200;
@@ -204,17 +204,12 @@ export async function GET(
     // GET /api/agent/[id]) so the client's post-turn refresh is one request
     // instead of two. On a get_state failure the field is omitted entirely —
     // callers treat a missing `agent` as "fetch it separately".
-    let agent: { running: boolean; state?: unknown } | undefined;
+    let agent: Awaited<ReturnType<typeof getLiveRpcSessionState>> | undefined;
     if (includeState) {
-      const rpc = getRpcSession(id);
-      if (rpc?.isAlive()) {
-        try {
-          agent = { running: true, state: await rpc.send({ type: "get_state" }) };
-        } catch {
-          // Leave agent unset; the session payload is still valid without it.
-        }
-      } else {
-        agent = { running: false };
+      try {
+        agent = await getLiveRpcSessionState(id);
+      } catch {
+        // Leave agent unset; the session payload is still valid without it.
       }
     }
 

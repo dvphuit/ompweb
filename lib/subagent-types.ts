@@ -123,6 +123,12 @@ function asProgressStatus(value: unknown): SubagentProgress["status"] | undefine
     : undefined;
 }
 
+export function subagentStatusFromProgress(status: SubagentProgress["status"]): SubagentInfo["status"] | undefined {
+  if (status === "pending" || status === "running") return "started";
+  if (status === "completed" || status === "failed" || status === "aborted") return status;
+  return undefined;
+}
+
 /** Defensively copy an AgentProgress-shaped object into a SubagentProgress. */
 export function parseSubagentProgress(value: unknown): SubagentProgress | undefined {
   if (!isRecord(value)) return undefined;

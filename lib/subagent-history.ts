@@ -79,6 +79,40 @@ function resultStatus(value: Record<string, unknown>): SubagentHistoryEntry["sta
   return "started";
 }
 
+function asyncTaskStatus(value: unknown): SubagentHistoryEntry["status"] | undefined {
+  if (value === "completed") return "completed";
+  if (value === "merge failed" || (typeof value === "string" && value.startsWith("failed"))) return "failed";
+  if (value === "cancelled" || value === "aborted") return "aborted";
+  return undefined;
+}
+
+function customMessageText(entry: SessionEntry): string | undefined {
+  if (entry.type !== "custom_message" || entry.customType !== "async-result") return undefined;
+  if (typeof entry.content === "string") return entry.content;
+  if (!Array.isArray(entry.content)) return undefined;
+  return entry.content
+    .filter((block): block is { type: "text"; text: string } => isRecord(block) && block.type === "text" && typeof block.text === "string")
+    .map((block) => block.text)
+    .join("\n");
+}
+
+function applyTerminalSnapshot(
+  byId: Map<string, SubagentHistoryEntry>,
+  id: string,
+  status: SubagentHistoryEntry["status"],
+  fields: { agent?: string; durationMs?: number; resolvedModel?: string } = {},
+): void {
+  const existing = byId.get(id);
+  if (!existing) return;
+  byId.set(id, {
+    ...existing,
+    status,
+    agent: fields.agent ?? existing.agent,
+    durationMs: fields.durationMs ?? existing.durationMs,
+    resolvedModel: fields.resolvedModel ?? existing.resolvedModel,
+  });
+}
+
 /**
  * Recover the subagent roster from a parent session file. Walks task
  * toolResults, merging `progress` (live-snapshot fields) with `results`
@@ -212,6 +246,39 @@ export function extractSubagentHistory(sessionFilePath: string): SubagentHistory
           transcriptAvailable: false,
         });
       }
+    }
+  }
+
+  // Async task calls return while their progress rows are pending/running.
+  // Their terminal state is persisted later either as an async-result custom
+  // message or as a consumed `hub jobs`/`hub wait` snapshot.
+  for (const entry of entries) {
+    const completion = customMessageText(entry);
+    if (completion) {
+      const taskResultPattern = /<task-result\b([^>]*)>/g;
+      let match: RegExpExecArray | null;
+      while ((match = taskResultPattern.exec(completion)) !== null) {
+        const attrs = match[1];
+        const id = /\bid="([^"]+)"/.exec(attrs)?.[1];
+        const status = asyncTaskStatus(/\bstatus="([^"]+)"/.exec(attrs)?.[1]);
+        if (!id || !status) continue;
+        applyTerminalSnapshot(byId, id, status, { agent: /\bagent="([^"]+)"/.exec(attrs)?.[1] });
+      }
+      continue;
+    }
+
+    if (entry.type !== "message" || entry.message?.role !== "toolResult") continue;
+    const message = entry.message as { toolName?: unknown; details?: unknown };
+    if (message.toolName !== "hub" || !isRecord(message.details) || !Array.isArray(message.details.jobs)) continue;
+    for (const raw of message.details.jobs) {
+      if (!isRecord(raw) || raw.type !== "task") continue;
+      const id = asString(raw.id);
+      const status = asyncTaskStatus(raw.status);
+      if (!id || !status) continue;
+      applyTerminalSnapshot(byId, id, status, {
+        durationMs: asNumber(raw.durationMs),
+        resolvedModel: asString(raw.resolvedModel),
+      });
     }
   }
 

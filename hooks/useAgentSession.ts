@@ -21,7 +21,7 @@ import { getPreferredToolPreset, setPreferredToolPreset } from "@/lib/tool-prese
 import { toast } from "@/components/ui/toast";
 import { expandWebSlashCommand } from "@/lib/web-slash-commands";
 import { createActiveGoal, parseActiveGoal, type ActiveGoal, type ActivePlan } from "@/lib/web-mode-state";
-import type { HostToolDefinition, HostUriSchemeDefinition, RpcAvailableSlashCommand, SessionStatsInfo, TodoPhase } from "@/lib/pi-types";
+import type { HostToolDefinition, HostUriSchemeDefinition, LiveRpcSessionState, RpcAvailableSlashCommand, SessionStatsInfo, TodoPhase, WebSessionState } from "@/lib/pi-types";
 import { isRecord } from "@/lib/type-guards";
 import { subscribeSessionsChanged } from "@/lib/session-change-bus";
 import {
@@ -29,12 +29,14 @@ import {
   parseSubagentLifecycle,
   parseSubagentProgress,
   parseSubagentSnapshot,
+  subagentStatusFromProgress,
   type SubagentActivityEvent,
   type SubagentHistoryEntry,
   type SubagentInfo,
   type SubagentProgress,
   type SubagentSnapshotLike,
 } from "@/lib/subagent-types";
+import { INITIAL_RUNTIME_CONTROLS, mergeRuntimeControls, runtimeControlPatch, type RuntimeControls } from "@/lib/session-state";
 
 // SubagentInfo lives in lib/subagent-types (shared with the server-side
 // history module); keep the export path stable for components.
@@ -45,6 +47,7 @@ export interface SessionData {
   filePath: string;
   tree: SessionTreeNode[];
   leafId: string | null;
+  agent?: LiveRpcSessionState;
   context: {
     messages: AgentMessage[];
     entryIds: string[];
@@ -165,32 +168,6 @@ interface CompactCommandResult {
 interface LastAssistantTextResponse {
   text?: string;
 }
-
-// Shape of lib/rpc-manager's WebSessionState as seen over HTTP.
-type AgentStateResponse = {
-  // Raw get_state passthrough: the resolved model omp is actually running.
-  model?: { provider: string; id: string; name?: string; reasoning?: boolean; thinking?: { efforts?: string[] } };
-  contextUsage?: { percent: number | null; contextWindow: number; tokens: number | null } | null;
-  systemPrompt?: string;
-  thinkingLevel?: string;
-  fastModeEnabled?: boolean;
-  fastModeActive?: boolean;
-  autoRetryEnabled?: boolean;
-  interruptMode?: "immediate" | "wait";
-  autoCompactionEnabled?: boolean;
-  steeringMode?: "all" | "one-at-a-time";
-  followUpMode?: "all" | "one-at-a-time";
-  isStreaming?: boolean;
-  isPromptRunning?: boolean;
-  isBashRunning?: boolean;
-  isCompacting?: boolean;
-  tokensPerSecond?: number | null;
-  extensionStatuses?: ExtensionStatusItem[];
-  extensionWidgets?: ExtensionWidgetItem[];
-  // omp only reports a count; the queued texts are tracked client-side.
-  queuedMessageCount?: number;
-  todoPhases?: TodoPhase[];
-};
 
 export interface QueuedMessages {
   steering: string[];
@@ -614,16 +591,14 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [newSessionDefaultModel, setNewSessionDefaultModel] = useState<SelectedModel | null>(null);
   const [toolPreset, setToolPreset] = useState<ToolPreset>(() => getPreferredToolPreset());
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevelOption>("auto");
-  const [fastModeEnabled, setFastModeEnabled] = useState(false);
-  const [fastModeActive, setFastModeActive] = useState<boolean | undefined>(undefined);
-  // Runtime session modes returned by get_state and changed via RPC
-  // (set_interrupt_mode / set_auto_compaction).
-  const [interruptMode, setInterruptMode] = useState<"immediate" | "wait">("immediate");
-  const [autoCompactionEnabled, setAutoCompactionEnabled] = useState(true);
-  const [autoRetryEnabled, setAutoRetryEnabled] = useState(false);
-  // Queue delivery modes (set_steering_mode / set_follow_up_mode).
-  const [steeringMode, setSteeringMode] = useState<"all" | "one-at-a-time">("all");
-  const [followUpMode, setFollowUpMode] = useState<"all" | "one-at-a-time">("all");
+  const [runtimeControls, setRuntimeControls] = useState<RuntimeControls>(INITIAL_RUNTIME_CONTROLS);
+  const { fastModeEnabled, fastModeActive, autoRetryEnabled, interruptMode, autoCompactionEnabled, steeringMode, followUpMode } = runtimeControls;
+  const setRuntimeControlPatch = useCallback((patch: Partial<RuntimeControls>) => {
+    setRuntimeControls((current) => mergeRuntimeControls(current, patch));
+  }, []);
+  const applyRuntimeState = useCallback((state: Partial<WebSessionState> | undefined, scope: "full" | "fast") => {
+    setRuntimeControls((current) => mergeRuntimeControls(current, runtimeControlPatch(state, scope)));
+  }, []);
   const [retryInfo, setRetryInfo] = useState<{ attempt: number; maxAttempts: number; errorMessage?: string } | null>(null);
   const [contextUsage, setContextUsage] = useState<{ percent: number | null; contextWindow: number; tokens: number | null } | null>(null);
   const [systemPrompt, setSystemPrompt] = useState<string | null>(null);
@@ -1008,6 +983,35 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     return true;
   }, []);
 
+  const applySessionState = useCallback((
+    agentState: LiveRpcSessionState,
+    scope: "full" | "terminal",
+    token?: number,
+  ): boolean => {
+    const state = agentState.running ? agentState.state : undefined;
+    // A terminal snapshot is only authoritative when it contains the model
+    // that finished the run. A dead wrapper must not clear the next run's UI.
+    if (scope === "terminal" && !state?.model) return false;
+    const modelApplied = applyAuthoritativeModel(toThinkingModelMeta(state?.model), token);
+    if (!modelApplied) return false;
+
+    if (state?.contextUsage !== undefined) setContextUsage(state.contextUsage ?? null);
+    if (state?.systemPrompt !== undefined) setSystemPrompt(state.systemPrompt || null);
+    if (state?.thinkingLevel !== undefined) setThinkingLevel(normalizeThinkingLevel(state.thinkingLevel));
+    applyRuntimeState(state, scope === "terminal" ? "fast" : "full");
+    if (state?.extensionStatuses !== undefined) setExtensionStatuses(state.extensionStatuses ?? []);
+    if (state?.extensionWidgets !== undefined) setExtensionWidgets(state.extensionWidgets ?? []);
+    if (state?.todoPhases !== undefined) setTodoPhases(state.todoPhases ?? []);
+
+    // omp reports only a queued count; an empty (or dead) session means the
+    // client-tracked queue texts are stale. Keep the grace period for a just-
+    // sent queue mutation so a lagging snapshot cannot erase it.
+    if ((!state || state.queuedMessageCount === 0) && Date.now() - queueMutatedAtRef.current >= 5000) {
+      setQueuedMessages(EMPTY_QUEUE);
+    }
+    return true;
+  }, [applyAuthoritativeModel, applyRuntimeState]);
+
   // Lightweight live-state sync after composer commands. A command against an
   // idle-disposed session restarts omp, which re-resolves the model from the
   // session file — the freshly resolved model (and clamped thinking level)
@@ -1017,35 +1021,27 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     try {
       const res = await fetch(`/api/sessions/${encodeURIComponent(sid)}/state`);
       if (!res.ok) return;
-      const agentState = await res.json() as { running: boolean; state?: AgentStateResponse };
+      const agentState = await res.json() as LiveRpcSessionState;
       if (sessionIdRef.current !== sid) return;
-      const applied = applyAuthoritativeModel(toThinkingModelMeta(agentState.state?.model), token);
-      if (!applied) return; // stale snapshot — drop its thinking level too
-      if (agentState.state?.thinkingLevel !== undefined) {
-        setThinkingLevel(normalizeThinkingLevel(agentState.state.thinkingLevel));
-      }
-      // Fast mode is family-scoped in omp: switching to a fast-supported
-      // model flips the child's state without any event, so the composer
-      // toggle must re-sync from the refreshed state.
-      if (agentState.state?.fastModeEnabled !== undefined) {
-        setFastModeEnabled(agentState.state.fastModeEnabled);
-      }
-      setFastModeActive(agentState.state?.fastModeActive);
-      if (agentState.state?.autoRetryEnabled !== undefined) setAutoRetryEnabled(agentState.state.autoRetryEnabled);
-      if (agentState.state?.interruptMode !== undefined) setInterruptMode(agentState.state.interruptMode);
-      if (agentState.state?.autoCompactionEnabled !== undefined) setAutoCompactionEnabled(agentState.state.autoCompactionEnabled);
-      if (agentState.state?.steeringMode !== undefined) setSteeringMode(agentState.state.steeringMode);
-      if (agentState.state?.followUpMode !== undefined) setFollowUpMode(agentState.state.followUpMode);
+      applySessionState(agentState, "full", token);
     } catch {
       // Best effort; the next loadSession/reconcile re-syncs.
     }
-  }, [applyAuthoritativeModel, beginAuthoritativeModelSync]);
+  }, [applySessionState, beginAuthoritativeModelSync]);
 
-  const loadSession = useCallback(async (sid: string, showLoading = false, includeState = false, fenceRunId?: number) => {
+  const loadSession = useCallback(async (
+    sid: string,
+    options: { showLoading?: boolean; stateMode?: "full" | "terminal"; fenceRunId?: number } = {},
+  ): Promise<LiveRpcSessionState | null> => {
+    const { showLoading = false, stateMode, fenceRunId } = options;
     let messagesLoaded = false;
+    // Capture this before the transcript request: a slower response must not
+    // mint a newer token and clobber a model/control sync started meanwhile.
+    const stateToken = stateMode ? beginAuthoritativeModelSync() : undefined;
     try {
       if (showLoading) setLoading(true);
       const params = new URLSearchParams({ deferThinking: "1", deferMedia: "1" });
+      if (stateMode) params.set("includeState", "1");
       const res = await fetch(`/api/sessions/${encodeURIComponent(sid)}?${params}`);
       if (res.status === 404) {
         if (showLoading) {
@@ -1060,8 +1056,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       const d = await res.json() as SessionData;
       if (sessionIdRef.current !== sid) return null;
       // A terminal reload for a finished run must not overwrite the messages
-      // of a run that started while this fetch was in flight (it would delete
-      // the new run's optimistic user bubble).
+      // of a run that started while this fetch was in flight.
       if (fenceRunId !== undefined && promptRunIdRef.current !== fenceRunId) return null;
       setData(d);
       setActiveLeafId(d.leafId);
@@ -1069,8 +1064,6 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       setEntryIds(d.context.entryIds ?? []);
       setShowPreCompactionHistory(false);
       setTodoPhases(d.context.todoPhases ?? []);
-      // Recover on-disk subagent history (task toolResults) for this session —
-      // populates the composer roster for finished/past runs.
       void refreshSubagentHistory(sid);
       setCurrentModelOverride(null);
       setError(null);
@@ -1079,19 +1072,18 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       }
 
       messagesLoaded = true;
-      if (!includeState) {
+      if (!stateMode) {
         if (showLoading) setLoading(false);
         return null;
       }
 
-      try {
-        // Capture the sequence token BEFORE the fetch: a response snapshotted
-        // earlier must not mint a fresh token on arrival and clobber a newer
-        // sync that started while this request was in flight.
-        const token = beginAuthoritativeModelSync();
+      let agentState = d.agent;
+      // The combined endpoint deliberately omits `agent` when get_state fails;
+      // retain the old best-effort fallback for that documented case only.
+      if (!agentState) {
         const stateRes = await fetch(`/api/sessions/${encodeURIComponent(sid)}/state`);
         if (!stateRes.ok) throw new Error(`HTTP ${stateRes.status}`);
-        const agentState = await stateRes.json() as { running: boolean; state?: AgentStateResponse };
+        agentState = await stateRes.json() as LiveRpcSessionState;
         if (sessionIdRef.current !== sid) {
           if (showLoading) setLoading(false);
           return null;
@@ -1100,41 +1092,18 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           if (showLoading) setLoading(false);
           return null;
         }
-
-        const liveState = agentState.state;
-        const modelApplied = applyAuthoritativeModel(toThinkingModelMeta(liveState?.model), token);
-        if (liveState) {
-          if (liveState.contextUsage !== undefined) setContextUsage(liveState.contextUsage ?? null);
-          if (liveState.systemPrompt !== undefined) setSystemPrompt(liveState.systemPrompt || null);
-          if (modelApplied && liveState.thinkingLevel !== undefined) setThinkingLevel(normalizeThinkingLevel(liveState.thinkingLevel));
-          if (liveState.fastModeEnabled !== undefined) setFastModeEnabled(liveState.fastModeEnabled);
-          setFastModeActive(liveState.fastModeActive);
-          if (liveState.autoRetryEnabled !== undefined) setAutoRetryEnabled(liveState.autoRetryEnabled);
-          if (liveState.interruptMode !== undefined) setInterruptMode(liveState.interruptMode);
-          if (liveState.autoCompactionEnabled !== undefined) setAutoCompactionEnabled(liveState.autoCompactionEnabled);
-          if (liveState.steeringMode !== undefined) setSteeringMode(liveState.steeringMode);
-          if (liveState.followUpMode !== undefined) setFollowUpMode(liveState.followUpMode);
-          if (liveState.extensionStatuses !== undefined) setExtensionStatuses(liveState.extensionStatuses ?? []);
-          if (liveState.extensionWidgets !== undefined) setExtensionWidgets(liveState.extensionWidgets ?? []);
-          if (liveState.todoPhases !== undefined) setTodoPhases(liveState.todoPhases ?? []);
-          if (liveState.queuedMessageCount === 0 && Date.now() - queueMutatedAtRef.current >= 5000) setQueuedMessages(EMPTY_QUEUE);
-        } else if (!agentState.running && Date.now() - queueMutatedAtRef.current >= 5000) {
-          setQueuedMessages(EMPTY_QUEUE);
-        }
-        if (showLoading) setLoading(false);
-        return agentState;
-      } catch (e) {
-        console.error("Failed to load agent state:", e);
-        if (showLoading) setLoading(false);
-        return null;
       }
+      applySessionState(agentState, stateMode, stateToken);
+      if (showLoading) setLoading(false);
+      return agentState;
     } catch (e) {
-      setError(String(e));
+      if (messagesLoaded) console.error("Failed to load agent state:", e);
+      else setError(String(e));
       return null;
     } finally {
       if (showLoading && !messagesLoaded) setLoading(false);
     }
-  }, [refreshSubagentHistory, applyAuthoritativeModel, beginAuthoritativeModelSync]);
+  }, [applySessionState, beginAuthoritativeModelSync, refreshSubagentHistory]);
 
   const loadContext = useCallback(async (sid: string, leafId: string | null, includePreCompaction = false) => {
     const seq = ++contextRequestSeqRef.current;
@@ -1233,7 +1202,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     const sid = sessionIdRef.current ?? await ensureNewSession();
     if (!sid) return;
 
-    const state = await sendAgentCommand<AgentStateResponse>(sid, { type: "get_state" });
+    const state = await sendAgentCommand<WebSessionState>(sid, { type: "get_state" });
     if (!hookAliveRef.current || sessionIdRef.current !== sid) return;
     setSystemPrompt(state.systemPrompt ?? "");
   }, [ensureNewSession]);
@@ -1694,7 +1663,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       // Pass the fence into loadSession: the pre-check above only guards the
       // start — a next prompt that begins while the reload is in flight must
       // not be overwritten by the finished run's snapshot.
-      if (sid) await loadSession(sid, false, true, runId);
+      if (sid) await loadSession(sid, { stateMode: "full", fenceRunId: runId });
     } finally {
       if (runId !== undefined && promptRunIdRef.current !== runId) return;
       optimisticUserMessageKeyRef.current = null;
@@ -1732,8 +1701,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       try {
         const res = await fetch(`/api/agent/${encodeURIComponent(sid)}`);
         if (res.ok) {
-          const data = await res.json() as { running?: boolean; state?: AgentStateResponse };
-          const state = data.state;
+          const data = await res.json() as LiveRpcSessionState;
+          const state = data.running ? data.state : undefined;
           if (!data.running || !state || (!state.isStreaming && !state.isPromptRunning)) {
             await finishPromptWithoutStream(sid, runId);
             return;
@@ -1759,8 +1728,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       try {
         const res = await fetch(`/api/agent/${encodeURIComponent(sid)}`);
         if (!res.ok) continue;
-        const data = await res.json() as { state?: AgentStateResponse };
-        if (data.state?.isBashRunning) continue;
+        const data = await res.json() as LiveRpcSessionState;
+        if (data.running && data.state.isBashRunning) continue;
 
         await loadSession(sid);
         if (bashRecoveryIdRef.current !== recoveryId || sessionIdRef.current !== sid) return;
@@ -1785,12 +1754,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     try {
       const res = await fetch(`/api/agent/${encodeURIComponent(sid)}`);
       if (!res.ok) return;
-      const data = await res.json() as { running?: boolean; state?: AgentStateResponse };
+      const data = await res.json() as LiveRpcSessionState;
       // A slow response can straddle a run boundary (previous run finished
       // and the user already started the next one while this request was in
       // flight) — everything in it is stale, drop it.
       if (promptRunIdRef.current !== runId) return;
-      const state = data.state;
+      const state = data.running ? data.state : undefined;
       // Mirror compaction state unconditionally: a missed compaction_end
       // would otherwise leave the "Stop compaction" UI stuck. No state
       // (wrapper destroyed) means nothing is compacting.
@@ -1851,9 +1820,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       let cancelled = false;
       void fetch(`/api/agent/${encodeURIComponent(sid)}`)
         .then((res) => (res.ok ? res.json() : null))
-        .then((data: { state?: AgentStateResponse } | null) => {
+        .then((data: LiveRpcSessionState | null) => {
           if (cancelled) return;
-          const tps = data?.state?.tokensPerSecond;
+          const tps = data?.running ? data.state.tokensPerSecond : null;
           setTokensPerSecond(typeof tps === "number" && Number.isFinite(tps) && tps > 0 ? tps : null);
         })
         .catch(() => {});
@@ -1864,8 +1833,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       if (!sid) return;
       void fetch(`/api/agent/${encodeURIComponent(sid)}`)
         .then((res) => (res.ok ? res.json() : null))
-        .then((data: { state?: AgentStateResponse } | null) => {
-          const tps = data?.state?.tokensPerSecond;
+        .then((data: LiveRpcSessionState | null) => {
+          const tps = data?.running ? data.state.tokensPerSecond : null;
           setTokensPerSecond(typeof tps === "number" && Number.isFinite(tps) && tps > 0 ? tps : null);
         })
         .catch(() => {});
@@ -1993,32 +1962,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           }
         }
         if (endedSid) {
-          void loadSession(endedSid, false, false, endedRunId);
-          const endToken = beginAuthoritativeModelSync();
-          fetch(`/api/agent/${encodeURIComponent(endedSid)}`)
-            .then((r) => (r.ok ? r.json() as Promise<{ state?: AgentStateResponse }> : null))
-            .then((d) => {
-              if (!d?.state?.model) return;
-              // Stale terminal snapshot: the user switched sessions or started
-              // the next run while this request was in flight — drop it.
-              if (sessionIdRef.current !== endedSid || promptRunIdRef.current !== endedRunId) return;
-              const applied = applyAuthoritativeModel(toThinkingModelMeta(d.state.model), endToken);
-              if (!applied) return; // stale snapshot — drop everything derived from it
-              if (d.state?.contextUsage !== undefined) setContextUsage(d.state.contextUsage ?? null);
-              if (d.state?.systemPrompt !== undefined) setSystemPrompt(d.state.systemPrompt || null);
-              // Fast mode is family-scoped in omp: re-sync from the terminal
-              // state so a run that switched models/families never leaves the
-              // composer toggle stuck on a stale value.
-              if (d.state?.fastModeEnabled !== undefined) setFastModeEnabled(d.state.fastModeEnabled);
-              setFastModeActive(d.state?.fastModeActive);
-              if (d.state?.extensionStatuses !== undefined) setExtensionStatuses(d.state.extensionStatuses ?? []);
-              if (d.state?.extensionWidgets !== undefined) setExtensionWidgets(d.state.extensionWidgets ?? []);
-              if (d.state?.todoPhases !== undefined) setTodoPhases(d.state.todoPhases ?? []);
-              // omp reports only a queued count; an empty (or dead) session
-              // means the client-tracked queue texts are stale.
-              if ((!d.state || d.state.queuedMessageCount === 0) && Date.now() - queueMutatedAtRef.current >= 5000) setQueuedMessages(EMPTY_QUEUE);
-            })
-            .catch(() => {});
+          void loadSession(endedSid, { stateMode: "terminal", fenceRunId: endedRunId });
         }
         onAgentEnd?.();
         break;
@@ -2068,20 +2012,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         if (!sid) break;
         const token = beginAuthoritativeModelSync();
         void fetch(`/api/agent/${encodeURIComponent(sid)}`)
-          .then((r) => (r.ok ? r.json() as Promise<{ state?: AgentStateResponse }> : null))
+          .then((r) => (r.ok ? r.json() as Promise<LiveRpcSessionState> : null))
           .then((d) => {
-            if (!d?.state?.model) return;
+            if (!d?.running || !d.state.model) return;
             if (sessionIdRef.current !== sid) return;
-            const applied = applyAuthoritativeModel(toThinkingModelMeta(d.state.model), token);
-            if (!applied) return; // stale snapshot — drop its thinking level too
-            if (d.state.thinkingLevel !== undefined) setThinkingLevel(normalizeThinkingLevel(d.state.thinkingLevel));
-            if (d.state.fastModeEnabled !== undefined) setFastModeEnabled(d.state.fastModeEnabled);
-            setFastModeActive(d.state.fastModeActive);
-            if (d.state.autoRetryEnabled !== undefined) setAutoRetryEnabled(d.state.autoRetryEnabled);
-            if (d.state.interruptMode !== undefined) setInterruptMode(d.state.interruptMode);
-            if (d.state.autoCompactionEnabled !== undefined) setAutoCompactionEnabled(d.state.autoCompactionEnabled);
-            if (d.state.steeringMode !== undefined) setSteeringMode(d.state.steeringMode);
-            if (d.state.followUpMode !== undefined) setFollowUpMode(d.state.followUpMode);
+            applySessionState(d, "full", token);
           })
           .catch(() => {});
         break;
@@ -2245,6 +2180,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         const parentToolCallId = typeof payload?.parentToolCallId === "string" ? payload.parentToolCallId : null;
         const task = typeof payload?.task === "string" && payload.task.trim() ? payload.task : (progress?.task ?? null);
         const assignment = typeof payload?.assignment === "string" ? payload.assignment : progress?.assignment;
+        const status = subagentStatusFromProgress(progress?.status);
         if (!progressId && !task && !parentToolCallId && index < 0) break;
         setSubagents((prev) => {
           if (prev.length === 0) return prev;
@@ -2279,6 +2215,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
             ...(typeof payload?.detached === "boolean" ? { detached: payload.detached } : {}),
             ...(task ? { task } : {}),
             ...(assignment !== undefined ? { assignment } : {}),
+            ...(status ? { status } : {}),
             ...(progress ? { progress } : {}),
             lastUpdate: Date.now(),
             source: "live",
@@ -2292,6 +2229,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
             current.detached === nextEntry.detached &&
             current.task === nextEntry.task &&
             current.assignment === nextEntry.assignment &&
+            current.status === nextEntry.status &&
             JSON.stringify(current.progress) === JSON.stringify(nextEntry.progress)
           ) return prev;
           const next = [...prev];
@@ -2346,7 +2284,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         handleExtensionUiRequest(event as unknown as IncomingExtensionUiRequest);
         break;
     }
-  }, [addNotice, consumeQueuedMessage, finishPromptWithoutStream, handleExtensionUiRequest, handleHostToolCall, handleHostUriRequest, loadSession, mergeSubagents, onAgentEnd, reconcileAgentState, resetSubagentActivityState, applyAuthoritativeModel, beginAuthoritativeModelSync]);
+  }, [addNotice, applyAuthoritativeModel, applySessionState, beginAuthoritativeModelSync, consumeQueuedMessage, finishPromptWithoutStream, handleExtensionUiRequest, handleHostToolCall, handleHostUriRequest, loadSession, mergeSubagents, onAgentEnd, reconcileAgentState, resetSubagentActivityState]);
   handleAgentEventRef.current = handleAgentEvent;
 
   const handleSend = useCallback(async (message: string, images?: AttachedImage[]): Promise<boolean> => {
@@ -2623,79 +2561,80 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     if (!sid) return;
     try {
       const result = await sendAgentCommand<{ enabled?: boolean; active?: boolean }>(sid, { type: "set_fast_mode", enabled });
-      setFastModeEnabled(result?.enabled ?? enabled);
-      setFastModeActive(result?.active);
+      setRuntimeControlPatch({ fastModeEnabled: result?.enabled ?? enabled, fastModeActive: result?.active });
       void refreshLiveModelState(sid);
     } catch (error) {
       console.error("Failed to change Fast mode:", error);
       addNotice({ type: "error", message: error instanceof Error ? error.message : String(error) });
     }
-  }, [addNotice, ensureNewSession, refreshLiveModelState]);
+  }, [addNotice, ensureNewSession, refreshLiveModelState, setRuntimeControlPatch]);
 
   /** Toggle automatic retry for transient model failures. */
   const handleAutoRetryChange = useCallback(async (enabled: boolean) => {
     const sid = sessionIdRef.current ?? await ensuringNewSessionRef.current;
     if (!sid) return;
-    setAutoRetryEnabled(enabled);
+    setRuntimeControlPatch({ autoRetryEnabled: enabled });
     try {
       await sendAgentCommand(sid, { type: "set_auto_retry", enabled });
     } catch (error) {
-      setAutoRetryEnabled((current) => (current === enabled ? !enabled : current));
+      setRuntimeControls((current) => current.autoRetryEnabled === enabled
+        ? mergeRuntimeControls(current, { autoRetryEnabled: !enabled })
+        : current);
       addNotice({ type: "error", message: error instanceof Error ? error.message : String(error) });
     }
-  }, [addNotice]);
+  }, [addNotice, setRuntimeControlPatch]);
 
   /** Change how steering interrupts the running agent (immediate vs wait). */
   const handleInterruptModeChange = useCallback(async (mode: "immediate" | "wait") => {
     const sid = sessionIdRef.current ?? await ensuringNewSessionRef.current;
     if (!sid) return;
-    setInterruptMode(mode);
+    setRuntimeControlPatch({ interruptMode: mode });
     try {
       await sendAgentCommand(sid, { type: "set_interrupt_mode", mode });
     } catch (error) {
       console.error("Failed to change interrupt mode:", error);
       addNotice({ type: "error", message: error instanceof Error ? error.message : String(error) });
     }
-  }, [addNotice]);
+  }, [addNotice, setRuntimeControlPatch]);
 
   /** Toggle automatic context compaction on the live session. */
   const handleAutoCompactionChange = useCallback(async (enabled: boolean) => {
     const sid = sessionIdRef.current ?? await ensuringNewSessionRef.current;
     if (!sid) return;
-    setAutoCompactionEnabled(enabled);
+    setRuntimeControlPatch({ autoCompactionEnabled: enabled });
     try {
       await sendAgentCommand(sid, { type: "set_auto_compaction", enabled });
     } catch (error) {
       console.error("Failed to change auto-compaction:", error);
       addNotice({ type: "error", message: error instanceof Error ? error.message : String(error) });
     }
-  }, [addNotice]);
+  }, [addNotice, setRuntimeControlPatch]);
 
   /** Change how queued steering messages are delivered (all at once / one at a time). */
   const handleSteeringModeChange = useCallback(async (mode: "all" | "one-at-a-time") => {
     const sid = sessionIdRef.current ?? await ensuringNewSessionRef.current;
     if (!sid) return;
-    setSteeringMode(mode);
+    setRuntimeControlPatch({ steeringMode: mode });
     try {
       await sendAgentCommand(sid, { type: "set_steering_mode", mode });
     } catch (error) {
       console.error("Failed to change steering mode:", error);
       addNotice({ type: "error", message: error instanceof Error ? error.message : String(error) });
     }
-  }, [addNotice]);
+  }, [addNotice, setRuntimeControlPatch]);
 
   /** Change how queued follow-up messages are delivered. */
   const handleFollowUpModeChange = useCallback(async (mode: "all" | "one-at-a-time") => {
     const sid = sessionIdRef.current ?? await ensuringNewSessionRef.current;
     if (!sid) return;
-    setFollowUpMode(mode);
+    setRuntimeControlPatch({ followUpMode: mode });
     try {
       await sendAgentCommand(sid, { type: "set_follow_up_mode", mode });
     } catch (error) {
       console.error("Failed to change follow-up mode:", error);
       addNotice({ type: "error", message: error instanceof Error ? error.message : String(error) });
     }
-  }, [addNotice]);
+  }, [addNotice, setRuntimeControlPatch]);
 
   /** Cycle to the next available model (⌘/Ctrl+Alt+M). */
   const handleCycleModel = useCallback(async () => {
@@ -2741,7 +2680,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     if (!sid || isCompactingRef.current || agentRunningRef.current || bashRunningRef.current) return;
     try {
       await sendAgentCommand(sid, { type: "handoff" });
-      await loadSession(sid, true);
+      await loadSession(sid, { showLoading: true });
       void refreshLiveModelState(sid);
     } catch (error) {
       addNotice({ type: "error", message: error instanceof Error ? error.message : String(error) });
@@ -2758,7 +2697,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     try {
       const result = await sendAgentCommand<CompactCommandResult>(sid, { type: "compact" });
       setCompactResult(readCompactResult(result, "manual"));
-      await loadSession(sid, true);
+      await loadSession(sid, { showLoading: true });
       void refreshLiveModelState(sid);
     } catch (e) {
       setCompactError(e instanceof Error ? e.message : String(e));
@@ -2830,7 +2769,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
             ...(args ? { customInstructions: args } : {}),
           });
           setCompactResult(readCompactResult(result, "manual"));
-          await loadSession(sid, true);
+          await loadSession(sid, { showLoading: true });
           isCompactingRef.current = false;
           setIsCompacting(false);
           // loadSession resolves to null unless state was requested, so promote
@@ -2844,7 +2783,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           if (!sid) return complete({ handled: true, error: translate("agentSession.noSessionToReload") });
           await sendAgentCommand(sid, { type: "reload" });
           await Promise.all([
-            loadSession(sid, false, true),
+            loadSession(sid, { stateMode: "full" }),
             loadSlashCommands(),
             loadModels(),
           ]);
@@ -3081,7 +3020,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   useEffect(() => {
     if (session) {
       sessionIdRef.current = session.id;
-      loadSession(session.id, true, true).then((agentState) => {
+      loadSession(session.id, { showLoading: true, stateMode: "full" }).then((agentState) => {
         if (agentState?.running) {
           if (agentState.state?.isStreaming || agentState.state?.isPromptRunning) {
             agentRunningRef.current = true;
@@ -3116,27 +3055,17 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
             void waitForBashSettlement(session.id);
           }
         }
-        if (agentState?.state) {
-          // Model + thinking level are owned by loadSession (token-guarded);
-          // re-applying this same snapshot here would mint a fresh token and
-          // bypass the stale-response guard.
+        if (agentState?.running) {
+          // The combined full-state load owns model, controls, display fields,
+          // extensions, todos, and queue freshness. Mount still handles the
+          // process-only compaction flag and persisted queue restoration.
           if (agentState.state.isCompacting !== undefined) setIsCompacting(agentState.state.isCompacting);
-          if (agentState.state.contextUsage !== undefined) setContextUsage(agentState.state.contextUsage ?? null);
-          if (agentState.state.systemPrompt !== undefined) setSystemPrompt(agentState.state.systemPrompt || null);
-          if (agentState.state.extensionStatuses !== undefined) setExtensionStatuses(agentState.state.extensionStatuses ?? []);
-          if (agentState.state.extensionWidgets !== undefined) setExtensionWidgets(agentState.state.extensionWidgets ?? []);
           if (agentState.state.queuedMessageCount === 0 && Date.now() - queueMutatedAtRef.current >= 5000) {
             setQueuedMessages(EMPTY_QUEUE);
-            // The queue drained while the page was closed — a stored copy
-            // from a previous page load is stale.
             clearPersistedQueue(session.id);
           } else if (typeof agentState.state.queuedMessageCount === "number") {
-            // omp still holds queued messages: restore the client-tracked
-            // texts persisted by the previous page load.
             const persisted = readPersistedQueue(session.id);
-            if (persisted) {
-              setQueuedMessages((prev) => (isEmptyQueue(prev) ? persisted : prev));
-            }
+            if (persisted) setQueuedMessages((prev) => (isEmptyQueue(prev) ? persisted : prev));
           }
         }
       });

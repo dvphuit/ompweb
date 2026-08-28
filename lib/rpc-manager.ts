@@ -8,6 +8,7 @@ import { cacheSessionPath, invalidateSessionListCache } from "./session-reader";
 import { PRESET_FULL } from "./tool-presets";
 import type {
   BashResultInfo,
+  LiveRpcSessionState,
   OmpModel,
   RpcAvailableSlashCommand,
   RpcSessionState,
@@ -15,6 +16,7 @@ import type {
   WebSessionState,
 } from "./pi-types";
 import type { ExtensionWidgetItem } from "./types";
+
 
 // ============================================================================
 // Types
@@ -1177,6 +1179,12 @@ function getRegistry(): Map<string, AgentSessionWrapper> {
 function getLocks(): Map<string, Promise<{ session: AgentSessionWrapper; realSessionId: string }>> {
   if (!globalThis.__ompStartLocks) globalThis.__ompStartLocks = new Map();
   return globalThis.__ompStartLocks;
+}
+
+export async function getLiveRpcSessionState(sessionId: string): Promise<LiveRpcSessionState> {
+  const session = getRpcSession(sessionId);
+  if (!session || !session.isAlive()) return { running: false };
+  return { running: true, state: await session.send({ type: "get_state" }) as WebSessionState };
 }
 
 export function getRpcSession(sessionId: string): AgentSessionWrapper | undefined {

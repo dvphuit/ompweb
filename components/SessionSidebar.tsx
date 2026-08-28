@@ -11,7 +11,7 @@ import { Tooltip } from "./ui/primitives";
 import { toast } from "./ui/toast";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { clearLastOpenSession, setLastOpenSession, workspaceKeyOf } from "@/lib/workspace-memory";
-import { groupSessionsByProject, projectActivityCounts, sortManagedProjects } from "@/lib/project-ordering";
+import { buildSidebarSessionIndex, groupSessionsByProject, projectActivityCounts, sortManagedProjects } from "@/lib/project-ordering";
 import { comparableProjectPath } from "@/lib/comparable-path";
 import { Archive, Check, ChevronDown, ChevronRight, FileUp, Folder, GitBranch, MoreHorizontal, Plus, RefreshCw, Search, Settings2, SlidersHorizontal, Trash2 } from "lucide-react";
 import { publishSessionsChanged } from "@/lib/session-change-bus";
@@ -782,30 +782,35 @@ export function SessionSidebar({ selectedSessionId, optimisticSession, onSelectS
    *  prune against running on an empty (still-loading) project list. */
   const projectsLoadedRef = useRef(false);
 
-  /** Resolve the project root for a cwd from the freshest data available.
-   *  The worktree/branch cache is keyed per repository, so this lookup is
-   *  scoped: a worktree belongs to the repository whose cached GitState lists
-   *  it — never to a different repository's state. */
-  const projectRootFor = useCallback((cwd: string | null): string | null => {
-    if (!cwd) return null;
-    // Any path in a cached repo's worktree list belongs to that repo — covers
-    // worktrees without sessions, so switching to them keeps the row mounted.
+  const allSessionIndex = useMemo(() => buildSidebarSessionIndex(allSessions), [allSessions]);
+  const registeredProjectByComparablePath = useMemo(() => {
+    const map = new Map<string, ManagedProject>();
+    for (const project of projects) {
+      const key = comparableProjectPath(project.path);
+      if (!map.has(key)) map.set(key, project);
+    }
+    return map;
+  }, [projects]);
+  const worktreeRootByNormalizedPath = useMemo(() => {
+    const map = new Map<string, string>();
     for (const state of Object.values(worktreeStateByProject)) {
-      if (state.worktrees.some((w) => normalizeProjectKey(w.path) === normalizeProjectKey(cwd))) {
-        return state.projectRoot;
+      for (const worktree of state.worktrees) {
+        const key = normalizeProjectKey(worktree.path);
+        if (!map.has(key)) map.set(key, state.projectRoot);
       }
     }
-    // A registered project path is its own canonical root. The lookup goes
-    // through the case-folded comparable form (Windows/NTFS is
-    // case-insensitive, so a session's cwd/projectRoot can spell the same
-    // folder with different casing), and the registered path itself is
-    // returned so the caller gets a canonical value.
-    const registered = projects.find((p) => comparableProjectPath(p.path) === comparableProjectPath(cwd));
+    return map;
+  }, [worktreeStateByProject]);
+
+  /** Resolve the project root for a cwd from indexed and cached data. */
+  const projectRootFor = useCallback((cwd: string | null): string | null => {
+    if (!cwd) return null;
+    const worktreeRoot = worktreeRootByNormalizedPath.get(normalizeProjectKey(cwd));
+    if (worktreeRoot) return worktreeRoot;
+    const registered = registeredProjectByComparablePath.get(comparableProjectPath(cwd));
     if (registered) return registered.path;
-    const foldedCwd = comparableProjectPath(cwd);
-    const match = allSessions.find((s) => comparableProjectPath(s.cwd) === foldedCwd);
-    return match?.projectRoot ?? cwd;
-  }, [worktreeStateByProject, allSessions, projects]);
+    return allSessionIndex.projectRootByComparableCwd.get(comparableProjectPath(cwd)) ?? cwd;
+  }, [allSessionIndex, registeredProjectByComparablePath, worktreeRootByNormalizedPath]);
 
   // ---- Expansion (used by the sync/notify effects below, so declared first) --
   const expandProject = useCallback((path: string) => {
@@ -918,35 +923,27 @@ export function SessionSidebar({ selectedSessionId, optimisticSession, onSelectS
   // Keep a just-created session and its project visible while omp is still
   // flushing the JSONL file. The server list remains authoritative once it
   // contains the same id.
-  // IMPORTANT: derive synchronously — the previous projectRootFor(cwd) needs
-  // the async /api/worktrees git lookup, so the optimistic row would park in
-  // cwd-bucket then jump to repo bucket. Use registered-project match first.
   const optimisticProjectRoot = (() => {
     if (!optimisticSession) return null;
     if (optimisticSession.projectRoot) return optimisticSession.projectRoot;
     if (optimisticSession.projectKey) return optimisticSession.projectKey;
     const cw = optimisticSession.cwd ?? "";
     if (!cw) return null;
-    const reg = projects.find((p) => comparableProjectPath(p.path) === comparableProjectPath(cw));
-    if (reg) return reg.path;
-    return cw;
+    return registeredProjectByComparablePath.get(comparableProjectPath(cw))?.path ?? cw;
   })();
   // Stable placeholder timestamps: Date.now() inside the memo would churn every refresh and bust downstream memos.
   const placeholderTsRef = useRef<Map<string, string>>(new Map());
   const visibleSessions = useMemo(() => {
     let base = allSessions;
-    if (optimisticSession && !base.some((session) => session.id === optimisticSession.id)) {
+    if (optimisticSession && !allSessionIndex.byId.has(optimisticSession.id)) {
       const stableRoot = optimisticProjectRoot ?? optimisticSession.cwd;
       const stableKey = stableRoot ? comparableProjectPath(stableRoot) : undefined;
       base = [...base, { ...optimisticSession, projectRoot: stableRoot ?? optimisticSession.cwd, ...(stableKey ? { projectKey: stableKey } : {}) }];
     }
-    // A running session's JSONL may not exist yet (first turn still
-    // streaming). Keep it in the list so navigating away never hides it
-    // until the file lands and the next refresh replaces the placeholder.
     const known = new Set(base.map((s) => s.id));
     const placeholders: SessionInfo[] = [];
     for (const id of runningSessionIds) {
-      if (known.has(id)) continue;
+      if (allSessionIndex.byId.has(id) || known.has(id)) continue;
       let ts = placeholderTsRef.current.get(id);
       if (!ts) {
         ts = new Date().toISOString();
@@ -967,41 +964,32 @@ export function SessionSidebar({ selectedSessionId, optimisticSession, onSelectS
         ...(phKey ? { projectKey: phKey } : {}),
       });
     }
-    // Prune timestamps for ids that are now materialized or no longer running
     if (placeholderTsRef.current.size > placeholders.length) {
       for (const key of [...placeholderTsRef.current.keys()]) {
-        if (!runningSessionIds.has(key) || known.has(key)) placeholderTsRef.current.delete(key);
+        if (!runningSessionIds.has(key) || allSessionIndex.byId.has(key) || known.has(key)) placeholderTsRef.current.delete(key);
       }
     }
     return placeholders.length ? [...base, ...placeholders] : base;
-  }, [allSessions, optimisticSession, optimisticProjectRoot, runningSessionIds, selectedCwd]);
+  }, [allSessionIndex, allSessions, optimisticSession, optimisticProjectRoot, runningSessionIds, selectedCwd]);
+  const visibleSessionIndex = useMemo(() => buildSidebarSessionIndex(visibleSessions), [visibleSessions]);
+  const hasUnmaterializedRunning = useMemo(
+    () => [...runningSessionIds].some((id) => !allSessionIndex.byId.has(id)),
+    [allSessionIndex, runningSessionIds],
+  );
   const visibleProjects = useMemo(() => {
     let base = projects;
-    const hasOpt = optimisticProjectRoot ? base.some((p) => comparableProjectPath(p.path) === comparableProjectPath(optimisticProjectRoot)) : false;
-    if (optimisticProjectRoot && !hasOpt) {
-      base = [...base, { path: optimisticProjectRoot }];
-    }
-    // Running placeholders may belong to a project not yet in the managed list
-    // (new session's cwd wasn't registered as a project). Keep that workspace
-    // visible so the placeholder row has a bucket to render in.
-    const knownFolded = new Set(base.map((p) => comparableProjectPath(p.path)));
-    for (const id of runningSessionIds) {
-      if (allSessions.some((s) => s.id === id)) continue;
+    const hasOpt = optimisticProjectRoot ? registeredProjectByComparablePath.has(comparableProjectPath(optimisticProjectRoot)) : false;
+    if (optimisticProjectRoot && !hasOpt) base = [...base, { path: optimisticProjectRoot }];
+    if (hasUnmaterializedRunning) {
       const phPath = optimisticProjectRoot ?? selectedCwd ?? "";
-      if (phPath && !knownFolded.has(comparableProjectPath(phPath))) {
-        base = [...base, { path: phPath }];
-        knownFolded.add(comparableProjectPath(phPath));
-      }
+      if (phPath && !base.some((p) => comparableProjectPath(p.path) === comparableProjectPath(phPath))) base = [...base, { path: phPath }];
     }
     return base;
-  }, [optimisticProjectRoot, projects, runningSessionIds, allSessions, selectedCwd]);
+  }, [hasUnmaterializedRunning, optimisticProjectRoot, projects, registeredProjectByComparablePath, selectedCwd]);
 
   // ---- Derived project list ---------------------------------------------------
   const selectedProject = useMemo(() => projectRootFor(selectedCwd), [projectRootFor, selectedCwd]);
-  // While a fresh optimistic/placeholder is pending (JSONL not yet on disk),
-  // freeze ordering so the new project row does not flicker optimistic ->
-  // confirmed position. New projects are allowed to append at the end.
-  const hasPendingNewSession = Boolean(optimisticSession || [...runningSessionIds].some((id) => !allSessions.some((ss) => ss.id === id)));
+  const hasPendingNewSession = Boolean(optimisticSession || hasUnmaterializedRunning);
   const sortedProjectsBase = useMemo(() => sortManagedProjects(visibleProjects), [visibleProjects]);
   const sortedProjectsRef = useRef<ManagedProject[] | null>(null);
   const sortedProjects = useMemo(() => {
@@ -1016,12 +1004,12 @@ export function SessionSidebar({ selectedSessionId, optimisticSession, onSelectS
     return sortedProjectsBase;
   }, [sortedProjectsBase, hasPendingNewSession]);
   const sessionsByProject = useMemo(
-    () => groupSessionsByProject(sortedProjects, visibleSessions),
-    [sortedProjects, visibleSessions],
+    () => groupSessionsByProject(sortedProjects, visibleSessionIndex),
+    [sortedProjects, visibleSessionIndex],
   );
   const projectActivity = useMemo(
-    () => projectActivityCounts(visibleSessions, runningSessionIds, unreadSessionIds),
-    [visibleSessions, runningSessionIds, unreadSessionIds],
+    () => projectActivityCounts(visibleSessionIndex, runningSessionIds, unreadSessionIds),
+    [visibleSessionIndex, runningSessionIds, unreadSessionIds],
   );
 
   // Client-side filtering (Workspaces header: search + "running only").
@@ -1094,7 +1082,7 @@ export function SessionSidebar({ selectedSessionId, optimisticSession, onSelectS
     // If restoring a session, set cwd to match that session
     if (initialSessionId && !restoredRef.current) {
       if (allSessions.length === 0) return; // wait for sessions to load
-      const target = allSessions.find((s) => s.id === initialSessionId);
+      const target = allSessionIndex.byId.get(initialSessionId);
       if (target) {
         restoreRetryRef.current = 0;
         restoredRef.current = true;
@@ -1130,7 +1118,7 @@ export function SessionSidebar({ selectedSessionId, optimisticSession, onSelectS
     setSelectedCwd(top.path);
     expandProject(top.path);
     provisionalSelectionRef.current = allSessions.length === 0;
-  }, [allSessions, selectedCwd, initialSessionId, skipInitialProjectSelection, onSelectSession, onInitialRestoreDone, sortedProjects, expandProject, loadSessions]);
+  }, [allSessionIndex.byId, allSessions.length, selectedCwd, initialSessionId, skipInitialProjectSelection, onSelectSession, onInitialRestoreDone, sortedProjects, expandProject, loadSessions]);
 
   // Default expansion: when the user has never stored an expansion choice,
   // expand only the active project.
@@ -1440,16 +1428,17 @@ export function SessionSidebar({ selectedSessionId, optimisticSession, onSelectS
   // Stable callbacks for the session list so memoized children don't re-render
   // on every parent state change.
   const handleSessionDeleted = useCallback((id: string) => {
-    const deleted = allSessions.find((session) => session.id === id);
+    const deleted = allSessionIndex.byId.get(id);
     if (deleted) clearLastOpenSession(workspaceKeyOf(deleted));
     onSessionDeleted?.(id);
     loadSessions();
-  }, [allSessions, onSessionDeleted, loadSessions]);
+  }, [allSessionIndex, onSessionDeleted, loadSessions]);
 
   useEffect(() => {
-    const selected = allSessions.find((session) => session.id === selectedSessionId);
+    if (!selectedSessionId) return;
+    const selected = allSessionIndex.byId.get(selectedSessionId);
     if (selected) setLastOpenSession(workspaceKeyOf(selected), selected.id);
-  }, [allSessions, selectedSessionId]);
+  }, [allSessionIndex, selectedSessionId]);
 
   // row. Non-Git projects intentionally render no Git affordance at all. The
   // switcher shows the ACTIVE repo's own worktrees/branches only.

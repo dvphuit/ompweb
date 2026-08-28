@@ -106,6 +106,9 @@ export interface WebSessionState {
   extensionStatuses: Array<{ key: string; text: string }>;
   extensionWidgets: Array<{ key: string; lines: string[]; placement: "aboveEditor" | "belowEditor" }>;
 }
+export type LiveRpcSessionState =
+  | { running: false }
+  | { running: true; state: WebSessionState };
 
 export type AvailableSlashCommandSource =
   | "builtin"
