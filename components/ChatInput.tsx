@@ -331,12 +331,10 @@ function ComposerModeStatus({
   goal,
   plan,
   onClearGoal,
-  isStreaming = false,
 }: {
   goal?: ActiveGoal | null;
   plan?: ActivePlan | null;
   onClearGoal?: () => void;
-  isStreaming?: boolean;
 }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
@@ -365,7 +363,7 @@ function ComposerModeStatus({
 
   if (!goal && !plan) return null;
 
-  const isCompleted = Boolean(goal?.completedAt || (!isStreaming && goal?.startedAt));
+  const isCompleted = Boolean(goal?.completedAt);
   const elapsed = goal ? formatGoalElapsed((goal.completedAt ?? now) - goal.startedAt) : "0m";
 
   return (
@@ -964,12 +962,13 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         return name.includes(slashQuery) || description.includes(slashQuery);
       })
       .sort((a, b) => {
+        const sourceDelta = SLASH_SOURCE_ORDER[a.source] - SLASH_SOURCE_ORDER[b.source];
+        if (sourceDelta !== 0) return sourceDelta;
         const rankDelta = slashMatchRank(a, slashQuery) - slashMatchRank(b, slashQuery);
         if (rankDelta !== 0) return rankDelta;
         const dormancyDelta = Number(isDormantSkillCommand(a, dormantSkillNames)) - Number(isDormantSkillCommand(b, dormantSkillNames));
         if (dormancyDelta !== 0) return dormancyDelta;
-        return SLASH_SOURCE_ORDER[a.source] - SLASH_SOURCE_ORDER[b.source]
-          || modelCollator.compare(a.name, b.name);
+        return modelCollator.compare(a.name, b.name);
       });
   })();
 
@@ -1638,7 +1637,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
       />
       <div style={{ maxWidth: CHAT_COLUMN_MAX_WIDTH, margin: "0 auto" }}>
         <ModelErrorBanner error={modelError} />
-        <ComposerModeStatus goal={activeGoal} plan={activePlan} onClearGoal={onClearGoal} isStreaming={isStreaming} />
+        <ComposerModeStatus goal={activeGoal} plan={activePlan} onClearGoal={onClearGoal} />
         {/* Retry banner */}
         {retryInfo && (
           <div style={{

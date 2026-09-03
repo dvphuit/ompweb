@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useState, useRef, useEffect, useMemo, useCallback, type ComponentProps } from "react";
-import { Copy, Check, GitFork, CornerUpLeft, ChevronRight, ChevronDown, Brain, EyeOff, LoaderCircle, FileText, FilePlus, Pencil, Terminal, Search, FolderSearch, ListTodo, Bot, MessageCircleQuestion, Plug, Wrench } from "lucide-react";
+import { Copy, Check, GitFork, CornerUpLeft, ChevronRight, ChevronDown, Brain, EyeOff, LoaderCircle, FileText, FilePlus, Pencil, Terminal, Search, FolderSearch, ListTodo, Bot, MessageCircleQuestion, Plug, Wrench, Hash } from "lucide-react";
 import { MarkdownBody } from "./MarkdownBody";
 import { ClickableImage } from "./ImageLightbox";
 import { translate, useI18n, type Locale } from "@/lib/i18n";
@@ -419,6 +419,18 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
     </div>
   );
 }
+function isAssistantErrorVisible(message: AssistantMessage): string | null {
+  const raw = typeof message.errorMessage === "string" ? message.errorMessage.trim() : "";
+  if (!raw) return null;
+  if (raw === "__omp.silent_abort__") return null;
+  if (message.stopReason === "error") return raw;
+  if (message.stopReason === "aborted") {
+    if (raw === "Request was aborted" || raw === "Request was aborted.") return null;
+    return raw;
+  }
+  return null;
+}
+
 function AssistantMessageView({
   message,
   isStreaming,
@@ -545,7 +557,9 @@ function AssistantMessageView({
     return () => clearInterval(id);
   }, [isStreaming]);
 
-  if (blocks.length === 0 && !isStreaming) return null;
+  const errorText = isAssistantErrorVisible(message);
+
+  if (blocks.length === 0 && !isStreaming && !errorText) return null;
 
   return (
     <div
@@ -627,6 +641,49 @@ function AssistantMessageView({
           });
         })()}
       </div>
+      {errorText && (
+        <div style={{ marginTop: blocks.length > 0 ? 8 : 0, display: "flex", justifyContent: "flex-start" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              alignItems: "flex-start",
+              maxWidth: "85%",
+              padding: "10px 12px",
+              background: "color-mix(in srgb, var(--status-error) 8%, var(--bg-panel))",
+              border: "1px solid color-mix(in srgb, var(--status-error) 22%, transparent)",
+              borderRadius: "var(--radius-card)",
+              boxShadow: "var(--shadow-card)",
+              fontSize: 14,
+              lineHeight: 1.6,
+              color: "var(--text)",
+              whiteSpace: "pre-wrap",
+              overflowWrap: "anywhere",
+            }}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="var(--status-error)"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ flexShrink: 0, marginTop: 2 }}
+              aria-hidden="true"
+            >
+              <path d="M10.3 2.9 1.8 17a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 2.9a2 2 0 0 0-3.4 0Z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ fontWeight: 600, color: "var(--status-error)" }}>{t("messageView.error")}: </span>
+              {errorText}
+            </span>
+          </div>
+        </div>
+      )}
 
       {time && !isStreaming && (
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 3 }}>
@@ -924,6 +981,7 @@ const TOOL_ICONS = {
   MessageCircleQuestion,
   Plug,
   Wrench,
+  Hash,
 } as const;
 
 const ToolCallBlock = memo(function ToolCallBlock({ block, result, duration, isStreaming, defaultCollapsed = true }: { block: ToolCallContent; result?: ToolResultMessage; duration?: number; isStreaming?: boolean; defaultCollapsed?: boolean }) {
@@ -959,7 +1017,7 @@ const ToolCallBlock = memo(function ToolCallBlock({ block, result, duration, isS
               <LoaderCircle size={12} strokeWidth={1.8} className="activity-row-spinner" />
             </span>
           ) : null}
-          <span className={`activity-row-tool${isError ? " activity-row-tool-error" : ""}`}>{block.toolName}</span>
+          <span className={`activity-row-tool${isError ? " activity-row-tool-error" : ""}`}>{block.toolName === "irc" ? "#" : block.toolName}</span>
           <span className="sr-only">{statusLabel}</span>
           <span className="activity-row-preview">{getToolPreview(block)}</span>
           {duration !== undefined && (

@@ -74,11 +74,11 @@ test("renders goal, planning, and advisor indicators at the composer", () => {
       onSend() {},
       onAbort() {},
       onModelChange() {},
-      isStreaming: true,
+      isStreaming: false,
       model: { provider: "test", modelId: "model" },
       modelList: [{ provider: "test", modelId: "model", id: "model", name: "Test model" }],
       modelNames: {},
-      activeGoal: { objective: "Ship the active goal bar", startedAt: 0 },
+      activeGoal: { objective: "Ship the active goal bar", startedAt: 1000 },
       onClearGoal() {},
       activePlan: { objective: "Plan the implementation" },
       advisorEnabled: true,
@@ -88,6 +88,7 @@ test("renders goal, planning, and advisor indicators at the composer", () => {
 
   assert.match(html, /Ship the active goal bar/);
   assert.match(html, /(Goal active|chatInput\.goalActive)/);
+  assert.doesNotMatch(html, /(Goal completed|chatInput\.goalCompleted)/);
   assert.match(html, /(Planning in progress|chatInput\.planningInProgress)/);
   // The per-chat advisor toggle renders pressed with its disable title.
   assert.match(html, /aria-pressed="true"/);

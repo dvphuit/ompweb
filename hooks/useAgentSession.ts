@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo, useReducer } from "react";
 import type {
   AgentMessage,
+  AssistantMessage,
   CustomMessage,
   ExtensionStatusItem,
   ExtensionUiRequest,
@@ -1557,6 +1558,21 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     });
   }, []);
 
+  const pushErrorAsChat = useCallback((text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    const errMsg: AssistantMessage = {
+      role: "assistant",
+      content: [],
+      model: "",
+      provider: "",
+      stopReason: "error",
+      errorMessage: trimmed,
+      timestamp: Date.now(),
+    };
+    setMessages((prev) => [...prev, errMsg]);
+  }, []);
+
   // Declared after addNotice: the dependency array below is evaluated during
   // render, so addNotice must already be initialized.
   const ensureEventsConnected = useCallback(async (sid: string) => {
@@ -2377,12 +2393,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
             : prev;
         });
       }
-      addNotice({
-        type: "error",
-        message: e instanceof EventStreamConnectionError
-          ? e.message
-          : translate("agentSession.sendFailed", { detail: e instanceof Error ? e.message : String(e) }),
-      });
+      const errorMessage = e instanceof EventStreamConnectionError
+        ? e.message
+        : translate("agentSession.sendFailed", { detail: e instanceof Error ? e.message : String(e) });
+      pushErrorAsChat(errorMessage);
       // Restore the user's text into the input instead of losing it. Mirrors the
       // shell-command recovery in executeBash; insertIfEmpty avoids clobbering
       // anything typed since.
@@ -2394,7 +2408,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       dispatch({ type: "end" });
       return false;
     }
-  }, [isNew, newSessionCwd, newSessionModel, session, ensureNewSession, ensureEventsConnected, promoteNewSession, waitForPromptSettlement, addNotice, opts.chatInputRef, refreshSubagentRoster, registerHostTools, registerHostUriSchemes]);
+  }, [isNew, newSessionCwd, newSessionModel, session, ensureNewSession, ensureEventsConnected, promoteNewSession, pushErrorAsChat, waitForPromptSettlement, opts.chatInputRef, refreshSubagentRoster, registerHostTools, registerHostUriSchemes]);
 
   /** Abort the running agent and send the message as a fresh prompt
    * (abort_and_prompt). Only valid mid-run; the old turn's agent_end is
@@ -2434,10 +2448,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         });
       }
       optimisticUserMessageKeyRef.current = null;
-      addNotice({ type: "error", message: e instanceof Error ? e.message : String(e) });
+      const msg = e instanceof Error ? e.message : String(e);
+      pushErrorAsChat(msg);
       return false;
     }
-  }, [addNotice, ensureEventsConnected, refreshSubagentRoster]);
+  }, [ensureEventsConnected, pushErrorAsChat, refreshSubagentRoster]);
 
   const executeBash = useCallback(async (command: string, excludeFromContext: boolean) => {
     if (agentRunningRef.current || bashRunningRef.current) return;
@@ -2506,9 +2521,13 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     }
   }, [onSessionForked]);
 
-  // omp's RPC protocol has no navigate-within-tree command, so branch
-  // selection is display-only: the viewed branch is loaded from the session
-  // file, while a live agent keeps prompting from its own current leaf.
+  // Branch navigation is display-only: the transcript for the selected leaf is
+  // loaded from the session
+  // file while the live RPC process keeps its own leaf.
+  // This matches omp 18.1.3+ where `branch`/`rewind` keep the old path as a
+  // sibling in `/tree` (in-place branching) — the web UI surfaces that sibling
+  // via BranchNavigator, and a subsequent prompt continues from the displayed
+  // leaf once the run finishes and the client re-loads.
   const handleNavigate = useCallback(async (entryId: string) => {
     // While a run is active its streaming frames append to the displayed
     // message list — swapping in another branch's context mid-run would mix
@@ -2539,6 +2558,8 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         await sendAgentCommand(sid, { type: "set_model", provider, modelId });
       } catch (e) {
         console.error("Failed to set model:", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        pushErrorAsChat(msg);
       }
       return;
     }
@@ -2550,8 +2571,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       void refreshLiveModelState(sid);
     } catch (e) {
       console.error("Failed to set model:", e);
+      const msg = e instanceof Error ? e.message : String(e);
+      pushErrorAsChat(msg);
     }
-  }, [isNew, setNewSessionModel, refreshLiveModelState]);
+  }, [isNew, setNewSessionModel, refreshLiveModelState, pushErrorAsChat]);
 
   const handleFastModeChange = useCallback(async (enabled: boolean) => {
     // A brand-new session has no runtime yet: the model picker updates local

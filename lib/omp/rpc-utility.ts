@@ -27,12 +27,21 @@ const DEFAULT_COMMAND_TIMEOUT_MS = 60_000;
 
 /** Minimal mirror of omp's Model (packages/catalog/src/types.ts) — only the
  * fields the models/auth routes read. Everything else passes through opaque. */
+/** Minimal mirror of omp's Model (packages/catalog/src/types.ts) — only the
+ * fields the models/auth routes read. Kept in sync with @oh-my-pi/pi-ai catalog:
+ * omp 18.1.0 adds provider-supplied `description` and badge flags surfaced via
+ * `get_available_models` for the model picker. */
 export interface OmpModel {
   id: string;
   name: string;
   provider: string;
   api?: string;
   reasoning?: boolean;
+  description?: string;
+  isNew?: boolean;
+  isBeta?: boolean;
+  isRecommended?: boolean;
+  badges?: string[];
   thinking?: {
     mode?: string;
     efforts?: string[];

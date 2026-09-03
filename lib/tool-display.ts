@@ -12,6 +12,7 @@ export type ToolVarName =
   | "--tool-task"
   | "--tool-ask"
   | "--tool-hub"
+  | "--tool-irc"
   | "--tool-generic";
 
 export type ToolIconName =
@@ -25,7 +26,8 @@ export type ToolIconName =
   | "Bot"
   | "MessageCircleQuestion"
   | "Plug"
-  | "Wrench";
+  | "Wrench"
+  | "Hash";
 
 export interface ToolDisplay {
   iconName: ToolIconName;
@@ -46,6 +48,8 @@ export function normalizeToolKey(name: string): string {
 
 export function getToolDisplay(toolName: string): ToolDisplay {
   const key = normalizeToolKey(toolName);
+  // omp 18.1.3+ renders the IRC tool as "#" (was "irc") — keep web glyph in sync with TUI's ASCII_SYMBOLS.
+  if (key === "irc") return { iconName: "Hash", varName: "--tool-irc" };
   if (key === "read" || key === "cat" || key === "view") return { iconName: "FileText", varName: "--tool-read" };
   if (key === "write") return { iconName: "FilePlus", varName: "--tool-write" };
   if (key === "edit" || key === "apply_patch" || key === "patch") return { iconName: "Pencil", varName: "--tool-edit" };
@@ -63,6 +67,7 @@ export function getToolDisplay(toolName: string): ToolDisplay {
   if (key.includes("grep") || key.includes("search") || key.includes("glob") || key.includes("find")) return { iconName: "FolderSearch", varName: "--tool-search" };
   if (key.includes("todo")) return { iconName: "ListTodo", varName: "--tool-todo" };
   if (key.includes("task")) return { iconName: "Bot", varName: "--tool-task" };
+  if (key.includes("irc")) return { iconName: "Hash", varName: "--tool-irc" };
   return { iconName: "Wrench", varName: "--tool-generic" };
 }
 

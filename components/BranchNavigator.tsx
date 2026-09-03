@@ -5,6 +5,9 @@ import { GitBranch } from "lucide-react";
 import { translate, useI18n } from "@/lib/i18n";
 import type { BranchPreview, SessionEntry, SessionTreeNode } from "@/lib/types";
 
+// omp 18.1.3: rewinding to a user message now branches in place — the old
+// path stays as a sibling branch reachable via `/tree`. This navigator
+// surfaces that sibling tree; the active leaf's path is highlighted.
 interface Props {
   tree: SessionTreeNode[];
   activeLeafId: string | null;

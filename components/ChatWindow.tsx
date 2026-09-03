@@ -69,8 +69,21 @@ const CHAT_COLUMN_PADDING = 16;
 // the banner and the load looked like a no-op.
 const LOAD_MORE_ROOT_MARGIN = "400px 0px 0px 0px";
 
+function isAssistantErrorVisibleInChat(message: AssistantMessage): string | null {
+  const raw = typeof message.errorMessage === "string" ? message.errorMessage.trim() : "";
+  if (!raw) return null;
+  if (raw === "__omp.silent_abort__") return null;
+  if (message.stopReason === "error") return raw;
+  if (message.stopReason === "aborted") {
+    if (raw === "Request was aborted" || raw === "Request was aborted.") return null;
+    return raw;
+  }
+  return null;
+}
+
 function hasFinalAssistantAnswer(message: AgentMessage): boolean {
   if (message.role !== "assistant") return false;
+  if (isAssistantErrorVisibleInChat(message as AssistantMessage)) return true;
   return splitFinalAssistantBlocks(message as AssistantMessage).answerBlocks.some((block) => (
     block.type === "image" || (block.type === "text" && block.text.trim().length > 0)
   ));
@@ -112,6 +125,7 @@ function countToolCalls(messages: AgentMessage[], indices: number[]): number {
 
 function hasDisplayableProcessMessage(message: AgentMessage): boolean {
   if (message.role === "assistant") {
+    if (isAssistantErrorVisibleInChat(message as AssistantMessage)) return true;
     return getDisplayableAssistantBlocks(message as AssistantMessage).length > 0;
   }
   return message.role === "custom";
@@ -372,9 +386,12 @@ const CommittedTranscript = memo(function CommittedTranscript({
     const finalProcessMessage = finalSplit.processBlocks.length > 0
       ? withAssistantBlocks(finalAssistant, finalSplit.processBlocks, { omitUsage: true })
       : null;
+    const errorText = isAssistantErrorVisibleInChat(finalAssistant);
     const finalAnswerMessage = finalSplit.answerBlocks.length > 0
       ? withAssistantBlocks(finalAssistant, finalSplit.answerBlocks)
-      : null;
+      : errorText
+        ? finalAssistant
+        : null;
 
     const processCount = visibleProcessIndices.length + (finalProcessMessage ? 1 : 0);
     if (processCount > 0) {

@@ -56,6 +56,7 @@
   --tool-task: #E11D48;
   --tool-ask: #9333EA;
   --tool-hub: #EA580C;
+  --tool-irc: #BE185D;
   --tool-generic: var(--accent);
   --on-accent: #FFFFFF;
   --overlay-backdrop: rgba(0, 0, 0, 0.45);
@@ -90,6 +91,7 @@ html.dark {
   --tool-task: #FB7185;
   --tool-ask: #C084FC;
   --tool-hub: #FB923C;
+  --tool-irc: #F472B6;
   --tool-generic: var(--accent);
   --on-accent: #FFFFFF;
   --overlay-backdrop: rgba(0, 0, 0, 0.72);
