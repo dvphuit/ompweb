@@ -252,17 +252,17 @@ export function AppUpdateDialog({ open, update, phase, visibleStage, error, onPr
         </div>
 
         {versionTransition && (
-          <div style={{ marginTop: 18, padding: "11px 13px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+          <div style={{ marginTop: 18, padding: "11px 13px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
             <span>v{versionTransition.fromVersion}</span><span aria-hidden="true">→</span><span>v{versionTransition.targetVersion}</span>
           </div>
         )}
 
         {phase === "idle" && visibleReleaseNotes && (
-          <details style={{ marginTop: 14, maxWidth: "100%", minWidth: 0, border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)" }}>
+          <details style={{ marginTop: 14, maxWidth: "100%", minWidth: 0, border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)" }}>
             <summary style={{ padding: "10px 13px", cursor: "pointer", color: "var(--text)", fontSize: 13, fontWeight: 600, overflowWrap: "anywhere" }}>
               {t("appUpdateDialog.releaseNotesTitle", { version: visibleReleaseNotes.version })}
             </summary>
-            <div style={{ borderTop: "1px solid var(--border)", padding: "12px 13px" }}>
+            <div style={{ borderTop: "var(--bw) solid var(--border)", padding: "12px 13px" }}>
               <div
                 role="region"
                 aria-label={t("appUpdateDialog.releaseNotesTitle", { version: visibleReleaseNotes.version })}
@@ -336,7 +336,7 @@ export function AppUpdateDialog({ open, update, phase, visibleStage, error, onPr
         {showDrain && drainSummary && (
           <section
             aria-label={drainSummary}
-            style={{ marginTop: 10, padding: "10px 11px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", fontSize: 11 }}
+            style={{ marginTop: 10, padding: "10px 11px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", fontSize: 11 }}
           >
             <div role="status" aria-live="polite" style={{ color: "var(--text-muted)", fontWeight: 600 }}>
               {drainSummary}
@@ -345,7 +345,7 @@ export function AppUpdateDialog({ open, update, phase, visibleStage, error, onPr
         )}
 
         {phase === "idle" && (
-          <div style={{ marginTop: 18, padding: "13px 14px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-subtle)", display: "grid", gap: 9, color: "var(--text-muted)", fontSize: 12, lineHeight: 1.55 }}>
+          <div style={{ marginTop: 18, padding: "13px 14px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-subtle)", display: "grid", gap: 9, color: "var(--text-muted)", fontSize: 12, lineHeight: 1.55 }}>
             {[
               t("appUpdateDialog.activeSessionsWarning"),
               t("appUpdateDialog.savedSessionsWarning"),
@@ -361,7 +361,7 @@ export function AppUpdateDialog({ open, update, phase, visibleStage, error, onPr
         )}
 
         {phase === "failed" && (
-          <div role="alert" style={{ marginTop: 16, padding: "10px 12px", border: "1px solid var(--status-error)", borderRadius: "var(--radius-control)", background: "var(--bg-subtle)", color: "var(--text)", fontSize: 12, lineHeight: 1.5 }}>
+          <div role="alert" style={{ marginTop: 16, padding: "10px 12px", border: "var(--bw) solid var(--status-error)", borderRadius: "var(--radius-control)", background: "var(--bg-subtle)", color: "var(--text)", fontSize: 12, lineHeight: 1.5 }}>
             {error && <div>{error}</div>}
             {recoveryMessage && (
               <div style={{ marginTop: error ? 8 : 0, display: "flex", alignItems: "flex-start", gap: 6, color: update?.selfUpdateStatus?.recovered ? "var(--status-success)" : "var(--status-error)" }}>
@@ -374,7 +374,7 @@ export function AppUpdateDialog({ open, update, phase, visibleStage, error, onPr
             <div style={{ marginTop: error || recoveryMessage ? 10 : 0 }}>{t("appUpdateDialog.failedFallback")}</div>
             <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8 }}>
               <code style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere", color: "var(--accent)", fontFamily: "var(--font-mono)" }}>{command}</code>
-              <button type="button" onClick={() => void copyText(command).then(() => toast.success(t("appShell.commandCopied"))).catch(() => toast.error(t("appShell.commandCopyFailed")))} style={{ padding: "5px 9px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-panel)", color: "var(--text)", cursor: "pointer", fontSize: 11 }}>
+              <button type="button" onClick={() => void copyText(command).then(() => toast.success(t("appShell.commandCopied"))).catch(() => toast.error(t("appShell.commandCopyFailed")))} style={{ padding: "5px 9px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-panel)", color: "var(--text)", cursor: "pointer", fontSize: 11 }}>
                 {t("appShell.copyCommand")}
               </button>
             </div>
@@ -382,7 +382,7 @@ export function AppUpdateDialog({ open, update, phase, visibleStage, error, onPr
         )}
 
         {phase === "restarting" && (
-          <p role="note" style={{ margin: "16px 0 0", paddingTop: 12, borderTop: "1px solid var(--border)", display: "flex", alignItems: "flex-start", gap: 8, color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
+          <p role="note" style={{ margin: "16px 0 0", paddingTop: 12, borderTop: "var(--bw) solid var(--border)", display: "flex", alignItems: "flex-start", gap: 8, color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>
             <Info size={14} aria-hidden="true" style={{ marginTop: 2, flexShrink: 0 }} /> <span>{t("appUpdateDialog.keepOpen")}</span>
           </p>
         )}
@@ -395,17 +395,17 @@ export function AppUpdateDialog({ open, update, phase, visibleStage, error, onPr
 
         <div style={{ marginTop: 22, display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 8 }}>
           {!busy && (
-            <button type="button" onClick={onNotNow} style={{ padding: "7px 13px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "transparent", color: "var(--text-muted)", cursor: "pointer", fontSize: 12 }}>
+            <button type="button" onClick={onNotNow} style={{ padding: "7px 13px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "transparent", color: "var(--text-muted)", cursor: "pointer", fontSize: 12 }}>
               {phase === "failed" ? t("appUpdateDialog.close") : t("appUpdateDialog.notNow")}
             </button>
           )}
           {phase === "idle" && (
-            <button type="button" onClick={onProceed} style={{ padding: "7px 13px", border: "1px solid var(--accent-strong)", borderRadius: "var(--radius-control)", background: "var(--accent-strong)", color: "var(--on-accent)", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", flexShrink: 0 }}>
+            <button type="button" onClick={onProceed} style={{ padding: "7px 13px", border: "var(--bw) solid var(--accent-strong)", borderRadius: "var(--radius-control)", background: "var(--accent-strong)", color: "var(--on-accent)", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", flexShrink: 0 }}>
               <Download size={13} aria-hidden="true" /> {t("appUpdateDialog.proceed")}
             </button>
           )}
           {phase === "failed" && (
-            <button type="button" onClick={onProceed} style={{ padding: "7px 13px", border: "1px solid var(--accent-strong)", borderRadius: "var(--radius-control)", background: "var(--accent-strong)", color: "var(--on-accent)", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", flexShrink: 0 }}>
+            <button type="button" onClick={onProceed} style={{ padding: "7px 13px", border: "var(--bw) solid var(--accent-strong)", borderRadius: "var(--radius-control)", background: "var(--accent-strong)", color: "var(--on-accent)", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", flexShrink: 0 }}>
               <RotateCcw size={13} aria-hidden="true" /> {t("appUpdateDialog.retry")}
             </button>
           )}

@@ -272,7 +272,7 @@ export function UsageConfig() {
             gap: 6,
             padding: "6px 14px",
             background: "var(--bg-panel)",
-            border: "1px solid var(--border)",
+            border: "var(--bw) solid var(--border)",
             borderRadius: "var(--radius-control)",
             color: "var(--text)",
             fontSize: 12,
@@ -315,7 +315,7 @@ export function UsageConfig() {
           flexWrap: "wrap",
           gap: 12,
           paddingBottom: 4,
-          borderBottom: "1px solid var(--border)",
+          borderBottom: "var(--bw) solid var(--border)",
         }}
       >
         <div>
@@ -345,7 +345,7 @@ export function UsageConfig() {
               background: "var(--bg-subtle)",
               padding: 2,
               borderRadius: "var(--radius-control)",
-              border: "1px solid var(--border)",
+              border: "var(--bw) solid var(--border)",
             }}
           >
             {(["daily", "monthly", "projects"] as UsageGranularity[]).map((g) => {
@@ -389,7 +389,7 @@ export function UsageConfig() {
                 padding: "5px 28px 5px 10px",
                 fontSize: 12,
                 borderRadius: "var(--radius-control)",
-                border: "1px solid var(--border)",
+                border: "var(--bw) solid var(--border)",
                 background: "var(--bg-panel)",
                 color: "var(--text)",
                 cursor: "pointer",
@@ -427,7 +427,7 @@ export function UsageConfig() {
               width: 30,
               height: 30,
               borderRadius: "var(--radius-control)",
-              border: "1px solid var(--border)",
+              border: "var(--bw) solid var(--border)",
               background: "var(--bg-panel)",
               color: "var(--text-muted)",
               cursor: refreshing ? "default" : "pointer",
@@ -450,7 +450,7 @@ export function UsageConfig() {
         <div
           style={{
             background: "var(--bg-panel)",
-            border: "1px solid var(--border)",
+            border: "var(--bw) solid var(--border)",
             borderRadius: "var(--radius-card)",
             padding: "16px 18px",
             display: "flex",
@@ -555,7 +555,7 @@ export function UsageConfig() {
         <div
           style={{
             background: "var(--bg-panel)",
-            border: "1px solid var(--border)",
+            border: "var(--bw) solid var(--border)",
             borderRadius: "var(--radius-card)",
             padding: "16px 18px",
             display: "flex",
@@ -605,7 +605,7 @@ export function UsageConfig() {
                 background: "var(--bg-subtle)",
                 padding: 2,
                 borderRadius: "var(--radius-control)",
-                border: "1px solid var(--border)",
+                border: "var(--bw) solid var(--border)",
               }}
             >
               <button
@@ -753,7 +753,7 @@ export function UsageConfig() {
                   top: Math.max(26, hoverPos.y - 8),
                   transform: "translate(-50%, -100%)",
                   background: "var(--bg)",
-                  border: "1px solid var(--border)",
+                  border: "var(--bw) solid var(--border)",
                   borderRadius: "var(--radius-control)",
                   boxShadow: "var(--shadow-card)",
                   padding: "6px 9px",
@@ -766,7 +766,7 @@ export function UsageConfig() {
                   whiteSpace: "nowrap",
                 }}
               >
-                <div style={{ fontWeight: 600, color: "var(--text)", borderBottom: "1px solid var(--border)", paddingBottom: 2 }}>
+                <div style={{ fontWeight: 600, color: "var(--text)", borderBottom: "var(--bw) solid var(--border)", paddingBottom: 2 }}>
                   {activeHoverPoint.label}
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
@@ -805,7 +805,7 @@ export function UsageConfig() {
         <div
           style={{
             background: "var(--bg-panel)",
-            border: "1px solid var(--border)",
+            border: "var(--bw) solid var(--border)",
             borderRadius: "var(--radius-control)",
             padding: "12px 14px",
             display: "flex",
@@ -828,7 +828,7 @@ export function UsageConfig() {
         <div
           style={{
             background: "var(--bg-panel)",
-            border: "1px solid var(--border)",
+            border: "var(--bw) solid var(--border)",
             borderRadius: "var(--radius-control)",
             padding: "12px 14px",
             display: "flex",
@@ -851,7 +851,7 @@ export function UsageConfig() {
         <div
           style={{
             background: "var(--bg-panel)",
-            border: "1px solid var(--border)",
+            border: "var(--bw) solid var(--border)",
             borderRadius: "var(--radius-control)",
             padding: "12px 14px",
             display: "flex",
@@ -874,7 +874,7 @@ export function UsageConfig() {
         <div
           style={{
             background: "var(--bg-panel)",
-            border: "1px solid var(--border)",
+            border: "var(--bw) solid var(--border)",
             borderRadius: "var(--radius-control)",
             padding: "12px 14px",
             display: "flex",
@@ -897,7 +897,7 @@ export function UsageConfig() {
         <div
           style={{
             background: "var(--bg-panel)",
-            border: "1px solid var(--border)",
+            border: "var(--bw) solid var(--border)",
             borderRadius: "var(--radius-control)",
             padding: "12px 14px",
             display: "flex",
@@ -933,7 +933,7 @@ export function UsageConfig() {
         <div
           style={{
             background: "var(--bg-panel)",
-            border: "1px solid var(--border)",
+            border: "var(--bw) solid var(--border)",
             borderRadius: "var(--radius-card)",
             padding: "14px 16px",
             display: "flex",
@@ -954,7 +954,7 @@ export function UsageConfig() {
                 background: "var(--bg-subtle)",
                 padding: 2,
                 borderRadius: "var(--radius-control)",
-                border: "1px solid var(--border)",
+                border: "var(--bw) solid var(--border)",
               }}
             >
               <button
@@ -1015,7 +1015,7 @@ export function UsageConfig() {
           <div style={{ maxHeight: 220, overflowY: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
               <thead>
-                <tr style={{ borderBottom: "1px solid var(--border)", color: "var(--text-dim)", textAlign: "left" }}>
+                <tr style={{ borderBottom: "var(--bw) solid var(--border)", color: "var(--text-dim)", textAlign: "left" }}>
                   <th style={{ padding: "6px 4px", fontWeight: 500 }}>
                     {breakdownView === "model"
                       ? t("usageConfig.model")
@@ -1120,7 +1120,7 @@ export function UsageConfig() {
         <div
           style={{
             background: "var(--bg-panel)",
-            border: "1px solid var(--border)",
+            border: "var(--bw) solid var(--border)",
             borderRadius: "var(--radius-card)",
             padding: "14px 16px",
             display: "flex",

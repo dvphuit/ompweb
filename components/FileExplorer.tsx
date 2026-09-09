@@ -793,7 +793,7 @@ export function FileExplorer({
               boxSizing: "border-box",
               padding: searchQuery ? "0 26px 0 9px" : "0 9px",
               background: "var(--bg)",
-              border: "1px solid var(--border)",
+              border: "var(--bw) solid var(--border)",
               borderRadius: "var(--radius-control)",
               outline: "none",
               color: "var(--text)",
@@ -838,7 +838,7 @@ export function FileExplorer({
         </div>
       )}
 
-      <div style={{ display: "flex", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
+      <div style={{ display: "flex", borderBottom: "var(--bw) solid var(--border)", flexShrink: 0 }}>
         <button
           type="button"
           onClick={() => setActiveTab("all")}
@@ -897,7 +897,7 @@ export function FileExplorer({
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
-                borderRadius: 8,
+                borderRadius: "var(--radius-card)",
                 background: activeTab === "changes" ? "var(--accent)" : "var(--bg-hover)",
                 color: activeTab === "changes" ? "white" : "var(--text-muted)",
                 fontSize: 10,
@@ -982,14 +982,14 @@ export function FileExplorer({
                 justifyContent: "flex-end",
                 gap: 6,
                 padding: "4px 6px",
-                borderBottom: "1px solid var(--border)",
+                borderBottom: "var(--bw) solid var(--border)",
                 flexShrink: 0,
               }}
             >
               <div
                 style={{
                   display: "flex",
-                  border: "1px solid var(--border)",
+                  border: "var(--bw) solid var(--border)",
                   borderRadius: "var(--radius-control)",
                   overflow: "hidden",
                 }}
@@ -1029,7 +1029,7 @@ export function FileExplorer({
                     height: 22,
                     background: changesView === "list" ? "var(--bg-selected)" : "transparent",
                     border: "none",
-                    borderLeft: "1px solid var(--border)",
+                    borderLeft: "var(--bw) solid var(--border)",
                     color: changesView === "list" ? "var(--text)" : "var(--text-muted)",
                     cursor: "pointer",
                     fontSize: 11,

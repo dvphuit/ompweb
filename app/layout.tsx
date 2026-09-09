@@ -1,16 +1,23 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Noto_Sans_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
-const notoSansMono = Noto_Sans_Mono({
-  subsets: ["latin", "cyrillic"],
-  variable: "--font-noto-mono",
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin", "cyrillic", "vietnamese"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin", "vietnamese"],
+  weight: ["500", "700"],
+  variable: "--font-space-grotesk",
   display: "swap",
 });
 
 const inter = Inter({
   subsets: ["latin", "cyrillic", "vietnamese"],
-  variable: "--font-sans",
+  variable: "--font-inter",
   display: "swap",
 });
 export const metadata: Metadata = {
@@ -35,8 +42,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#FFFFFF" },
-    { media: "(prefers-color-scheme: dark)", color: "#09090B" },
+    { media: "(prefers-color-scheme: light)", color: "#F5F2EA" },
+    { media: "(prefers-color-scheme: dark)", color: "#141414" },
   ],
 };
 
@@ -46,14 +53,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" translate="no" className={`${notoSansMono.variable} ${inter.variable} notranslate`} suppressHydrationWarning>
+    <html lang="en" translate="no" className={`${jetbrainsMono.variable} ${spaceGrotesk.variable} ${inter.variable} notranslate`} suppressHydrationWarning>
       <head>
         <meta name="google" content="notranslate" />
         {/* Pre-hydration: apply stored appearance and color preset before first
             paint. This mirrors the selectors in globals.css. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var e=document.documentElement,t=localStorage.getItem("omp-theme"),p=localStorage.getItem("omp-theme-preset"),d=matchMedia("(prefers-color-scheme: dark)").matches,a=["obsidian","carbon","cyber","emerald","violet","amber"],m={"ember":"obsidian","graphite":"carbon","ocean":"cyber","forest":"emerald","rose":"violet","amber":"amber"};if(t==="dark"||(t!=="light"&&t!=="dark"&&d))e.classList.add("dark");if(p&&m[p])p=m[p];e.dataset.themePreset=a.indexOf(p)>-1?p:"obsidian"}catch(e){}})();`,
+            __html: `(function(){try{var e=document.documentElement,t=localStorage.getItem("omp-theme"),p=localStorage.getItem("omp-theme-preset"),d=matchMedia("(prefers-color-scheme: dark)").matches,a=["signal","coral","mint","electric"],m={"obsidian":"electric","carbon":"signal","cyber":"electric","emerald":"mint","violet":"electric","amber":"signal","ember":"coral","graphite":"signal","ocean":"electric","forest":"mint","rose":"coral"};if(t==="dark"||(t!=="light"&&t!=="dark"&&d))e.classList.add("dark");if(p&&m[p])p=m[p];e.dataset.themePreset=a.indexOf(p)>-1?p:"signal"}catch(e){}})();`,
           }}
         />
         <script

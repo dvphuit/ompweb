@@ -81,7 +81,7 @@ export function SafeMarkdownBody({ children, className, ...props }: ComponentPro
       <button
         type="button"
         onClick={() => setShowRaw(true)}
-        style={{ display: "block", width: "100%", margin: "4px 0", padding: "7px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-panel)", color: "var(--text-muted)", cursor: "pointer", fontSize: 12, textAlign: "left" }}
+        style={{ display: "block", width: "100%", margin: "4px 0", padding: "7px 10px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-panel)", color: "var(--text-muted)", cursor: "pointer", fontSize: 12, textAlign: "left" }}
       >
         {t("messageView.largeMessageReveal", { size: formatMessageSize(children.length) })}
       </button>
@@ -285,10 +285,9 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
             maxWidth: "100%",
             minWidth: 0,
             background: "var(--user-bg)",
-            border: "1px solid color-mix(in srgb, var(--accent) 28%, transparent)",
+            border: "var(--bw) solid var(--border)",
             borderRadius: "var(--radius-card)",
-            boxShadow: "var(--shadow-card)",
-            padding: "8px 12px",
+            padding: "10px 14px",
             fontSize: "var(--chat-user-font-size)",
             lineHeight: "var(--chat-line-height)",
             color: "var(--text)",
@@ -308,7 +307,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
                     key={i}
                     src={src}
                     alt=""
-                    style={{ maxWidth: 240, maxHeight: 240, borderRadius: 6, objectFit: "contain", display: "block", border: "1px solid color-mix(in srgb, var(--accent) 18%, transparent)" }}
+                    style={{ maxWidth: 240, maxHeight: 240, borderRadius: "var(--radius-control)", objectFit: "contain", display: "block", border: "1px solid color-mix(in srgb, var(--accent) 18%, transparent)" }}
                   />
                 );
               })}
@@ -342,7 +341,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
                   display: "flex", alignItems: "center", gap: 4,
                   padding: "3px 8px", height: 24, minHeight: 24,
                   background: "none", border: "none",
-                  borderRadius: 5,
+                  borderRadius: "var(--radius-control)",
                   color: copied ? "var(--accent)" : "var(--text-dim)",
                   cursor: "pointer",
                   fontSize: 11, fontWeight: 400,
@@ -377,7 +376,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
                       display: "flex", alignItems: "center", gap: 4,
                       padding: "3px 8px", height: 24, minHeight: 24,
                       background: "none", border: "none",
-                      borderRadius: 5,
+                      borderRadius: "var(--radius-control)",
                       color: "var(--text-dim)",
                       cursor: "pointer",
                       fontSize: 11, fontWeight: 400,
@@ -402,7 +401,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
                       display: "flex", alignItems: "center", gap: 4,
                       padding: "3px 8px", height: 24, minHeight: 24,
                       background: "none", border: "none",
-                      borderRadius: 5,
+                      borderRadius: "var(--radius-control)",
                       color: forking ? "var(--accent)" : "var(--text-dim)",
                       cursor: forking ? "not-allowed" : "pointer",
                       fontSize: 11, fontWeight: 400,
@@ -1090,7 +1089,7 @@ const ToolCallBlock = memo(function ToolCallBlock({ block, result, duration, isS
                           key={i}
                           src={imageBlockSrc(img)}
                           alt=""
-                          style={{ maxWidth: 240, maxHeight: 240, borderRadius: 6, objectFit: "contain", display: "block", border: "1px solid color-mix(in srgb, var(--accent) 18%, transparent)" }}
+                          style={{ maxWidth: 240, maxHeight: 240, borderRadius: "var(--radius-control)", objectFit: "contain", display: "block", border: "1px solid color-mix(in srgb, var(--accent) 18%, transparent)" }}
                         />
                       ))}
                     </div>
@@ -1130,8 +1129,8 @@ function CompactionMessageView({ message }: { message: CustomMessage }) {
 
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden", background: "var(--bg)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", borderBottom: "1px solid var(--border)", background: "var(--bg-panel)", color: "var(--text-muted)" }}>
+      <div style={{ border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-card)", overflow: "hidden", background: "var(--bg)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", borderBottom: "var(--bw) solid var(--border)", background: "var(--bg-panel)", color: "var(--text-muted)" }}>
           <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 650 }}>{t("messageView.compactionLabel")}</span>
           {time && <span style={{ marginLeft: "auto", color: "var(--text-dim)", fontSize: 10 }}>{time}</span>}
         </div>
@@ -1287,8 +1286,8 @@ function HiddenExtensionView({ message, cwd, onOpenFile }: { message: CustomMess
             style={{
               marginTop: 6,
               width: "100%",
-              border: "1px solid var(--border)",
-              borderRadius: 8,
+              border: "var(--bw) solid var(--border)",
+              borderRadius: "var(--radius-card)",
               overflow: "hidden",
               background: "var(--bg-subtle)",
             }}
@@ -1304,7 +1303,7 @@ function HiddenExtensionView({ message, cwd, onOpenFile }: { message: CustomMess
                         key={i}
                         src={src}
                         alt=""
-                        style={{ maxWidth: 240, maxHeight: 240, borderRadius: 6, objectFit: "contain", display: "block", border: "1px solid var(--border)" }}
+                        style={{ maxWidth: 240, maxHeight: 240, borderRadius: "var(--radius-control)", objectFit: "contain", display: "block", border: "var(--bw) solid var(--border)" }}
                       />
                     );
                   })}
@@ -1324,7 +1323,7 @@ function HiddenExtensionView({ message, cwd, onOpenFile }: { message: CustomMess
                 alignItems: "center",
                 gap: 8,
                 padding: "4px 9px",
-                borderTop: "1px solid var(--border)",
+                borderTop: "var(--bw) solid var(--border)",
                 background: "var(--bg-panel)",
               }}
             >
@@ -1388,7 +1387,7 @@ function HiddenExtensionView({ message, cwd, onOpenFile }: { message: CustomMess
                 style={{
                   margin: 0,
                   padding: "9px 10px",
-                  borderTop: "1px solid var(--border)",
+                  borderTop: "var(--bw) solid var(--border)",
                   backgroundColor: "var(--bg)",
                   color: "var(--text-muted)",
                   fontSize: 12,
@@ -1434,8 +1433,8 @@ function CustomMessageView({ message, cwd, onOpenFile }: { message: CustomMessag
     <div style={{ marginBottom: 16 }}>
       <div
         style={{
-          border: "1px solid var(--border)",
-          borderRadius: 8,
+          border: "var(--bw) solid var(--border)",
+          borderRadius: "var(--radius-card)",
           overflow: "hidden",
           background: "var(--bg)",
         }}
@@ -1446,7 +1445,7 @@ function CustomMessageView({ message, cwd, onOpenFile }: { message: CustomMessag
             alignItems: "center",
             gap: 8,
             padding: "7px 10px",
-            borderBottom: "1px solid var(--border)",
+            borderBottom: "var(--bw) solid var(--border)",
             background: "var(--bg-panel)",
             color: "var(--text-muted)",
             fontSize: 12,
@@ -1470,7 +1469,7 @@ function CustomMessageView({ message, cwd, onOpenFile }: { message: CustomMessag
                       key={i}
                       src={src}
                       alt=""
-                      style={{ maxWidth: 240, maxHeight: 240, borderRadius: 6, objectFit: "contain", display: "block", border: "1px solid var(--border)" }}
+                      style={{ maxWidth: 240, maxHeight: 240, borderRadius: "var(--radius-control)", objectFit: "contain", display: "block", border: "var(--bw) solid var(--border)" }}
                     />
                   );
                 })}
@@ -1503,7 +1502,7 @@ function CustomMessageView({ message, cwd, onOpenFile }: { message: CustomMessag
             alignItems: "center",
             gap: 8,
             padding: "4px 9px",
-            borderTop: "1px solid var(--border)",
+            borderTop: "var(--bw) solid var(--border)",
             background: "var(--bg-subtle)",
           }}
         >
@@ -1547,7 +1546,7 @@ function CustomMessageView({ message, cwd, onOpenFile }: { message: CustomMessag
             style={{
               margin: 0,
               padding: "9px 10px",
-              borderTop: "1px solid var(--border)",
+              borderTop: "var(--bw) solid var(--border)",
               backgroundColor: "var(--bg)",
               color: "var(--text-muted)",
               fontSize: 12,
@@ -1709,7 +1708,7 @@ function BashExecutionView({ message, sessionId }: { message: BashExecutionMessa
         </div>
       )}
       {fullOutput?.phase === "ready" && (
-        <div style={{ maxHeight: 420, overflow: "auto", marginTop: 6, border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-panel)" }}>
+        <div style={{ maxHeight: 420, overflow: "auto", marginTop: 6, border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-panel)" }}>
           <pre style={{ margin: 0, padding: "8px 10px", whiteSpace: "pre-wrap", wordBreak: "break-word", fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-muted)" }}>
             {fullOutput.output}
           </pre>

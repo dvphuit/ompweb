@@ -22,6 +22,18 @@ import {
   SidebarPortalMenu,
   UnreadSessionIndicator,
 } from "./SessionSidebar-chrome";
+const PROJECT_AVATAR_COLORS = ["var(--accent-3)", "var(--accent-2)", "var(--accent-4)", "var(--tool-ask)", "var(--tool-search)", "var(--tool-irc)"];
+/** Stable per-project accent for the initial avatar (hash of the path). */
+function projectAvatarColor(path: string): string {
+  let h = 0;
+  for (let i = 0; i < path.length; i++) h = (h * 31 + path.charCodeAt(i)) | 0;
+  return PROJECT_AVATAR_COLORS[Math.abs(h) % PROJECT_AVATAR_COLORS.length];
+}
+function projectInitial(label: string): string {
+  const ch = label.trim().replace(/^[^\p{L}\p{N}]+/u, "").charAt(0);
+  return (ch || "#").toUpperCase();
+}
+
 interface ProjectRowProps {
   project: ManagedProject;
   isActive: boolean;
@@ -156,7 +168,7 @@ function ProjectRow({
           borderRadius: "var(--radius-control)",
           background: hovered ? "var(--bg-hover)" : "transparent",
           transition: SIDEBAR_BUTTON_TRANSITION,
-          ...(isDragTarget ? { outline: "1px solid var(--accent)", outlineOffset: -1 } : {}),
+          ...(isDragTarget ? { outline: "var(--bw) solid var(--accent)", outlineOffset: -1 } : {}),
         }}
       >
         {aliasEditing ? (
@@ -197,7 +209,7 @@ function ProjectRow({
                   setAliasEditing(false);
                 }
               }}
-              style={{ flex: 1, minWidth: 0, height: 22, padding: "2px 6px", border: "1px solid var(--accent)", borderRadius: "var(--radius-control)", outline: "none", background: "var(--bg)", color: "var(--text)", fontSize: 12, fontFamily: "var(--font-mono)", fontWeight: 600 }}
+              style={{ flex: 1, minWidth: 0, height: 22, padding: "2px 6px", border: "var(--bw) solid var(--accent)", borderRadius: "var(--radius-control)", outline: "none", background: "var(--bg)", color: "var(--text)", fontSize: 12, fontFamily: "var(--font-mono)", fontWeight: 600 }}
             />
           </div>
         ) : (
@@ -232,21 +244,22 @@ function ProjectRow({
               textAlign: "left",
             }}
           >
-            <Folder
-              size={15}
-              strokeWidth={1.8}
-              style={{ flexShrink: 0, color: isActive ? "var(--accent)" : hovered ? "var(--text-muted)" : "var(--text-dim)", transition: "color var(--dur-fast) var(--ease-out-warm)" }}
+            <span
+              className="sidebar-project-avatar"
               aria-hidden="true"
-            />
+              style={{ background: projectAvatarColor(project.path) }}
+            >
+              {projectInitial(label)}
+            </span>
             <span
               style={{
                 minWidth: 0,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
-                fontFamily: "var(--font-mono)",
-                fontSize: 12,
-                fontWeight: 600,
+                fontFamily: "var(--font-display)",
+                fontSize: 13,
+                fontWeight: 700,
                 letterSpacing: "-0.01em",
                 lineHeight: 1.25,
               }}
@@ -341,19 +354,19 @@ function ProjectRow({
             placement="below"
             minWidth={136}
           >
-            <button type="button" role="menuitem" className="sidebar-menu-item" onClick={() => { startAliasEdit(); setActionMenuOpen(false); }} style={{ display: "block", width: "100%", padding: "6px 9px", border: "none", borderRadius: 6, background: "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", fontSize: 11 }}>
+            <button type="button" role="menuitem" className="sidebar-menu-item" onClick={() => { startAliasEdit(); setActionMenuOpen(false); }} style={{ display: "block", width: "100%", padding: "6px 9px", border: "none", borderRadius: "var(--radius-control)", background: "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", fontSize: 11 }}>
               {project.alias ? t("projects.editAlias") : t("projects.nameAlias")}
             </button>
-            <button type="button" role="menuitem" className="sidebar-menu-item" onClick={() => { onEditLaunchConfig(project); setActionMenuOpen(false); }} style={{ display: "block", width: "100%", padding: "6px 9px", border: "none", borderRadius: 6, background: "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", fontSize: 11 }}>
+            <button type="button" role="menuitem" className="sidebar-menu-item" onClick={() => { onEditLaunchConfig(project); setActionMenuOpen(false); }} style={{ display: "block", width: "100%", padding: "6px 9px", border: "none", borderRadius: "var(--radius-control)", background: "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", fontSize: 11 }}>
               {project.launchConfig ? t("sessionSidebar.editLaunchConfig") : t("sessionSidebar.configureLaunchConfig")}
             </button>
-            <button type="button" role="menuitem" className="sidebar-menu-item" onClick={() => { setActionMenuOpen(false); void onMoveProject(project.path, -1); }} style={{ display: "block", width: "100%", padding: "6px 9px", border: "none", borderRadius: 6, background: "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", fontSize: 11 }}>
+            <button type="button" role="menuitem" className="sidebar-menu-item" onClick={() => { setActionMenuOpen(false); void onMoveProject(project.path, -1); }} style={{ display: "block", width: "100%", padding: "6px 9px", border: "none", borderRadius: "var(--radius-control)", background: "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", fontSize: 11 }}>
               {t("projects.moveUp")}
             </button>
-            <button type="button" role="menuitem" className="sidebar-menu-item" onClick={() => { setActionMenuOpen(false); void onMoveProject(project.path, 1); }} style={{ display: "block", width: "100%", padding: "6px 9px", border: "none", borderRadius: 6, background: "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", fontSize: 11 }}>
+            <button type="button" role="menuitem" className="sidebar-menu-item" onClick={() => { setActionMenuOpen(false); void onMoveProject(project.path, 1); }} style={{ display: "block", width: "100%", padding: "6px 9px", border: "none", borderRadius: "var(--radius-control)", background: "transparent", color: "var(--text)", cursor: "pointer", textAlign: "left", fontSize: 11 }}>
               {t("projects.moveDown")}
             </button>
-            <button type="button" role="menuitem" className="sidebar-menu-item" disabled={removeBusy} onClick={() => { setActionMenuOpen(false); void onRemoveProject(project.path); }} style={{ display: "block", width: "100%", padding: "6px 9px", border: "none", borderRadius: 6, background: "transparent", color: "var(--status-error)", cursor: removeBusy ? "default" : "pointer", textAlign: "left", fontSize: 11 }}>
+            <button type="button" role="menuitem" className="sidebar-menu-item" disabled={removeBusy} onClick={() => { setActionMenuOpen(false); void onRemoveProject(project.path); }} style={{ display: "block", width: "100%", padding: "6px 9px", border: "none", borderRadius: "var(--radius-control)", background: "transparent", color: "var(--status-error)", cursor: removeBusy ? "default" : "pointer", textAlign: "left", fontSize: 11 }}>
               {t("projects.remove", { name: label })}
             </button>
           </SidebarPortalMenu>
@@ -509,7 +522,7 @@ function ProjectWorktreeSwitcher({
                 || (wt.isMain && !worktreeState.worktrees.some((w) => comparableProjectPath(w.path) === foldedCwd));
               if (wtConfirmRemove === wt.path) {
                 return (
-                  <div key={wt.path} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 10px", borderBottom: "1px solid var(--border)", background: "color-mix(in srgb, var(--accent) 6%, transparent)" }}>
+                  <div key={wt.path} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 10px", borderBottom: "var(--bw) solid var(--border)", background: "color-mix(in srgb, var(--accent) 6%, transparent)" }}>
                     <span style={{ flex: 1, fontSize: 11, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {t("sessionSidebar.uncommittedForceRemove")}
                     </span>
@@ -522,7 +535,7 @@ function ProjectWorktreeSwitcher({
                     </button>
                     <button
                       onClick={() => setWtConfirmRemove(null)}
-                      style={{ padding: "3px 9px", background: "var(--bg-hover)", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", color: "var(--text-muted)", fontSize: 11, cursor: "pointer", flexShrink: 0 }}
+                      style={{ padding: "3px 9px", background: "var(--bg-hover)", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", color: "var(--text-muted)", fontSize: 11, cursor: "pointer", flexShrink: 0 }}
                     >
                       {t("sessionSidebar.cancel")}
                     </button>
@@ -533,7 +546,7 @@ function ProjectWorktreeSwitcher({
                 <div
                   key={wt.path}
                   className="wt-row"
-                  style={{ display: "flex", alignItems: "center", borderBottom: "1px solid var(--border)" }}
+                  style={{ display: "flex", alignItems: "center", borderBottom: "var(--bw) solid var(--border)" }}
                 >
                   <button
                     onClick={() => onSelectWorktree(wt.path)}
@@ -639,7 +652,7 @@ function ProjectWorktreeSwitcher({
                   fontSize: 11,
                   fontFamily: "var(--font-mono)",
                   padding: "5px 8px",
-                  border: "1px solid var(--accent)",
+                  border: "var(--bw) solid var(--accent)",
                   borderRadius: "var(--radius-control)",
                   outline: "none",
                   background: "var(--bg)",
@@ -672,7 +685,7 @@ function ProjectWorktreeSwitcher({
                     flex: 1,
                     padding: "4px 0",
                     background: "var(--bg-hover)",
-                    border: "1px solid var(--border)",
+                    border: "var(--bw) solid var(--border)",
                     borderRadius: "var(--radius-control)",
                     color: "var(--text-muted)",
                     fontSize: 11,
@@ -962,9 +975,9 @@ const SessionItem = memo(function SessionItem({
             left: 20 + depth * 14,
             top: 0,
             bottom: 0,
-            width: 2,
-            borderRadius: 1,
-            background: "var(--accent)",
+            width: 3,
+            borderRadius: 0,
+            background: "var(--accent-2)",
             pointerEvents: "none",
           }}
         />
@@ -979,12 +992,12 @@ const SessionItem = memo(function SessionItem({
           <button onClick={(event) => { event.stopPropagation(); if (confirmArchive) void handleArchive(); else void handleDelete(); }} style={{ height: 28, padding: "0 10px", border: "none", borderRadius: "var(--radius-control)", background: "var(--accent-strong)", color: "var(--on-accent)", cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
             {confirmArchive ? t("sessionSidebar.archive") : t("sessionSidebar.delete")}
           </button>
-          <button onClick={(event) => { event.stopPropagation(); closeConfirmation(); }} autoFocus style={{ height: 28, padding: "0 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text-muted)", cursor: "pointer", fontSize: 11 }}>
+          <button onClick={(event) => { event.stopPropagation(); closeConfirmation(); }} autoFocus style={{ height: 28, padding: "0 10px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text-muted)", cursor: "pointer", fontSize: 11 }}>
             {t("sessionSidebar.cancel")}
           </button>
         </>
       ) : renaming ? (
-        <input ref={inputRef} autoFocus aria-label={t("sessionSidebar.rename")} value={renameValue} onChange={(event) => setRenameValue(event.target.value)} onBlur={commitRename} onKeyDown={(event) => { if (event.key === "Enter") void commitRename(); if (event.key === "Escape") { event.preventDefault(); renameCancelRef.current = true; setRenaming(false); } }} style={{ flex: 1, height: 25, padding: "3px 7px", border: "1px solid var(--accent)", borderRadius: "var(--radius-control)", outline: "none", background: "var(--bg)", color: "var(--text)", fontSize: 12 }} />
+        <input ref={inputRef} autoFocus aria-label={t("sessionSidebar.rename")} value={renameValue} onChange={(event) => setRenameValue(event.target.value)} onBlur={commitRename} onKeyDown={(event) => { if (event.key === "Enter") void commitRename(); if (event.key === "Escape") { event.preventDefault(); renameCancelRef.current = true; setRenaming(false); } }} style={{ flex: 1, height: 25, padding: "3px 7px", border: "var(--bw) solid var(--accent)", borderRadius: "var(--radius-control)", outline: "none", background: "var(--bg)", color: "var(--text)", fontSize: 12 }} />
       ) : (
         <>
           {depth > 0 && <GitBranch size={11} strokeWidth={2} style={{ flexShrink: 0, color: "var(--text-dim)" }} aria-hidden="true" />}
@@ -1000,7 +1013,7 @@ const SessionItem = memo(function SessionItem({
               <div aria-hidden={showActions} style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 2, width: "100%", whiteSpace: "nowrap", opacity: showActions ? 0 : 1, pointerEvents: showActions ? "none" : "auto", transition: "opacity var(--dur-fast) var(--ease-out-warm)" }}>
                 {isRunning && <RunningSessionIndicator size={12} />}
                 {!isRunning && isUnread && <UnreadSessionIndicator size={11} />}
-                {relativeTime && <span title={new Date(session.modified).toLocaleString(locale)} style={{ minWidth: 42, whiteSpace: "nowrap", textAlign: "right", color: isSelected ? "var(--accent)" : "var(--text-dim)", fontSize: 10, fontVariantNumeric: "tabular-nums" }}>{relativeTime}</span>}
+                {relativeTime && <span title={new Date(session.modified).toLocaleString(locale)} style={{ minWidth: 42, whiteSpace: "nowrap", textAlign: "right", color: isSelected ? "var(--text-muted)" : "var(--text-dim)", fontSize: 10, fontVariantNumeric: "tabular-nums" }}>{relativeTime}</span>}
               </div>
               <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 2, opacity: showActions ? 1 : 0, pointerEvents: showActions ? "auto" : "none", transition: "opacity var(--dur-fast) var(--ease-out-warm)" }}>
                 {isRunning && <span style={{ display: "flex", alignItems: "center", marginRight: 2 }}><RunningSessionIndicator size={12} /></span>}
@@ -1008,9 +1021,9 @@ const SessionItem = memo(function SessionItem({
                   <MoreHorizontal size={14} strokeWidth={2} aria-hidden="true" />
                 </button>
                 <SidebarPortalMenu anchor={menuButtonRef} open={actionMenuOpen} onClose={() => setActionMenuOpen(false)} placement="below" minWidth={128}>
- <button type="button" role="menuitem" className="sidebar-menu-item" onClick={(event) => { event.stopPropagation(); setActionMenuOpen(false); void handleArchive(); }} disabled={hasChildren} title={hasChildren ? t("sessionSidebar.archiveLeafOnly") : t("sessionSidebar.archive")} style={{ display: "block", width: "100%", padding: "6px 9px", border: "none", borderRadius: 6, background: "transparent", color: hasChildren ? "var(--text-dim)" : "var(--text-muted)", cursor: hasChildren ? "not-allowed" : "pointer", textAlign: "left", fontSize: 11, opacity: hasChildren ? 0.55 : 1 }}>{t("sessionSidebar.archive")}</button>
-                  <button type="button" role="menuitem" className="sidebar-menu-item" onClick={(event) => { startRename(event); setActionMenuOpen(false); }} style={{ display: "block", width: "100%", padding: "6px 9px", border: "none", borderRadius: 6, background: "transparent", color: "var(--text-muted)", cursor: "pointer", textAlign: "left", fontSize: 11 }}>{t("sessionSidebar.rename")}</button>
-                  <button type="button" role="menuitem" className="sidebar-menu-item" onClick={(event) => { event.stopPropagation(); setActionMenuOpen(false); void handleDelete(); }} style={{ display: "block", width: "100%", padding: "6px 9px", border: "none", borderRadius: 6, background: "transparent", color: "var(--status-error)", cursor: "pointer", textAlign: "left", fontSize: 11 }}>{t("sessionSidebar.delete")}</button>
+ <button type="button" role="menuitem" className="sidebar-menu-item" onClick={(event) => { event.stopPropagation(); setActionMenuOpen(false); void handleArchive(); }} disabled={hasChildren} title={hasChildren ? t("sessionSidebar.archiveLeafOnly") : t("sessionSidebar.archive")} style={{ display: "block", width: "100%", padding: "6px 9px", border: "none", borderRadius: "var(--radius-control)", background: "transparent", color: hasChildren ? "var(--text-dim)" : "var(--text-muted)", cursor: hasChildren ? "not-allowed" : "pointer", textAlign: "left", fontSize: 11, opacity: hasChildren ? 0.55 : 1 }}>{t("sessionSidebar.archive")}</button>
+                  <button type="button" role="menuitem" className="sidebar-menu-item" onClick={(event) => { startRename(event); setActionMenuOpen(false); }} style={{ display: "block", width: "100%", padding: "6px 9px", border: "none", borderRadius: "var(--radius-control)", background: "transparent", color: "var(--text-muted)", cursor: "pointer", textAlign: "left", fontSize: 11 }}>{t("sessionSidebar.rename")}</button>
+                  <button type="button" role="menuitem" className="sidebar-menu-item" onClick={(event) => { event.stopPropagation(); setActionMenuOpen(false); void handleDelete(); }} style={{ display: "block", width: "100%", padding: "6px 9px", border: "none", borderRadius: "var(--radius-control)", background: "transparent", color: "var(--status-error)", cursor: "pointer", textAlign: "left", fontSize: 11 }}>{t("sessionSidebar.delete")}</button>
                 </SidebarPortalMenu>
               </div>
             </div>

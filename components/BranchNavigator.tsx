@@ -182,7 +182,7 @@ const TreeNodeView = memo(function TreeNodeView({ node, activePathIds, depth, is
           borderRadius: "50%",
           flexShrink: 0,
           background: isActive ? "var(--accent)" : isOnPath ? "var(--text-muted)" : "var(--border)",
-          border: isActive ? "none" : "1px solid var(--text-dim)",
+          border: isActive ? "none" : "var(--bw) solid var(--text-dim)",
           marginRight: 6,
           transition: "background var(--dur-fast) var(--ease-out-warm)",
         }} />
@@ -194,7 +194,7 @@ const TreeNodeView = memo(function TreeNodeView({ node, activePathIds, depth, is
             fontFamily: "var(--font-mono)",
             color: role === "user" ? "var(--accent)" : "var(--text-dim)",
             background: role === "user" ? "color-mix(in srgb, var(--accent) 8%, transparent)" : "var(--bg-hover)",
-            border: `1px solid ${role === "user" ? "color-mix(in srgb, var(--accent) 20%, transparent)" : "var(--border)"}`,
+            border: `var(--bw) solid ${role === "user" ? "color-mix(in srgb, var(--accent) 20%, transparent)" : "var(--border)"}`,
             borderRadius: 3,
             padding: "0 4px",
             marginRight: 5,
@@ -408,7 +408,7 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
   }
 
   return (
-    <div style={{ borderBottom: "1px solid var(--border)", background: "var(--bg)", flexShrink: 0, position: "relative" }}>
+    <div style={{ borderBottom: "var(--bw) solid var(--border)", background: "var(--bg)", flexShrink: 0, position: "relative" }}>
       {/* Header toggle */}
       <button
         onClick={() => setOpenInternal((v) => !v)}
@@ -439,7 +439,7 @@ export function BranchNavigator({ tree, activeLeafId, onLeafChange, inline, cont
           left: 0,
           right: 0,
           background: "var(--bg)",
-          borderBottom: "1px solid var(--border)",
+          borderBottom: "var(--bw) solid var(--border)",
           boxShadow: "var(--shadow-pop)",
           zIndex: 100,
         }}>

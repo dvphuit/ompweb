@@ -125,7 +125,7 @@ function StatusBadge({ status }: { status?: ArchivedSessionInfo["status"] }) {
         letterSpacing: "0.03em",
         background: current.bg,
         color: current.color,
-        border: `1px solid ${current.border}`,
+        border: `var(--bw) solid ${current.border}`,
         lineHeight: 1.3,
       }}
     >
@@ -157,7 +157,7 @@ export function MetadataRow({
         padding: "8px 10px",
         borderRadius: "var(--radius-control)",
         background: "var(--bg-panel)",
-        border: "1px solid var(--border)",
+        border: "var(--bw) solid var(--border)",
         minWidth: 0,
       }}
     >
@@ -168,7 +168,7 @@ export function MetadataRow({
           justifyContent: "center",
           width: 26,
           height: 26,
-          borderRadius: 6,
+          borderRadius: "var(--radius-control)",
           background: "var(--bg-subtle)",
           color: "var(--text-dim)",
           flexShrink: 0,
@@ -358,7 +358,7 @@ export function ArchiveBrowser({ open, onClose, onRestored }: ArchiveBrowserProp
             flexDirection: "column",
             gap: 12,
             padding: "16px 20px 14px",
-            borderBottom: "1px solid var(--border)",
+            borderBottom: "var(--bw) solid var(--border)",
             background: "var(--bg)",
           }}
         >
@@ -401,7 +401,7 @@ export function ArchiveBrowser({ open, onClose, onRestored }: ArchiveBrowserProp
                     justifyContent: "center",
                     width: 30,
                     height: 30,
-                    border: "1px solid var(--border)",
+                    border: "var(--bw) solid var(--border)",
                     borderRadius: "var(--radius-control)",
                     background: "var(--bg-panel)",
                     color: "var(--text)",
@@ -425,7 +425,7 @@ export function ArchiveBrowser({ open, onClose, onRestored }: ArchiveBrowserProp
                   justifyContent: "center",
                   width: 30,
                   height: 30,
-                  border: "1px solid var(--border)",
+                  border: "var(--bw) solid var(--border)",
                   borderRadius: "var(--radius-control)",
                   background: "var(--bg-panel)",
                   color: "var(--text-muted)",
@@ -464,7 +464,7 @@ export function ArchiveBrowser({ open, onClose, onRestored }: ArchiveBrowserProp
                 width: "100%",
                 height: 34,
                 padding: "0 32px 0 32px",
-                border: "1px solid var(--border)",
+                border: "var(--bw) solid var(--border)",
                 borderRadius: "var(--radius-control)",
                 background: "var(--bg-panel)",
                 color: "var(--text)",
@@ -616,7 +616,7 @@ export function ArchiveBrowser({ open, onClose, onRestored }: ArchiveBrowserProp
                 style={{
                   width: "min(340px, 40%)",
                   flexShrink: 0,
-                  borderRight: "1px solid var(--border)",
+                  borderRight: "var(--bw) solid var(--border)",
                   background: "var(--bg-panel)",
                   display: "flex",
                   flexDirection: "column",
@@ -629,7 +629,7 @@ export function ArchiveBrowser({ open, onClose, onRestored }: ArchiveBrowserProp
                     fontSize: 11,
                     fontWeight: 600,
                     color: "var(--text-dim)",
-                    borderBottom: "1px solid var(--border)",
+                    borderBottom: "var(--bw) solid var(--border)",
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
@@ -686,7 +686,7 @@ export function ArchiveBrowser({ open, onClose, onRestored }: ArchiveBrowserProp
                             padding: "9px 10px",
                             borderRadius: "var(--radius-control)",
                             border: isSelected
-                              ? "1px solid var(--accent)"
+                              ? "var(--bw) solid var(--accent)"
                               : "1px solid transparent",
                             background: isSelected ? "var(--bg-selected)" : "transparent",
                             color: "var(--text)",
@@ -861,7 +861,7 @@ export function ArchiveBrowser({ open, onClose, onRestored }: ArchiveBrowserProp
                           fontWeight: 600,
                           cursor: restoringKey !== null ? "wait" : "pointer",
                           opacity: restoringKey !== null ? 0.7 : 1,
-                          boxShadow: "0 1px 3px rgba(0,0,0,0.12)",
+                          boxShadow: "none",
                           transition: "opacity var(--dur-fast), transform var(--dur-fast)",
                           flexShrink: 0,
                         }}
@@ -886,7 +886,7 @@ export function ArchiveBrowser({ open, onClose, onRestored }: ArchiveBrowserProp
                         padding: "10px 12px",
                         borderRadius: "var(--radius-control)",
                         background: "var(--bg-panel)",
-                        border: "1px solid var(--border)",
+                        border: "var(--bw) solid var(--border)",
                         fontSize: 12,
                         color: "var(--text-muted)",
                         lineHeight: 1.45,
@@ -983,7 +983,7 @@ export function ArchiveBrowser({ open, onClose, onRestored }: ArchiveBrowserProp
                           padding: "12px 14px",
                           borderRadius: "var(--radius-card)",
                           background: "var(--bg-panel)",
-                          border: "1px solid var(--border)",
+                          border: "var(--bw) solid var(--border)",
                           fontSize: 12.5,
                           lineHeight: 1.55,
                           color: selectedArchive.firstMessage.trim()

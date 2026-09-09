@@ -83,7 +83,7 @@ function Toggle({
         flexShrink: 0,
         width: 40,
         height: 22,
-        borderRadius: 11,
+        borderRadius: "var(--radius-card)",
         border: "none",
         padding: 0,
         cursor: loading ? "wait" : "pointer",
@@ -259,8 +259,8 @@ function SkillDetail({
                 disabled={checkingUpdate || updating}
                 style={{
                   padding: "4px 9px",
-                  border: "1px solid var(--border)",
-                  borderRadius: 5,
+                  border: "var(--bw) solid var(--border)",
+                  borderRadius: "var(--radius-control)",
                   background: "none",
                   color: "var(--text-muted)",
                   cursor: checkingUpdate || updating ? "not-allowed" : "pointer",
@@ -312,7 +312,7 @@ function SkillDetail({
                 style={{
                   padding: "4px 10px",
                   border: "none",
-                  borderRadius: 5,
+                  borderRadius: "var(--radius-control)",
                   background: "var(--accent)",
                   color: "var(--on-accent)",
                   cursor: updating || checkingUpdate ? "not-allowed" : "pointer",
@@ -483,8 +483,8 @@ function AddSkillPanel({
               padding: "7px 10px",
               fontSize: 13,
               background: "var(--bg-panel)",
-              border: "1px solid var(--border)",
-              borderRadius: 6,
+              border: "var(--bw) solid var(--border)",
+              borderRadius: "var(--radius-control)",
               color: "var(--text)",
               outline: "none",
             }}
@@ -495,7 +495,7 @@ function AddSkillPanel({
             style={{
               padding: "7px 16px",
               fontSize: 13,
-              borderRadius: 6,
+              borderRadius: "var(--radius-control)",
               border: "none",
               background: "var(--accent)",
               color: "var(--on-accent)",
@@ -513,8 +513,8 @@ function AddSkillPanel({
           <div
             style={{
               display: "flex",
-              borderRadius: 5,
-              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-control)",
+              border: "var(--bw) solid var(--border)",
               overflow: "hidden",
               fontSize: 12,
               flexShrink: 0,
@@ -532,7 +532,7 @@ function AddSkillPanel({
                   color: scope === s ? "var(--text)" : "var(--text-dim)",
                   fontWeight: scope === s ? 600 : 400,
                   borderRight:
-                    s === "global" ? "1px solid var(--border)" : "none",
+                    s === "global" ? "var(--bw) solid var(--border)" : "none",
                 }}
               >
                 {t(SOURCE_LABEL_KEYS[s])}
@@ -586,7 +586,7 @@ function AddSkillPanel({
                   alignItems: "center",
                   gap: 14,
                   padding: "12px 0",
-                  borderBottom: "1px solid var(--border)",
+                  borderBottom: "var(--bw) solid var(--border)",
                 }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -654,8 +654,8 @@ function AddSkillPanel({
                     padding: "5px 14px",
                     fontSize: 12,
                     fontWeight: 500,
-                    borderRadius: 5,
-                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius-control)",
+                    border: "var(--bw) solid var(--border)",
                     cursor:
                       isInstalled || isInstalling || installing !== null
                         ? "not-allowed"
@@ -902,7 +902,7 @@ export function SkillsConfig({
             alignItems: "center",
             justifyContent: "space-between",
             padding: "12px 18px",
-            borderBottom: "1px solid var(--border)",
+            borderBottom: "var(--bw) solid var(--border)",
             flexShrink: 0,
           }}
         >
@@ -952,8 +952,8 @@ export function SkillsConfig({
             style={{
               width: isMobile ? "100%" : 210,
               maxHeight: isMobile ? "40vh" : undefined,
-              borderRight: isMobile ? "none" : "1px solid var(--border)",
-              borderBottom: isMobile ? "1px solid var(--border)" : "none",
+              borderRight: isMobile ? "none" : "var(--bw) solid var(--border)",
+              borderBottom: isMobile ? "var(--bw) solid var(--border)" : "none",
               display: "flex",
               flexDirection: "column",
               flexShrink: 0,
@@ -1040,7 +1040,7 @@ export function SkillsConfig({
                             fontWeight: 600,
                             color: "var(--text-dim)",
                             textTransform: "uppercase",
-                            letterSpacing: "0.06em",
+                            letterSpacing: "0.06em", fontFamily: "var(--font-display)",
                           }}
                         >
                           {t(grpLabel)}
@@ -1054,7 +1054,7 @@ export function SkillsConfig({
                           return (
                             <Fragment key={skill.filePath}>
                             {firstDormant && (
-                              <div style={{ marginTop: 6, padding: "6px 8px 3px", borderTop: "1px solid var(--border)", fontSize: 10, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                              <div style={{ marginTop: 6, padding: "6px 8px 3px", borderTop: "var(--bw) solid var(--border)", fontSize: 10, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                                 {t("skillsConfig.dormant", { count: dormantCount })}
                               </div>
                             )}
@@ -1069,7 +1069,7 @@ export function SkillsConfig({
                                 alignItems: "center",
                                 gap: 7,
                                 padding: "8px 8px",
-                                borderRadius: 5,
+                                borderRadius: "var(--radius-control)",
                                 cursor: "pointer",
                                 width: "100%",
                                 border: "none",
@@ -1153,7 +1153,7 @@ export function SkillsConfig({
             <div
               style={{
                 padding: "8px 6px",
-                borderTop: "1px solid var(--border)",
+                borderTop: "var(--bw) solid var(--border)",
                 flexShrink: 0,
               }}
             >
@@ -1166,7 +1166,7 @@ export function SkillsConfig({
                   alignItems: "center",
                   gap: 6,
                   padding: "7px 8px",
-                  borderRadius: 5,
+                  borderRadius: "var(--radius-control)",
                   cursor: "pointer",
                   border: "none",
                   background: "none",
@@ -1260,7 +1260,7 @@ export function SkillsConfig({
             alignItems: "center",
             justifyContent: "space-between",
             padding: "10px 18px",
-            borderTop: "1px solid var(--border)",
+            borderTop: "var(--bw) solid var(--border)",
             flexShrink: 0,
           }}
         >
@@ -1272,8 +1272,8 @@ export function SkillsConfig({
                 style={{
                   padding: "6px 12px",
                   background: "none",
-                  border: "1px solid var(--border)",
-                  borderRadius: 6,
+                  border: "var(--bw) solid var(--border)",
+                  borderRadius: "var(--radius-control)",
                   color: "var(--text-muted)",
                   cursor:
                     checkingAll || updatingSkill !== null
@@ -1303,8 +1303,8 @@ export function SkillsConfig({
             style={{
               padding: "6px 14px",
               background: "none",
-              border: "1px solid var(--border)",
-              borderRadius: 6,
+              border: "var(--bw) solid var(--border)",
+              borderRadius: "var(--radius-control)",
               color: "var(--text-muted)",
               cursor: "pointer",
               fontSize: 13,

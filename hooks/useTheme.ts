@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 
 export type ThemePreference = "light" | "dark" | "system";
-export type ThemePreset = "obsidian" | "carbon" | "cyber" | "emerald" | "violet" | "amber";
+export type ThemePreset = "signal" | "coral" | "mint" | "electric";
 type Theme = "light" | "dark";
 
 export type ThemePresetDefinition = {
@@ -12,23 +12,26 @@ export type ThemePresetDefinition = {
   preview: Record<Theme, { bg: string; panel: string; accent: string; text: string }>;
 };
 
-export const DEFAULT_THEME_PRESET: ThemePreset = "obsidian";
+export const DEFAULT_THEME_PRESET: ThemePreset = "signal";
 export const THEME_PRESETS: readonly ThemePresetDefinition[] = [
-  { id: "obsidian", name: "Obsidian", preview: { light: { bg: "#FFFFFF", panel: "#F8F8FA", accent: "#4F46E5", text: "#09090B" }, dark: { bg: "#09090B", panel: "#121215", accent: "#818CF8", text: "#F4F4F5" } } },
-  { id: "carbon", name: "Carbon", preview: { light: { bg: "#FFFFFF", panel: "#F5F5F5", accent: "#171717", text: "#171717" }, dark: { bg: "#0A0A0A", panel: "#141414", accent: "#EDEDED", text: "#EDEDED" } } },
-  { id: "cyber", name: "Cyber", preview: { light: { bg: "#FFFFFF", panel: "#F1F5F9", accent: "#0E7490", text: "#0F172A" }, dark: { bg: "#080B10", panel: "#0E131C", accent: "#22D3EE", text: "#F0F6FC" } } },
-  { id: "emerald", name: "Emerald", preview: { light: { bg: "#FFFFFF", panel: "#F2F7F4", accent: "#047857", text: "#0D1F14" }, dark: { bg: "#090D0B", panel: "#101713", accent: "#34D399", text: "#EDF5F0" } } },
-  { id: "violet", name: "Violet", preview: { light: { bg: "#FFFFFF", panel: "#FAF5FF", accent: "#7E22CE", text: "#1E1035" }, dark: { bg: "#0C0912", panel: "#151020", accent: "#A855F7", text: "#F5F0FF" } } },
-  { id: "amber", name: "Amber", preview: { light: { bg: "#FFFFFF", panel: "#FFFBEB", accent: "#B45309", text: "#291C05" }, dark: { bg: "#0F0C08", panel: "#19140C", accent: "#FBBF24", text: "#FFFBF0" } } },
+  { id: "signal", name: "Signal", preview: { light: { bg: "#F5F2EA", panel: "#FFFFFF", accent: "#FFD400", text: "#111111" }, dark: { bg: "#141414", panel: "#1C1C1C", accent: "#FFD400", text: "#F5F2EA" } } },
+  { id: "coral", name: "Coral", preview: { light: { bg: "#FBF3EE", panel: "#FFFFFF", accent: "#FF7A59", text: "#1A1A1A" }, dark: { bg: "#161314", panel: "#1F1A1B", accent: "#FF7A59", text: "#FBF3EE" } } },
+  { id: "mint", name: "Mint", preview: { light: { bg: "#EEF6F1", panel: "#FFFFFF", accent: "#5CE0A8", text: "#0F1A14" }, dark: { bg: "#0F1512", panel: "#161E1A", accent: "#5CE0A8", text: "#EEF6F1" } } },
+  { id: "electric", name: "Electric", preview: { light: { bg: "#EEF1FB", panel: "#FFFFFF", accent: "#4F7CFF", text: "#0B0F1F" }, dark: { bg: "#0E1120", panel: "#151A2E", accent: "#6B90FF", text: "#EEF1FB" } } },
 ] as const;
 
 const LEGACY_PRESET_MAP: Record<string, ThemePreset> = {
-  ember: "obsidian",
-  graphite: "carbon",
-  ocean: "cyber",
-  forest: "emerald",
-  rose: "violet",
-  amber: "amber",
+  obsidian: "electric",
+  carbon: "signal",
+  cyber: "electric",
+  emerald: "mint",
+  violet: "electric",
+  amber: "signal",
+  ember: "coral",
+  graphite: "signal",
+  ocean: "electric",
+  forest: "mint",
+  rose: "coral",
 };
 const STORAGE_KEY = "omp-theme";
 const PRESET_STORAGE_KEY = "omp-theme-preset";

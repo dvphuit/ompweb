@@ -59,7 +59,7 @@ export function TaskResultPanel({ details }: { details: unknown }) {
   return (
     <div
       style={{
-        borderTop: "1px solid var(--border)",
+        borderTop: "var(--bw) solid var(--border)",
         background: "var(--bg-subtle)",
         padding: "8px 10px",
         display: "grid",

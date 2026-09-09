@@ -63,7 +63,7 @@ type NativeSettings = {
 const nativeSelectStyle = {
   minHeight: 32,
   padding: "4px 28px 4px 10px",
-  border: "1px solid var(--border)",
+  border: "var(--bw) solid var(--border)",
   borderRadius: "var(--radius-control)",
   background: "var(--bg)",
   color: "var(--text)",
@@ -207,7 +207,7 @@ function SearchResultsList({ results, query, onSelect }: { results: SearchResult
             flexDirection: "column",
             gap: 4,
             padding: "10px 12px",
-            border: "1px solid var(--border)",
+            border: "var(--bw) solid var(--border)",
             borderRadius: "var(--radius-card)",
             background: "var(--bg-panel)",
             color: "var(--text)",
@@ -267,7 +267,7 @@ function ToggleSwitch({
         alignItems: "center",
         width: 40,
         height: 24,
-        borderRadius: 12,
+        borderRadius: "var(--radius-card)",
         border: "none",
         background: checked ? "var(--accent)" : "var(--border)",
         cursor: disabled ? "not-allowed" : "pointer",
@@ -280,11 +280,11 @@ function ToggleSwitch({
         style={{
           width: 20,
           height: 20,
-          borderRadius: 10,
+          borderRadius: "var(--radius-card)",
           background: "#fff",
           transform: checked ? "translateX(16px)" : "translateX(0px)",
           transition: "transform var(--dur-fast)",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+          boxShadow: "none",
         }}
       />
     </button>
@@ -332,7 +332,7 @@ function NativeSetting({ label, description, scope, searchId, children }: { labe
       style={{
         minWidth: 0,
         padding: "12px 14px",
-        border: "1px solid var(--border)",
+        border: "var(--bw) solid var(--border)",
         borderRadius: "var(--radius-card)",
         background: "var(--bg-panel)",
         display: "flex",
@@ -389,7 +389,7 @@ function ThemePresetSetting({
       style={{
         minWidth: 0,
         padding: "12px 14px",
-        border: "1px solid var(--border)",
+        border: "var(--bw) solid var(--border)",
         borderRadius: "var(--radius-card)",
         background: "var(--bg-panel)",
         display: "flex",
@@ -479,7 +479,7 @@ function ThemePresetSetting({
                   height: 32,
                   overflow: "hidden",
                   border: "1px solid color-mix(in srgb, var(--border) 90%, transparent)",
-                  borderRadius: 5,
+                  borderRadius: "var(--radius-control)",
                   background: colors.bg,
                   boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.06)",
                   flexShrink: 0,
@@ -795,15 +795,15 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent ariaLabel={t("settingsConfig.title")} style={{ width: isMobile ? "calc(100vw - 16px)" : 940, maxWidth: "calc(100vw - 16px)", height: isMobile ? "calc(100dvh - 16px)" : "82vh", maxHeight: "calc(100dvh - 16px)", padding: 0, display: "flex", flexDirection: "column", overflow: "hidden", animation: "none" }}>
-        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "12px 18px", borderBottom: "1px solid var(--border)", background: "var(--bg-panel)" }}>
+        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "12px 18px", borderBottom: "var(--bw) solid var(--border)", background: "var(--bg-panel)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <DialogTitle style={{ fontSize: 16, margin: 0, fontWeight: 600 }}>{t("settingsConfig.title")}</DialogTitle>
             {nativeSavesInFlight > 0 ? (
-              <span style={{ fontSize: 11, color: "var(--accent)", padding: "2px 8px", borderRadius: 10, background: "var(--bg-subtle)", display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <span style={{ fontSize: 11, color: "var(--accent)", padding: "2px 8px", borderRadius: "var(--radius-card)", background: "var(--bg-subtle)", display: "inline-flex", alignItems: "center", gap: 4 }}>
                 <RefreshCw size={11} className="spin" aria-hidden="true" /> {t("settingsConfig.saving")}
               </span>
             ) : (
-              <span style={{ fontSize: 11, color: "var(--text-dim)", padding: "2px 8px", borderRadius: 10, background: "var(--bg-subtle)" }}>
+              <span style={{ fontSize: 11, color: "var(--text-dim)", padding: "2px 8px", borderRadius: "var(--radius-card)", background: "var(--bg-subtle)" }}>
                 {t("settingsConfig.autoSaved")}
               </span>
             )}
@@ -824,7 +824,7 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
                     (e.target as HTMLInputElement).blur();
                   }
                 }}
-                style={{ width: "100%", height: 28, padding: "0 8px 0 28px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)", fontSize: 12, outline: "none" }}
+                style={{ width: "100%", height: 28, padding: "0 8px 0 28px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)", fontSize: 12, outline: "none" }}
               />
             </div>
             <button type="button" onClick={onClose} aria-label={t("settingsConfig.closeSettings")} title={t("settingsConfig.closeSettings")} className="ui-focus-ring" style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 20, lineHeight: 1, padding: "4px 8px", minWidth: 28, minHeight: 28, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-control)" }}>×</button>
@@ -1055,7 +1055,7 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
             {currentTab === "intelligence" && (
               <div role="tabpanel" id="settings-panel-intelligence" aria-labelledby="settings-tab-intelligence" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 18 }}>
                 {/* Context Compaction Section */}
-                <section style={{ display: "flex", flexDirection: "column", gap: 10, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+                <section style={{ display: "flex", flexDirection: "column", gap: 10, borderTop: "var(--bw) solid var(--border)", paddingTop: 16 }}>
                   <div style={{ fontSize: 13, fontWeight: 600 }}>{t("settingsConfig.contextCompaction")}</div>
                   <p style={{ margin: 0, color: "var(--text-muted)", fontSize: 12 }}>{t("settingsConfig.contextCompactionDesc")}</p>
                   <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))", gap: 10 }}>
@@ -1094,7 +1094,7 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
                 </section>
 
                 {/* Memory & Auto-Learn Section */}
-                <section style={{ display: "flex", flexDirection: "column", gap: 10, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+                <section style={{ display: "flex", flexDirection: "column", gap: 10, borderTop: "var(--bw) solid var(--border)", paddingTop: 16 }}>
                   <div style={{ fontSize: 13, fontWeight: 600 }}>{t("settingsConfig.memoryAutoLearn")}</div>
                   <p style={{ margin: 0, color: "var(--text-muted)", fontSize: 12 }}>{t("settingsConfig.memoryAutoLearnDesc")}</p>
                   <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))", gap: 10 }}>
@@ -1149,7 +1149,7 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
                 </section>
 
                 {/* Retry Section */}
-                <section style={{ display: "flex", flexDirection: "column", gap: 10, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+                <section style={{ display: "flex", flexDirection: "column", gap: 10, borderTop: "var(--bw) solid var(--border)", paddingTop: 16 }}>
                   <div style={{ fontSize: 13, fontWeight: 600 }}>{t("settingsConfig.automaticRetry")}</div>
                   <p style={{ margin: 0, color: "var(--text-muted)", fontSize: 12 }}>{t("settingsConfig.automaticRetryDesc")}</p>
                   <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))", gap: 10 }}>
@@ -1244,7 +1244,7 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
                   padding: 20,
                   gap: 16,
                   ...(highlightId && ["agent-roster", "agent-model", "agent-tools"].includes(highlightId)
-                    ? { border: "1px solid var(--accent)", boxShadow: "0 0 0 2px var(--accent)" }
+                    ? { border: "var(--bw) solid var(--accent)", boxShadow: "0 0 0 2px var(--accent)" }
                     : {}),
                 }}
               >
@@ -1267,7 +1267,7 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
                 </div>
 
                 {/* ompweb app update card */}
-                <section style={{ padding: 14, border: "1px solid var(--border)", borderRadius: "var(--radius-card)", background: "var(--bg-panel)", display: "flex", flexDirection: "column", gap: 10 }}>
+                <section style={{ padding: 14, border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-card)", background: "var(--bg-panel)", display: "flex", flexDirection: "column", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 600 }}>{t("settingsConfig.appLabel")}</div>
@@ -1275,17 +1275,17 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
                         {checkingAppUpdate ? t("settingsConfig.checkingUpdates") : appUpdate?.updateAvailable ? t("appShell.updateVersion", { current: appUpdate.currentVersion ?? "?", available: appUpdate.availableVersion ?? "?" }) : appUpdate?.currentVersion ? t("settingsConfig.upToDate", { version: appUpdate.currentVersion }) : t("settingsConfig.versionUnavailable")}
                       </div>
                     </div>
-                    <button type="button" onClick={() => void checkForAppUpdate(true)} disabled={checkingAppUpdate} aria-label={t("settingsConfig.checkAppUpdates")} style={{ padding: "6px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "transparent", color: "var(--text)", cursor: checkingAppUpdate ? "wait" : "pointer", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5 }}>
+                    <button type="button" onClick={() => void checkForAppUpdate(true)} disabled={checkingAppUpdate} aria-label={t("settingsConfig.checkAppUpdates")} style={{ padding: "6px 10px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "transparent", color: "var(--text)", cursor: checkingAppUpdate ? "wait" : "pointer", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5 }}>
                       <RefreshCw size={13} aria-hidden="true" /> {t("settingsConfig.refresh")}
                     </button>
                   </div>
                   {appUpdate?.updateAvailable && (
-                    <div style={{ marginTop: 6, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ marginTop: 6, padding: "10px 12px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", display: "flex", flexDirection: "column", gap: 8 }}>
                       {appUpdate.selfUpdateSupported ? (
                         <button
                           type="button"
                           onClick={onRequestAppUpdate}
-                          style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", border: "1px solid var(--accent-strong)", borderRadius: "var(--radius-control)", background: "var(--accent-strong)", color: "var(--on-accent)", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                          style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", border: "var(--bw) solid var(--accent-strong)", borderRadius: "var(--radius-control)", background: "var(--accent-strong)", color: "var(--on-accent)", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
                         >
                           <Download size={13} aria-hidden="true" />
                           {t("settingsConfig.appUpdateAction")}
@@ -1304,7 +1304,7 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
                                   .then(() => toast.success(t("appShell.commandCopied")))
                                   .catch(() => toast.error(t("appShell.commandCopyFailed")));
                               }}
-                              style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 8px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-subtle)", color: "var(--text)", cursor: "pointer", fontSize: 11 }}
+                              style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 8px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-subtle)", color: "var(--text)", cursor: "pointer", fontSize: 11 }}
                             >
                               <Copy size={12} aria-hidden="true" /> {t("appShell.copyCommand")}
                             </button>
@@ -1317,7 +1317,7 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
                 </section>
 
                 {/* OMP runtime update card */}
-                <section style={{ padding: 14, border: "1px solid var(--border)", borderRadius: "var(--radius-card)", background: "var(--bg-panel)", display: "flex", flexDirection: "column", gap: 10 }}>
+                <section style={{ padding: 14, border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-card)", background: "var(--bg-panel)", display: "flex", flexDirection: "column", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 600 }}>{t("settingsConfig.ompLabel")}</div>
@@ -1325,12 +1325,12 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
                         {checking ? t("settingsConfig.checkingUpdates") : update?.updateAvailable ? t("appShell.updateVersion", { current: update.currentVersion ?? "?", available: update.availableVersion ?? "?" }) : update?.currentVersion ? t("settingsConfig.upToDate", { version: update.currentVersion }) : t("settingsConfig.versionUnavailable")}
                       </div>
                     </div>
-                    <button type="button" onClick={() => void checkForUpdate(true)} disabled={checking} aria-label={t("settingsConfig.checkOmpUpdates")} style={{ padding: "6px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "transparent", color: "var(--text)", cursor: checking ? "wait" : "pointer", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5 }}>
+                    <button type="button" onClick={() => void checkForUpdate(true)} disabled={checking} aria-label={t("settingsConfig.checkOmpUpdates")} style={{ padding: "6px 10px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "transparent", color: "var(--text)", cursor: checking ? "wait" : "pointer", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5 }}>
                       <RefreshCw size={13} aria-hidden="true" /> {t("settingsConfig.refresh")}
                     </button>
                   </div>
                   {update?.updateAvailable && (
-                    <div style={{ marginTop: 6, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div style={{ marginTop: 6, padding: "10px 12px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", display: "flex", flexDirection: "column", gap: 6 }}>
                       <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{t("settingsConfig.runOmpUpdateCommand")}</div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                         <code style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--accent)", wordBreak: "break-all" }}>{update.updateCommand || "omp update"}</code>
@@ -1338,7 +1338,7 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
                           type="button"
                           onClick={() => void handleOmpUpdateNow()}
                           disabled={ompUpdating}
-                          style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 8px", border: "1px solid var(--accent-strong)", borderRadius: "var(--radius-control)", background: "var(--accent-strong)", color: "var(--on-accent)", cursor: ompUpdating ? "wait" : "pointer", fontSize: 11, fontWeight: 600 }}
+                          style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 8px", border: "var(--bw) solid var(--accent-strong)", borderRadius: "var(--radius-control)", background: "var(--accent-strong)", color: "var(--on-accent)", cursor: ompUpdating ? "wait" : "pointer", fontSize: 11, fontWeight: 600 }}
                         >
                           <Download size={12} aria-hidden="true" /> {ompUpdating ? t("settingsConfig.updating") : t("settingsConfig.ompUpdateAction")}
                         </button>
@@ -1349,7 +1349,7 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
                               .then(() => toast.success(t("appShell.commandCopied")))
                               .catch(() => toast.error(t("appShell.commandCopyFailed")));
                           }}
-                          style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 8px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-subtle)", color: "var(--text)", cursor: "pointer", fontSize: 11 }}
+                          style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 8px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-subtle)", color: "var(--text)", cursor: "pointer", fontSize: 11 }}
                         >
                           <Copy size={12} aria-hidden="true" /> {t("appShell.copyCommand")}
                         </button>
@@ -1361,7 +1361,7 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
                       type="button"
                       onClick={() => void restartSessions()}
                       disabled={restarting}
-                      style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-subtle)", color: "var(--text)", cursor: restarting ? "wait" : "pointer", fontSize: 12 }}
+                      style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-subtle)", color: "var(--text)", cursor: restarting ? "wait" : "pointer", fontSize: 12 }}
                     >
                       <RotateCcw size={13} aria-hidden="true" /> {restarting ? t("settingsConfig.restarting") : t("settingsConfig.restartSessions")}
                     </button>
@@ -1369,7 +1369,7 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
                       href="https://github.com/can1357/oh-my-pi/releases"
                       target="_blank"
                       rel="noreferrer"
-                      style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", color: "var(--text-muted)", textDecoration: "none", fontSize: 12 }}
+                      style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", color: "var(--text-muted)", textDecoration: "none", fontSize: 12 }}
                     >
                       <ExternalLink size={13} aria-hidden="true" /> {t("settingsConfig.changelog")}
                     </a>
@@ -1379,7 +1379,7 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
 
                 {/* Windows Background Service & System Tray card (Windows only) */}
                 {windowsService?.isWindows && (
-                  <section style={{ padding: 14, border: "1px solid var(--border)", borderRadius: "var(--radius-card)", background: "var(--bg-panel)", display: "flex", flexDirection: "column", gap: 12 }}>
+                  <section style={{ padding: 14, border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-card)", background: "var(--bg-panel)", display: "flex", flexDirection: "column", gap: 12 }}>
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
@@ -1395,7 +1395,7 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
                         onClick={() => void fetchWindowsServiceStatus()}
                         disabled={loadingWindowsService}
                         aria-label={t("settingsConfig.refresh")}
-                        style={{ padding: "6px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "transparent", color: "var(--text)", cursor: loadingWindowsService ? "wait" : "pointer", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5 }}
+                        style={{ padding: "6px 10px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "transparent", color: "var(--text)", cursor: loadingWindowsService ? "wait" : "pointer", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5 }}
                       >
                         <RefreshCw size={13} aria-hidden="true" /> {t("settingsConfig.refresh")}
                       </button>
@@ -1403,7 +1403,7 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
 
                     {/* Status badges grid */}
                     <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))", gap: 10 }}>
-                      <div style={{ padding: 10, border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", display: "flex", flexDirection: "column", gap: 4 }}>
+                      <div style={{ padding: 10, border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", display: "flex", flexDirection: "column", gap: 4 }}>
                         <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
                           {t("settingsConfig.windowsServiceStatus")}
                         </div>
@@ -1413,7 +1413,7 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
                         </div>
                       </div>
 
-                      <div style={{ padding: 10, border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", display: "flex", flexDirection: "column", gap: 4 }}>
+                      <div style={{ padding: 10, border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", display: "flex", flexDirection: "column", gap: 4 }}>
                         <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
                           {t("settingsConfig.windowsServiceDesktopShortcut", { status: "" }).replace(/:\s*$/, "")}
                         </div>
@@ -1424,7 +1424,7 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
                     </div>
 
                     {/* Autostart Toggle */}
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "8px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "8px 10px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)" }}>
                       <div>
                         <div style={{ fontSize: 12, fontWeight: 500 }}>{t("settingsConfig.windowsServiceAutostart")}</div>
                         <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{t("settingsConfig.windowsServiceAutostartDesc")}</div>
@@ -1443,7 +1443,7 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
                         type="button"
                         onClick={() => void performWindowsServiceAction("install", { startImmediately: false })}
                         disabled={windowsServiceActionPending}
-                        style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-subtle)", color: "var(--text)", cursor: windowsServiceActionPending ? "wait" : "pointer", fontSize: 12 }}
+                        style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-subtle)", color: "var(--text)", cursor: windowsServiceActionPending ? "wait" : "pointer", fontSize: 12 }}
                       >
                         <Monitor size={13} aria-hidden="true" />
                         {windowsService.isInstalled ? t("settingsConfig.windowsServiceReinstallBtn") : t("settingsConfig.windowsServiceInstallBtn")}
@@ -1455,7 +1455,7 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
                             type="button"
                             onClick={() => void performWindowsServiceAction("restart")}
                             disabled={windowsServiceActionPending}
-                            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-subtle)", color: "var(--text)", cursor: windowsServiceActionPending ? "wait" : "pointer", fontSize: 12 }}
+                            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-subtle)", color: "var(--text)", cursor: windowsServiceActionPending ? "wait" : "pointer", fontSize: 12 }}
                           >
                             <RotateCcw size={13} aria-hidden="true" /> {t("settingsConfig.windowsServiceRestartBtn")}
                           </button>
@@ -1463,7 +1463,7 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
                             type="button"
                             onClick={() => void performWindowsServiceAction("stop")}
                             disabled={windowsServiceActionPending}
-                            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-subtle)", color: "var(--text)", cursor: windowsServiceActionPending ? "wait" : "pointer", fontSize: 12 }}
+                            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-subtle)", color: "var(--text)", cursor: windowsServiceActionPending ? "wait" : "pointer", fontSize: 12 }}
                           >
                             <Square size={13} aria-hidden="true" /> {t("settingsConfig.windowsServiceStopBtn")}
                           </button>
@@ -1473,7 +1473,7 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
                           type="button"
                           onClick={() => void performWindowsServiceAction("start")}
                           disabled={windowsServiceActionPending}
-                          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-subtle)", color: "var(--text)", cursor: windowsServiceActionPending ? "wait" : "pointer", fontSize: 12 }}
+                          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-subtle)", color: "var(--text)", cursor: windowsServiceActionPending ? "wait" : "pointer", fontSize: 12 }}
                         >
                           <Play size={13} aria-hidden="true" /> {t("settingsConfig.windowsServiceStartBtn")}
                         </button>
@@ -1484,7 +1484,7 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
                           type="button"
                           onClick={() => void performWindowsServiceAction("uninstall", { cleanConfig: false })}
                           disabled={windowsServiceActionPending}
-                          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "transparent", color: "var(--text-muted)", cursor: windowsServiceActionPending ? "wait" : "pointer", fontSize: 12 }}
+                          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "transparent", color: "var(--text-muted)", cursor: windowsServiceActionPending ? "wait" : "pointer", fontSize: 12 }}
                         >
                           <Trash2 size={13} aria-hidden="true" /> {t("settingsConfig.windowsServiceUninstallBtn")}
                         </button>

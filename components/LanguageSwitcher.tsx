@@ -149,7 +149,7 @@ export function LanguageSwitcher() {
             padding: 4,
             listStyle: "none",
             background: "var(--bg-panel)",
-            border: "1px solid var(--border)",
+            border: "var(--bw) solid var(--border)",
             borderRadius: "var(--radius-control)",
             boxShadow: "var(--shadow-pop)",
           }}
@@ -176,7 +176,7 @@ export function LanguageSwitcher() {
                     gap: 8,
                     padding: "7px 10px",
                     border: 0,
-                    borderRadius: 5,
+                    borderRadius: "var(--radius-control)",
                     background: selected ? "var(--bg-selected)" : "transparent",
                     color: selected ? "var(--text)" : "var(--text-muted)",
                     cursor: "pointer",

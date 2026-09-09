@@ -87,8 +87,8 @@ export const CommandPalette = memo(function CommandPalette({ onSelectSession, on
   const choose = (action: () => void) => { action(); setOpen(false); };
   return createPortal(
     <div role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setOpen(false); }} style={{ position: "fixed", inset: 0, zIndex: 2000, background: "var(--overlay-backdrop)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", paddingTop: "18vh" }}>
-      <Command label={t("commandPalette.label")} role="dialog" aria-modal="true" shouldFilter style={{ width: "min(92vw, 560px)", maxHeight: "min(70vh, 560px)", margin: "0 auto", overflow: "hidden", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius-modal)", boxShadow: "var(--shadow-modal)", animation: "ui-scale-in var(--dur-med) var(--ease-out-warm)" }}>
-        <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--border)" }}>
+      <Command label={t("commandPalette.label")} role="dialog" aria-modal="true" shouldFilter style={{ width: "min(92vw, 560px)", maxHeight: "min(70vh, 560px)", margin: "0 auto", overflow: "hidden", background: "var(--bg)", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-modal)", boxShadow: "var(--shadow-modal)", animation: "ui-scale-in var(--dur-med) var(--ease-out-warm)" }}>
+        <div style={{ padding: "14px 16px", borderBottom: "var(--bw) solid var(--border)" }}>
           <Command.Input autoFocus placeholder={t("commandPalette.placeholder")} style={{ width: "100%", border: 0, outline: 0, background: "transparent", color: "var(--text)", fontSize: 15 }} />
         </div>
         <Command.List style={{ padding: "8px", overflowY: "auto", maxHeight: "min(55vh, 440px)" }}>
@@ -104,7 +104,7 @@ export const CommandPalette = memo(function CommandPalette({ onSelectSession, on
             <Command.Item value={currentModel ?? t("commandPalette.currentModel")} disabled style={{ padding: "9px 10px", color: "var(--text-muted)", fontSize: 13 }}>{t("commandPalette.currentModel")}: {currentModel ?? t("commandPalette.notAvailable")}</Command.Item>
           </Command.Group>
         </Command.List>
-        <div style={{ borderTop: "1px solid var(--border)", padding: "8px 14px", color: "var(--text-dim)", fontSize: 11 }}>{t("commandPalette.hints")}</div>
+        <div style={{ borderTop: "var(--bw) solid var(--border)", padding: "8px 14px", color: "var(--text-dim)", fontSize: 11 }}>{t("commandPalette.hints")}</div>
       </Command>
     </div>,
     document.body

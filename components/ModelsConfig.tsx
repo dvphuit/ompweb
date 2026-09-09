@@ -132,10 +132,10 @@ function ProviderDetail({ name, provider, onChange, onRename, onDelete }: {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Hero Provider Header Card */}
-      <div style={{ padding: "14px 16px", border: "1px solid var(--border)", borderRadius: "var(--radius-card)", background: "var(--bg-panel)", display: "flex", flexDirection: "column", gap: 10, boxShadow: "var(--shadow-card)" }}>
+      <div style={{ padding: "14px 16px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-card)", background: "var(--bg-panel)", display: "flex", flexDirection: "column", gap: 10, boxShadow: "var(--shadow-card)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 36, height: 36, borderRadius: "var(--radius-control)", background: "var(--bg-subtle)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <div style={{ width: 36, height: 36, borderRadius: "var(--radius-control)", background: "var(--bg-subtle)", border: "var(--bw) solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <ProviderIcon id={name} size={20} />
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -161,8 +161,8 @@ function ProviderDetail({ name, provider, onChange, onRename, onDelete }: {
         </div>
 
         {/* {t("modelsConfig.quickEndpointPresets")} */}
-        <div style={{ borderTop: "1px solid var(--border)", paddingTop: 10, marginTop: 4 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+        <div style={{ borderTop: "var(--bw) solid var(--border)", paddingTop: 10, marginTop: 4 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--font-display)", marginBottom: 6 }}>
             Quick Endpoint Presets
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -283,7 +283,7 @@ function ProviderDetail({ name, provider, onChange, onRename, onDelete }: {
           style={{
             padding: "6px 12px",
             background: "none",
-            border: "1px solid var(--status-error)",
+            border: "var(--bw) solid var(--status-error)",
             borderRadius: "var(--radius-control)",
             color: "var(--status-error)",
             cursor: "pointer",
@@ -399,7 +399,7 @@ function ThinkingEditor({
               alignItems: "center",
               gap: 8,
               padding: "5px 4px",
-              borderRadius: 6,
+              borderRadius: "var(--radius-control)",
               background: "transparent",
               border: "1px solid transparent",
             }}
@@ -418,7 +418,7 @@ function ThinkingEditor({
             </div>
 
             {/* Default + Disabled buttons */}
-            <div style={{ display: "flex", borderRadius: 5, border: "1px solid var(--border)", overflow: "hidden", flexShrink: 0 }}>
+            <div style={{ display: "flex", borderRadius: "var(--radius-control)", border: "var(--bw) solid var(--border)", overflow: "hidden", flexShrink: 0 }}>
               <button
                 onClick={() => setLevel(level, "omit")}
                 style={{ ...btnBase, ...(state === "omit" ? btnActive : {}) }}
@@ -427,17 +427,17 @@ function ThinkingEditor({
               </button>
               <button
                 onClick={() => setLevel(level, null)}
-                style={{ ...btnBase, borderLeft: "1px solid var(--border)", ...(state === "null" ? btnActiveDisabled : {}) }}
+                style={{ ...btnBase, borderLeft: "var(--bw) solid var(--border)", ...(state === "null" ? btnActiveDisabled : {}) }}
               >
                 {t("modelsConfig.disabled")}
               </button>
             </div>
 
             {/* Custom button + input fused */}
-            <div style={{ display: "flex", borderRadius: 5, border: `1px solid ${state === "string" ? "var(--accent)" : "var(--border)"}`, overflow: "hidden", transition: "border-color var(--dur-fast) var(--ease-out-warm)" }}>
+            <div style={{ display: "flex", borderRadius: "var(--radius-control)", border: `var(--bw) solid ${state === "string" ? "var(--accent)" : "var(--border)"}`, overflow: "hidden", transition: "border-color var(--dur-fast) var(--ease-out-warm)" }}>
               <button
                 onClick={() => setLevel(level, strVal || level)}
-                style={{ ...btnBase, ...(state === "string" ? btnActive : {}), borderRight: "1px solid var(--border)", flexShrink: 0 }}
+                style={{ ...btnBase, ...(state === "string" ? btnActive : {}), borderRight: "var(--bw) solid var(--border)", flexShrink: 0 }}
               >
                 {t("modelsConfig.custom")}
               </button>
@@ -618,7 +618,7 @@ function ModelDetail({
                   fontSize: 10,
                   padding: "3px 9px",
                   background: "none",
-                  border: "1px solid var(--border)",
+                  border: "var(--bw) solid var(--border)",
                   borderRadius: "var(--radius-control)",
                   color: "var(--text-dim)",
                   cursor: "pointer",
@@ -674,7 +674,7 @@ function ModelDetail({
             style={{
               maxWidth: 360,
               padding: "4px 10px",
-              border: `1px solid ${
+              border: `var(--bw) solid ${
                 testState.phase === "error"
                   ? "color-mix(in srgb, var(--accent) 30%, transparent)"
                   : testState.phase === "success"
@@ -715,7 +715,7 @@ function ModelDetail({
             style={{
               padding: "5px 12px",
               background: testState.phase === "success" ? "color-mix(in srgb, var(--accent) 18%, var(--bg-panel))" : "none",
-              border: `1px solid ${
+              border: `var(--bw) solid ${
                 testState.phase === "success"
                   ? "color-mix(in srgb, var(--accent) 30%, transparent)"
                   : "var(--border)"
@@ -803,7 +803,7 @@ function AuthUrlRow({ url }: { url: string }) {
         onClick={() => { void copyText(url).then(() => toast.success(t("appShell.copied"))).catch(() => toast.error(t("appShell.commandCopyFailed"))); }}
         title={t("appShell.copyCommand")}
         aria-label={t("appShell.copyCommand")}
-        style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 10px", border: "1px solid var(--border)", borderRadius: 5, background: "var(--bg)", color: "var(--text-muted)", cursor: "pointer", fontSize: 11, flexShrink: 0 }}
+        style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 10px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text-muted)", cursor: "pointer", fontSize: 11, flexShrink: 0 }}
       >
         <Copy size={12} aria-hidden="true" /> {t("appShell.copyCommand")}
       </button>
@@ -987,7 +987,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
                 <button
                   key={option.id}
                   onClick={() => submitSelection(loginState.token, option.id)}
-                  style={{ padding: "6px 9px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text)", cursor: "pointer", fontSize: 12, textAlign: "left" }}
+                  style={{ padding: "6px 9px", background: "var(--bg)", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", color: "var(--text)", cursor: "pointer", fontSize: 12, textAlign: "left" }}
                 >
                   {option.label}
                 </button>
@@ -1010,12 +1010,12 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") submitCode(loginState.token, inputValue); }}
                 placeholder={loginState.phase === "auth" ? "http://localhost:1455/auth/callback?code=…" : (loginState.placeholder ?? t("modelsConfig.enterValue"))}
-                style={{ flex: 1, padding: "6px 9px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text)", fontSize: 12, outline: "none", fontFamily: "var(--font-mono)", boxSizing: "border-box" }}
+                style={{ flex: 1, padding: "6px 9px", background: "var(--bg)", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", color: "var(--text)", fontSize: 12, outline: "none", fontFamily: "var(--font-mono)", boxSizing: "border-box" }}
               />
               <button
                 onClick={() => submitCode(loginState.token, inputValue)}
                 disabled={!inputValue.trim()}
-                style={{ padding: "6px 12px", background: inputValue.trim() ? "var(--accent)" : "var(--bg-panel)", border: "none", borderRadius: 5, color: inputValue.trim() ? "var(--on-accent)" : "var(--text-dim)", cursor: inputValue.trim() ? "pointer" : "not-allowed", fontSize: 12, fontWeight: 600, flexShrink: 0 }}
+                style={{ padding: "6px 12px", background: inputValue.trim() ? "var(--accent)" : "var(--bg-panel)", border: "none", borderRadius: "var(--radius-control)", color: inputValue.trim() ? "var(--on-accent)" : "var(--text-dim)", cursor: inputValue.trim() ? "pointer" : "not-allowed", fontSize: 12, fontWeight: 600, flexShrink: 0 }}
               >
                 {t("modelsConfig.submit")}
               </button>
@@ -1027,7 +1027,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
             <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
               {t("modelsConfig.deviceCodeInstructions")}
             </p>
-            <div style={{ padding: "8px 10px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text)", fontSize: 16, fontWeight: 700, fontFamily: "var(--font-mono)", letterSpacing: 0 }}>
+            <div style={{ padding: "8px 10px", background: "var(--bg)", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", color: "var(--text)", fontSize: 16, fontWeight: 700, fontFamily: "var(--font-mono)", letterSpacing: 0 }}>
               {loginState.userCode}
             </div>
             <p style={{ margin: 0, fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>
@@ -1057,7 +1057,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         {isWorking ? (
           <button
             onClick={() => { eventSourceRef.current?.close(); setPendingAuthUrl(null); setLoginState({ phase: "idle" }); }}
-            style={{ padding: "5px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text-muted)", cursor: "pointer", fontSize: 12 }}
+            style={{ padding: "5px 12px", background: "none", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", color: "var(--text-muted)", cursor: "pointer", fontSize: 12 }}
           >
             {t("modelsConfig.cancel")}
           </button>
@@ -1065,14 +1065,14 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
           <>
             <button
               onClick={handleLogin}
-              style={{ padding: "5px 14px", background: "var(--accent)", border: "none", borderRadius: 5, color: "var(--on-accent)", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+              style={{ padding: "5px 14px", background: "var(--accent)", border: "none", borderRadius: "var(--radius-control)", color: "var(--on-accent)", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
             >
               {provider.loggedIn ? t("modelsConfig.relogin") : t("modelsConfig.login")}
             </button>
             {provider.loggedIn && (
               <button
                 onClick={handleLogout}
-                style={{ padding: "5px 12px", background: "none", border: "1px solid color-mix(in srgb, var(--status-error) 30%, transparent)", borderRadius: 5, color: "var(--status-error)", cursor: "pointer", fontSize: 12 }}
+                style={{ padding: "5px 12px", background: "none", border: "1px solid color-mix(in srgb, var(--status-error) 30%, transparent)", borderRadius: "var(--radius-control)", color: "var(--status-error)", cursor: "pointer", fontSize: 12 }}
               >
                 {t("modelsConfig.disconnect")}
               </button>
@@ -1424,21 +1424,21 @@ export function ModelsConfig({ onClose, onSelectTab, onSaved, embedded = false }
       const totalVisible = runtimeModels.filter((m) => visibleModelKeys === null || visibleModelKeys.has(`${m.provider}:${m.id}`)).length;
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "14px 16px", border: "1px solid var(--border)", borderRadius: "var(--radius-card)", background: "var(--bg-panel)", boxShadow: "var(--shadow-card)" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "14px 16px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-card)", background: "var(--bg-panel)", boxShadow: "var(--shadow-card)" }}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
               <div>
                 <SectionTitle>{t("modelsConfig.composerPickerTitle")}</SectionTitle>
                 <p style={{ margin: "6px 0 0", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>{t("modelsConfig.composerPickerDesc")}</p>
               </div>
               {/* Refresh OMP runtime models */}
-              <button type="button" onClick={() => void loadRuntimeModels()} disabled={runtimeModelsLoading} title={t("modelsConfig.refreshRuntimeModels")} style={{ padding: 7, border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text-muted)", cursor: runtimeModelsLoading ? "wait" : "pointer", flexShrink: 0 }}><RefreshCw size={14} aria-hidden="true" /></button>
+              <button type="button" onClick={() => void loadRuntimeModels()} disabled={runtimeModelsLoading} title={t("modelsConfig.refreshRuntimeModels")} style={{ padding: 7, border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text-muted)", cursor: runtimeModelsLoading ? "wait" : "pointer", flexShrink: 0 }}><RefreshCw size={14} aria-hidden="true" /></button>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 10, background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text-muted)", fontWeight: 600 }}>{t("modelsConfig.modelsVisible", { visible: totalVisible, total: runtimeModels.length })}</span>
+              <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: "var(--radius-card)", background: "var(--bg)", border: "var(--bw) solid var(--border)", color: "var(--text-muted)", fontWeight: 600 }}>{t("modelsConfig.modelsVisible", { visible: totalVisible, total: runtimeModels.length })}</span>
               <span style={{ fontSize: 11, color: "var(--text-dim)" }}>·</span>
               <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{tn("modelsConfig.providerCount", Object.keys(runtimeModelsByProvider).length)}</span>
             </div>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", cursor: "text" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", cursor: "text" }}>
               <Search size={14} aria-hidden="true" style={{ color: "var(--text-dim)", flexShrink: 0 }} />
               <input
                 value={composerPickerSearch}
@@ -1458,16 +1458,16 @@ export function ModelsConfig({ onClose, onSelectTab, onSaved, embedded = false }
           ) : filteredProviders.map(([provider, models]) => {
             const providerVisible = models.every((model) => visibleModelKeys === null || visibleModelKeys.has(`${model.provider}:${model.id}`));
             const providerSomeVisible = models.some((model) => visibleModelKeys === null || visibleModelKeys.has(`${model.provider}:${model.id}`));
-            return <section key={provider} style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-card)", overflow: "hidden", background: "var(--bg-panel)", boxShadow: "var(--shadow-card)" }}>
-              <label style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 12px", background: "var(--bg)", borderBottom: "1px solid var(--border)", color: "var(--text)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+            return <section key={provider} style={{ border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-card)", overflow: "hidden", background: "var(--bg-panel)", boxShadow: "var(--shadow-card)" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 12px", background: "var(--bg)", borderBottom: "var(--bw) solid var(--border)", color: "var(--text)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                 <input type="checkbox" checked={providerVisible} ref={(input) => { if (input) input.indeterminate = providerSomeVisible && !providerVisible; }} onChange={(event) => setComposerProviderVisible(provider, event.target.checked)} aria-label={`Show all ${provider} models in composer`} />
                 <ProviderIcon id={provider} size={15} />
                 <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{provider}</span>
-                <span style={{ color: "var(--text-dim)", fontSize: 11, fontWeight: 500, padding: "2px 7px", borderRadius: 10, background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>{models.length}</span>
+                <span style={{ color: "var(--text-dim)", fontSize: 11, fontWeight: 500, padding: "2px 7px", borderRadius: "var(--radius-card)", background: "var(--bg-subtle)", border: "var(--bw) solid var(--border)" }}>{models.length}</span>
               </label>
               <div style={{ display: "flex", flexDirection: "column" }}>
                 {models.map((model) => (
-                  <label key={`${model.provider}:${model.id}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", color: "var(--text)", cursor: "pointer", borderTop: "1px solid var(--border)", background: visibleModelKeys !== null && !visibleModelKeys.has(`${model.provider}:${model.id}`) ? "var(--bg)" : "var(--bg-panel)" }}>
+                  <label key={`${model.provider}:${model.id}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", color: "var(--text)", cursor: "pointer", borderTop: "var(--bw) solid var(--border)", background: visibleModelKeys !== null && !visibleModelKeys.has(`${model.provider}:${model.id}`) ? "var(--bg)" : "var(--bg-panel)" }}>
                     <input type="checkbox" checked={visibleModelKeys === null || visibleModelKeys.has(`${model.provider}:${model.id}`)} onChange={(event) => setComposerModelVisible(model, event.target.checked)} aria-label={`Show ${model.provider}/${model.id} in composer`} />
                     <span style={{ minWidth: 0, flex: 1, fontSize: 12, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{model.name || model.id}</span>
                     <code style={{ color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 220 }}>{model.provider}/{model.id}</code>
@@ -1480,7 +1480,7 @@ export function ModelsConfig({ onClose, onSelectTab, onSaved, embedded = false }
             <section key={provider.id} style={{ border: "1px dashed var(--border)", borderRadius: "var(--radius-card)", padding: 14, background: "var(--bg-panel)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text)", fontSize: 12, fontWeight: 600 }}><ProviderIcon id={provider.id} size={15} />{provider.name}</div>
               <p style={{ margin: "8px 0 0", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>{provider.disabled ? t("modelsConfig.connectedDisabledDesc") : t("modelsConfig.connectedNoModelsDesc")}</p>
-              {provider.disabled && <button type="button" onClick={() => void enableConnectedProvider(provider.id).catch((error) => toast.error(t("modelsConfig.couldNotEnableProvider"), error instanceof Error ? error.message : String(error)))} style={{ marginTop: 10, padding: "6px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)", cursor: "pointer", fontSize: 12 }}>{t("modelsConfig.enableInOmp")}</button>}
+              {provider.disabled && <button type="button" onClick={() => void enableConnectedProvider(provider.id).catch((error) => toast.error(t("modelsConfig.couldNotEnableProvider"), error instanceof Error ? error.message : String(error)))} style={{ marginTop: 10, padding: "6px 10px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)", cursor: "pointer", fontSize: 12 }}>{t("modelsConfig.enableInOmp")}</button>}
             </section>
           ))}
         </div>
@@ -1520,7 +1520,7 @@ export function ModelsConfig({ onClose, onSelectTab, onSaved, embedded = false }
       <ModelsConfigSurface embedded={embedded} isMobile={isMobile} onClose={onClose}>
 
         {/* Header */}
-        {!embedded && (<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
+        {!embedded && (<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", borderBottom: "var(--bw) solid var(--border)", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
             <DialogTitle style={{ fontSize: 16, margin: 0 }}>{t("modelsConfig.title")}</DialogTitle>
             <code style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>~/.omp/agent/models.yml</code>
@@ -1538,12 +1538,12 @@ export function ModelsConfig({ onClose, onSelectTab, onSaved, embedded = false }
               <code style={{ fontSize: 11, color: "var(--text-dim)", fontFamily: "var(--font-mono)", wordBreak: "break-all" }}>{parseError.path}</code>
             )}
             <pre style={{
-              margin: 0, padding: "10px 12px", background: "var(--bg-panel)", border: "1px solid var(--border)",
-              borderRadius: 6, color: "var(--text-muted)", fontSize: 11, fontFamily: "var(--font-mono)",
+              margin: 0, padding: "10px 12px", background: "var(--bg-panel)", border: "var(--bw) solid var(--border)",
+              borderRadius: "var(--radius-control)", color: "var(--text-muted)", fontSize: 11, fontFamily: "var(--font-mono)",
               whiteSpace: "pre-wrap", wordBreak: "break-word", overflowX: "auto",
             }}>{parseError.message}</pre>
             <button onClick={loadConfig} disabled={loading}
-              style={{ alignSelf: "flex-start", padding: "5px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text-muted)", cursor: loading ? "default" : "pointer", fontSize: 12 }}>
+              style={{ alignSelf: "flex-start", padding: "5px 12px", background: "none", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", color: "var(--text-muted)", cursor: loading ? "default" : "pointer", fontSize: 12 }}>
               {loading ? t("modelsConfig.loading") : t("modelsConfig.reload")}
             </button>
           </div>
@@ -1553,18 +1553,18 @@ export function ModelsConfig({ onClose, onSelectTab, onSaved, embedded = false }
           <div style={{
             width: isMobile ? "100%" : 258,
             maxHeight: isMobile ? "40vh" : undefined,
-            borderRight: isMobile ? "none" : "1px solid var(--border)",
-            borderBottom: isMobile ? "1px solid var(--border)" : "none",
+            borderRight: isMobile ? "none" : "var(--bw) solid var(--border)",
+            borderBottom: isMobile ? "var(--bw) solid var(--border)" : "none",
             display: "flex", flexDirection: "column", flexShrink: 0, background: "var(--bg-panel)",
             overflow: "hidden",
           }}>
             <div style={{ flex: 1, overflowY: "auto", padding: "10px 8px", display: "flex", flexDirection: "column", gap: 14 }}>
               {/* — OMP System — */}
               <section style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 6px", fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-dim)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 6px", fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "var(--font-display)", color: "var(--text-dim)" }}>
                   <Layers size={10} aria-hidden="true" style={{ opacity: 0.7 }} /> {t("modelsConfig.ompSystemSection")}
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: 4, border: "1px solid var(--border)", borderRadius: "var(--radius-card)", background: "var(--bg)" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: 4, border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-card)", background: "var(--bg)" }}>
                   <TreeNavButton icon={Layers} label={t("modelsConfig.navNativeRegistry")} selected={selection?.type === "registry"} onClick={() => setSelection({ type: "registry" })} />
                   <TreeNavButton icon={RotateCcw} label={t("modelsConfig.navRetryFallback")} selected={selection?.type === "fallbacks"} onClick={() => setSelection({ type: "fallbacks" })} />
                   <TreeNavButton icon={BookOpen} label={t("modelsConfig.navComposerPicker")} selected={selection?.type === "picker"} onClick={() => setSelection({ type: "picker" })} />
@@ -1575,12 +1575,12 @@ export function ModelsConfig({ onClose, onSelectTab, onSaved, embedded = false }
               {/* — Connected accounts — */}
               <section style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 6px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-dim)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "var(--font-display)", color: "var(--text-dim)" }}>
                     <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: "50%", background: activeOAuth.length + activeApiKey.length > 0 ? "var(--status-success)" : "var(--border)", flexShrink: 0 }} />
                     {t("modelsConfig.connectedAccounts")}
                   </div>
                   {(activeOAuth.length + activeApiKey.length) > 0 && (
-                    <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text-dim)", fontWeight: 600 }}>
+                    <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: "var(--radius-card)", background: "var(--bg)", border: "var(--bw) solid var(--border)", color: "var(--text-dim)", fontWeight: 600 }}>
                       {activeOAuth.length + activeApiKey.length}
                     </span>
                   )}
@@ -1592,13 +1592,13 @@ export function ModelsConfig({ onClose, onSelectTab, onSaved, embedded = false }
                     <span style={{ color: "var(--text-muted)" }}>{t("modelsConfig.addOneBelow")}</span>
                   </div>
                 ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: 4, border: "1px solid var(--border)", borderRadius: "var(--radius-card)", background: "var(--bg)" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: 4, border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-card)", background: "var(--bg)" }}>
                     {activeOAuth.map((p) => {
                       const isSelected = selection?.type === "oauth" && selection.providerId === p.id;
                       return (
                         <div
                           key={p.id}
-                          style={{ display: "flex", alignItems: "center", gap: 2, border: isSelected ? "1px solid var(--accent)" : "1px solid transparent", borderRadius: "var(--radius-control)", background: isSelected ? "var(--bg-selected)" : "none" }}
+                          style={{ display: "flex", alignItems: "center", gap: 2, border: isSelected ? "var(--bw) solid var(--accent)" : "1px solid transparent", borderRadius: "var(--radius-control)", background: isSelected ? "var(--bg-selected)" : "none" }}
                         >
                           <button
                             type="button"
@@ -1629,7 +1629,7 @@ export function ModelsConfig({ onClose, onSelectTab, onSaved, embedded = false }
                       return (
                         <div
                           key={p.id}
-                          style={{ display: "flex", alignItems: "center", gap: 2, border: isSelected ? "1px solid var(--accent)" : "1px solid transparent", borderRadius: "var(--radius-control)", background: isSelected ? "var(--bg-selected)" : "none" }}
+                          style={{ display: "flex", alignItems: "center", gap: 2, border: isSelected ? "var(--bw) solid var(--accent)" : "1px solid transparent", borderRadius: "var(--radius-control)", background: isSelected ? "var(--bg-selected)" : "none" }}
                         >
                           <button
                             type="button"
@@ -1665,7 +1665,7 @@ export function ModelsConfig({ onClose, onSelectTab, onSaved, embedded = false }
                   <div style={{ fontSize: 10, fontWeight: 700, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
                     {t("modelsConfig.customProviders")}
                   </div>
-                  <code style={{ fontSize: 9, padding: "1px 5px", borderRadius: 4, background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text-dim)", fontFamily: "var(--font-mono)" }}>models.yml</code>
+                  <code style={{ fontSize: 9, padding: "1px 5px", borderRadius: 4, background: "var(--bg)", border: "var(--bw) solid var(--border)", color: "var(--text-dim)", fontFamily: "var(--font-mono)" }}>models.yml</code>
                 </div>
                 {loading ? (
                   <div style={{ padding: "10px 8px", fontSize: 12, color: "var(--text-muted)" }}>{t("modelsConfig.loading")}</div>
@@ -1681,19 +1681,19 @@ export function ModelsConfig({ onClose, onSelectTab, onSaved, embedded = false }
                       const isProviderSelected = selection?.type === "provider" && selection.name === pName;
                       const models = pData.models ?? [];
                       return (
-                        <div key={pName} style={{ borderRadius: "var(--radius-card)", background: "var(--bg)", border: isProviderSelected ? "1px solid var(--accent)" : "1px solid var(--border)", overflow: "hidden", boxShadow: isProviderSelected ? "0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent)" : "none" }}>
+                        <div key={pName} style={{ borderRadius: "var(--radius-card)", background: "var(--bg)", border: isProviderSelected ? "var(--bw) solid var(--accent)" : "var(--bw) solid var(--border)", overflow: "hidden", boxShadow: isProviderSelected ? "0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent)" : "none" }}>
                           {/* Provider row */}
                           <button
                             type="button"
                             onClick={() => setSelection({ type: "provider", name: pName })}
-                            style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 10px", cursor: "pointer", width: "100%", border: "none", textAlign: "left", fontFamily: "inherit", background: isProviderSelected ? "var(--bg-selected)" : "var(--bg)", borderBottom: models.length ? "1px solid var(--border)" : "none" }}
+                            style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 10px", cursor: "pointer", width: "100%", border: "none", textAlign: "left", fontFamily: "inherit", background: isProviderSelected ? "var(--bg-selected)" : "var(--bg)", borderBottom: models.length ? "var(--bw) solid var(--border)" : "none" }}
                             {...hoverRow(isProviderSelected)}
                           >
                             <ProviderIcon id={pName} size={15} />
                             <span style={{ fontSize: 12, fontWeight: isProviderSelected ? 700 : 600, color: "var(--text)", fontFamily: "var(--font-mono)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                               {pName}
                             </span>
-                            <span style={{ fontSize: 10, color: isProviderSelected ? "var(--accent)" : "var(--text-dim)", padding: "2px 6px", borderRadius: 10, background: isProviderSelected ? "color-mix(in srgb, var(--accent) 14%, transparent)" : "var(--bg-subtle)", border: `1px solid ${isProviderSelected ? "color-mix(in srgb, var(--accent) 22%, transparent)" : "var(--border)"}`, fontWeight: 600 }}>
+                            <span style={{ fontSize: 10, color: isProviderSelected ? "var(--accent)" : "var(--text-dim)", padding: "2px 6px", borderRadius: "var(--radius-card)", background: isProviderSelected ? "color-mix(in srgb, var(--accent) 14%, transparent)" : "var(--bg-subtle)", border: `var(--bw) solid ${isProviderSelected ? "color-mix(in srgb, var(--accent) 22%, transparent)" : "var(--border)"}`, fontWeight: 600 }}>
                               {models.length} model{models.length === 1 ? "" : "s"}
                             </span>
                           </button>
@@ -1706,7 +1706,7 @@ export function ModelsConfig({ onClose, onSelectTab, onSaved, embedded = false }
                                 type="button"
                                 key={i}
                                 onClick={() => setSelection({ type: "model", providerName: pName, index: i })}
-                                style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px 6px 32px", cursor: "pointer", width: "100%", border: "none", textAlign: "left", fontFamily: "inherit", background: isModelSelected ? "var(--bg-selected)" : "transparent", borderLeft: isModelSelected ? "2px solid var(--accent)" : "2px solid transparent", borderTop: "1px solid var(--border)" }}
+                                style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px 6px 32px", cursor: "pointer", width: "100%", border: "none", textAlign: "left", fontFamily: "inherit", background: isModelSelected ? "var(--bg-selected)" : "transparent", borderLeft: isModelSelected ? "2px solid var(--accent)" : "2px solid transparent", borderTop: "var(--bw) solid var(--border)" }}
                                 {...hoverRow(isModelSelected)}
                               >
                                 <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: m.id ? (isModelSelected ? "var(--text)" : "var(--text-muted)") : "var(--text-dim)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: isModelSelected ? 600 : 400 }}>
@@ -1720,11 +1720,11 @@ export function ModelsConfig({ onClose, onSelectTab, onSaved, embedded = false }
                           })}
 
                           {/* Add model buttons */}
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 8px", background: "var(--bg-subtle)", borderTop: "1px solid var(--border)", flexWrap: "nowrap" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 8px", background: "var(--bg-subtle)", borderTop: "var(--bw) solid var(--border)", flexWrap: "nowrap" }}>
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); addModel(pName); }}
-                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 8px", borderRadius: "var(--radius-control)", cursor: "pointer", color: "var(--text-muted)", border: "1px solid var(--border)", background: "var(--bg)", fontFamily: "inherit", fontSize: 11, whiteSpace: "nowrap", flexShrink: 0, fontWeight: 500 }}
+                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 8px", borderRadius: "var(--radius-control)", cursor: "pointer", color: "var(--text-muted)", border: "var(--bw) solid var(--border)", background: "var(--bg)", fontFamily: "inherit", fontSize: 11, whiteSpace: "nowrap", flexShrink: 0, fontWeight: 500 }}
                               {...hoverAccent}
                             >
                               <Plus size={11} aria-hidden="true" />
@@ -1733,7 +1733,7 @@ export function ModelsConfig({ onClose, onSelectTab, onSaved, embedded = false }
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setCatalogPicker(pName); }}
-                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 8px", borderRadius: "var(--radius-control)", cursor: "pointer", color: "var(--text-muted)", border: "1px solid var(--border)", background: "var(--bg)", fontFamily: "inherit", fontSize: 11, whiteSpace: "nowrap", flexShrink: 0, fontWeight: 500 }}
+                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 8px", borderRadius: "var(--radius-control)", cursor: "pointer", color: "var(--text-muted)", border: "var(--bw) solid var(--border)", background: "var(--bg)", fontFamily: "inherit", fontSize: 11, whiteSpace: "nowrap", flexShrink: 0, fontWeight: 500 }}
                               {...hoverAccent}
                             >
                               <BookOpen size={11} aria-hidden="true" />
@@ -1749,10 +1749,10 @@ export function ModelsConfig({ onClose, onSelectTab, onSaved, embedded = false }
             </div>
 
             {/* Add provider — primary action */}
-            <div style={{ borderTop: "1px solid var(--border)", padding: "10px 8px", background: "var(--bg)", flexShrink: 0 }}>
+            <div style={{ borderTop: "var(--bw) solid var(--border)", padding: "10px 8px", background: "var(--bg)", flexShrink: 0 }}>
               <button onClick={() => setPickerOpen(true)} style={{
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                width: "100%", padding: "8px 0", background: "var(--accent)", border: "1px solid var(--accent)", borderRadius: "var(--radius-control)",
+                width: "100%", padding: "8px 0", background: "var(--accent)", border: "var(--bw) solid var(--accent)", borderRadius: "var(--radius-control)",
                 color: "var(--on-accent)", cursor: "pointer", fontSize: 12, fontWeight: 600,
               }}
                 onMouseEnter={(e) => { e.currentTarget.style.filter = "brightness(1.05)"; }}
@@ -1780,9 +1780,9 @@ export function ModelsConfig({ onClose, onSelectTab, onSaved, embedded = false }
         )}
 
         {/* Footer */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, padding: "10px 18px", borderTop: "1px solid var(--border)", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, padding: "10px 18px", borderTop: "var(--bw) solid var(--border)", flexShrink: 0 }}>
           {saveError && <span style={{ fontSize: 12, color: "var(--status-error)", flex: 1 }}>{saveError}</span>}
-          <button onClick={onClose} style={{ padding: "6px 14px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: "pointer", fontSize: 13 }}>
+          <button onClick={onClose} style={{ padding: "6px 14px", background: "none", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", color: "var(--text-muted)", cursor: "pointer", fontSize: 13 }}>
             {t("modelsConfig.cancel")}
           </button>
           <button onClick={handleSave} disabled={saving || savedOk || parseError !== null} style={{
@@ -1790,7 +1790,7 @@ export function ModelsConfig({ onClose, onSelectTab, onSaved, embedded = false }
             padding: "6px 16px",
             minWidth: 92,
             background: savedOk ? "var(--status-success)" : (saving || parseError) ? "var(--bg-panel)" : "var(--accent)",
-            border: "none", borderRadius: 6,
+            border: "none", borderRadius: "var(--radius-control)",
             color: savedOk ? "var(--on-accent)" : (saving || parseError) ? "var(--text-muted)" : "var(--on-accent)",
             cursor: (saving || savedOk || parseError) ? "default" : "pointer", fontSize: 13, fontWeight: 600,
             display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,

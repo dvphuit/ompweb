@@ -1153,7 +1153,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
       <div
         style={{
           padding: "10px 10px 8px",
-          borderBottom: "1px solid var(--border)",
+          borderBottom: "var(--bw) solid var(--border)",
           flexShrink: 0,
           display: "flex",
           flexDirection: "column",
@@ -1225,8 +1225,8 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
             justifyContent: "center",
             gap: 7,
             background: "var(--bg-hover)",
-            border: "1px solid var(--border)",
-            borderRadius: 9,
+            border: "var(--bw) solid var(--border)",
+            borderRadius: "var(--radius-card)",
             color: selectedCwd ? "var(--text)" : "var(--text-dim)",
             cursor: selectedCwd ? "pointer" : "not-allowed",
             fontSize: 12.5,
@@ -1259,7 +1259,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
             fontSize: 11,
             fontWeight: 600,
             letterSpacing: "0.08em",
-            textTransform: "uppercase",
+            textTransform: "uppercase", fontFamily: "var(--font-display)",
           }}
         >
           {t("projects.heading")}
@@ -1296,38 +1296,28 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
           <Plus size={15} strokeWidth={1.9} aria-hidden="true" />
         </SidebarIconButton>
       </div>
-      {searchOpen && (
-        <div style={{ padding: "0 10px 6px", flexShrink: 0 }}>
-          <input
-            ref={searchInputRef}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                e.preventDefault();
-                setSearchOpen(false);
-                setSearchQuery("");
-              }
-            }}
-            placeholder={t("sessionSidebar.searchPlaceholder")}
-            aria-label={t("sessionSidebar.search")}
-            style={{
-              width: "100%",
-              height: 27,
-              boxSizing: "border-box",
-              padding: "0 9px",
-              background: "var(--bg)",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-control)",
-              outline: "none",
-              color: "var(--text)",
-              fontSize: 12,
-            }}
-            onFocus={(e) => { e.currentTarget.style.borderColor = "var(--accent)"; }}
-            onBlur={(e) => { e.currentTarget.style.borderColor = "var(--border)"; }}
-          />
-        </div>
-      )}
+      {/* Session search is always visible; the toolbar toggle just focuses it
+          (and Escape clears + blurs). */}
+      <div className="sidebar-search" style={{ padding: "0 10px 6px", flexShrink: 0 }}>
+        <Search size={13} strokeWidth={2} aria-hidden="true" className="sidebar-search-icon" />
+        <input
+          ref={searchInputRef}
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.preventDefault();
+              setSearchOpen(false);
+              setSearchQuery("");
+              e.currentTarget.blur();
+            }
+          }}
+          onFocus={() => setSearchOpen(true)}
+          placeholder={t("sessionSidebar.searchPlaceholder")}
+          aria-label={t("sessionSidebar.search")}
+          className="sidebar-search-input"
+        />
+      </div>
 
       {/* Workspaces */}
         <div
@@ -1415,7 +1405,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
       {(selectedCwdProp || selectedCwd) && (
         <div
           style={{
-            borderTop: "1px solid var(--border)",
+            borderTop: "var(--bw) solid var(--border)",
             display: "flex",
             flexDirection: "column",
             flex: explorerOpen ? "1 1 0" : "0 0 auto",
@@ -1544,7 +1534,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
       )}
 
       {/* Pinned footer: Settings */}
-      <div style={{ borderTop: "1px solid var(--border)", flexShrink: 0 }}>
+      <div style={{ borderTop: "var(--bw) solid var(--border)", flexShrink: 0 }}>
         <button
           className="sidebar-settings-row"
           onClick={onOpenSettings}

@@ -88,7 +88,7 @@ export function SettingsTabs({
           padding: "12px 8px",
           width: 230,
           flexShrink: 0,
-          borderRight: "1px solid var(--border)",
+          borderRight: "var(--bw) solid var(--border)",
           background: "var(--bg-panel)",
           overflowY: "auto",
         }}
@@ -147,7 +147,7 @@ export function SettingsTabs({
   }
 
   return (
-    <nav aria-label={t("settingsTabs.ariaLabel")} role="tablist" style={{ display: "flex", gap: 3, padding: "7px 12px", borderBottom: "1px solid var(--border)", background: "var(--bg-panel)", flexShrink: 0, overflowX: "auto" }}>
+    <nav aria-label={t("settingsTabs.ariaLabel")} role="tablist" style={{ display: "flex", gap: 3, padding: "7px 12px", borderBottom: "var(--bw) solid var(--border)", background: "var(--bg-panel)", flexShrink: 0, overflowX: "auto" }}>
       {SETTINGS_CATEGORIES.map(({ id, label, description, Icon, needsWorkspace }, index) => {
         const labelKey = `settingsTabs.${id}.label`;
         const descKey = `settingsTabs.${id}.description`;

@@ -17,11 +17,12 @@ test("resolves system theme from the operating system preference", () => {
 });
 
 test("exposes unique color presets and falls back for invalid stored values", () => {
-  assert.deepEqual(THEME_PRESETS.map((preset) => preset.id), ["obsidian", "carbon", "cyber", "emerald", "violet", "amber"]);
+  assert.deepEqual(THEME_PRESETS.map((preset) => preset.id), ["signal", "coral", "mint", "electric"]);
   assert.equal(new Set(THEME_PRESETS.map((preset) => preset.id)).size, THEME_PRESETS.length);
-  assert.equal(normalizeThemePreset("cyber"), "cyber");
-  assert.equal(normalizeThemePreset("ember"), "obsidian");
-  assert.equal(normalizeThemePreset("graphite"), "carbon");
+  assert.equal(normalizeThemePreset("mint"), "mint");
+  assert.equal(normalizeThemePreset("obsidian"), "electric");
+  assert.equal(normalizeThemePreset("emerald"), "mint");
+  assert.equal(normalizeThemePreset("ember"), "coral");
   assert.equal(normalizeThemePreset("unknown"), DEFAULT_THEME_PRESET);
   assert.equal(normalizeThemePreset(null), DEFAULT_THEME_PRESET);
   for (const preset of THEME_PRESETS) {

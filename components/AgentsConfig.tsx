@@ -28,9 +28,9 @@ type AgentsResponse = {
   error?: string;
 };
 
-const inputStyle = { width: "100%", padding: "7px 9px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)", font: "12px var(--font-mono)" } as const;
-const textareaStyle = { width: "100%", padding: "7px 9px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)", font: "12px var(--font-mono)", lineHeight: "1.45" } as const;
-const nativeSelectStyle = { minHeight: 32, padding: "4px 28px 4px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)", fontSize: 12 } as const;
+const inputStyle = { width: "100%", padding: "7px 9px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)", font: "12px var(--font-mono)" } as const;
+const textareaStyle = { width: "100%", padding: "7px 9px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)", font: "12px var(--font-mono)", lineHeight: "1.45" } as const;
+const nativeSelectStyle = { minHeight: 32, padding: "4px 28px 4px 10px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)", fontSize: 12 } as const;
 const THINKING_LEVELS = ["", "auto", "off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
 
 function shorten(p: string) {
@@ -257,31 +257,31 @@ export function AgentsConfig({ cwd }: { cwd: string | null }) {
           </span>
         </div>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
-          <button type="button" onClick={() => void load()} disabled={loading} title={t("agentsConfig.reload")} style={{ padding: "5px 8px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-panel)", color: "var(--text)", cursor: loading ? "wait" : "pointer", display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12 }}>
+          <button type="button" onClick={() => void load()} disabled={loading} title={t("agentsConfig.reload")} style={{ padding: "5px 8px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-panel)", color: "var(--text)", cursor: loading ? "wait" : "pointer", display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12 }}>
             <RefreshCw size={13} aria-hidden="true" /> {t("agentsConfig.reload")}
           </button>
-          <button type="button" onClick={() => void unpack()} disabled={saving || workspaceCheckPending} title={workspaceUnavailable ? t("agentsConfig.workspaceUnavailableWarning") : workspaceCheckPending ? t("agentsConfig.loadingAgents") : t("agentsConfig.unpackBundled")} style={{ padding: "5px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-panel)", color: "var(--text)", cursor: saving || workspaceCheckPending ? "wait" : "pointer", fontSize: 12 }}>
+          <button type="button" onClick={() => void unpack()} disabled={saving || workspaceCheckPending} title={workspaceUnavailable ? t("agentsConfig.workspaceUnavailableWarning") : workspaceCheckPending ? t("agentsConfig.loadingAgents") : t("agentsConfig.unpackBundled")} style={{ padding: "5px 10px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-panel)", color: "var(--text)", cursor: saving || workspaceCheckPending ? "wait" : "pointer", fontSize: 12 }}>
             {t("agentsConfig.unpackBundled")}
           </button>
-          <button type="button" onClick={startCreate} disabled={workspaceCheckPending} title={workspaceCheckPending ? t("agentsConfig.loadingAgents") : t("agentsConfig.newAgent")} style={{ padding: "5px 10px", border: "1px solid var(--accent)", borderRadius: "var(--radius-control)", background: "var(--accent)", color: "white", cursor: workspaceCheckPending ? "wait" : "pointer", opacity: workspaceCheckPending ? 0.65 : 1, display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12 }}>
+          <button type="button" onClick={startCreate} disabled={workspaceCheckPending} title={workspaceCheckPending ? t("agentsConfig.loadingAgents") : t("agentsConfig.newAgent")} style={{ padding: "5px 10px", border: "var(--bw) solid var(--accent)", borderRadius: "var(--radius-control)", background: "var(--accent)", color: "white", cursor: workspaceCheckPending ? "wait" : "pointer", opacity: workspaceCheckPending ? 0.65 : 1, display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12 }}>
             <Plus size={13} aria-hidden="true" /> {t("agentsConfig.newAgent")}
           </button>
         </div>
       </div>
       {workspaceUnavailable ? (
-        <div role="status" style={{ display: "flex", alignItems: "flex-start", gap: 7, padding: "8px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-subtle)", color: "var(--text-muted)", fontSize: 11, lineHeight: 1.45 }}>
+        <div role="status" style={{ display: "flex", alignItems: "flex-start", gap: 7, padding: "8px 10px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-subtle)", color: "var(--text-muted)", fontSize: 11, lineHeight: 1.45 }}>
           <AlertCircle size={13} aria-hidden="true" style={{ flexShrink: 0, marginTop: 1, color: "var(--accent-strong)" }} />
           <span>{t("agentsConfig.workspaceUnavailableWarning")}</span>
         </div>
       ) : null}
       {diagnostics.length > 0 ? (
-        <div role="status" style={{ padding: "7px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-subtle)", color: "var(--text-muted)", fontSize: 11, lineHeight: 1.4 }}>
+        <div role="status" style={{ padding: "7px 10px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-subtle)", color: "var(--text-muted)", fontSize: 11, lineHeight: 1.4 }}>
           {diagnostics.map((diagnostic, index) => (
             <div key={`${diagnostic.type ?? "diagnostic"}-${index}`}>{diagnostic.type === "error" ? "Error: " : diagnostic.type === "warning" ? "Warning: " : ""}{diagnostic.message ?? "Agent discovery reported an issue."}</div>
           ))}
         </div>
       ) : null}
-      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-panel)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 8px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-panel)" }}>
         <Search size={13} aria-hidden="true" style={{ color: "var(--text-muted)", flexShrink: 0 }} />
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("agentsConfig.searchPlaceholder")} aria-label={t("agentsConfig.filterAgentsAria")} style={{ flex: 1, border: "none", outline: "none", background: "transparent", color: "var(--text)", font: "12px var(--font-mono)" }} />
         {search ? (
@@ -291,8 +291,8 @@ export function AgentsConfig({ cwd }: { cwd: string | null }) {
         ) : null}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "0.38fr 1fr", gap: 12, minHeight: 380, alignItems: "start" }}>
-        <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-card)", background: "var(--bg-panel)", overflow: "hidden", display: "flex", flexDirection: "column", maxHeight: 520 }}>
-          <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--border)", fontSize: 11, color: "var(--text-muted)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-card)", background: "var(--bg-panel)", overflow: "hidden", display: "flex", flexDirection: "column", maxHeight: 520 }}>
+          <div style={{ padding: "8px 10px", borderBottom: "var(--bw) solid var(--border)", fontSize: 11, color: "var(--text-muted)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <span>{tn("agentsConfig.agentsCount", filtered.length)}</span>
             {loading ? <span style={{ color: "var(--text-dim)" }}>{t("agentsConfig.loadingAgents")}</span> : null}
           </div>
@@ -312,7 +312,7 @@ export function AgentsConfig({ cwd }: { cwd: string | null }) {
                     <span style={{ minWidth: 0, flex: 1 }}>
                       <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.name}</span>
-                        <span style={{ fontSize: 10, padding: "1px 5px", borderRadius: 999, background: badgeBg, color: "var(--text-muted)", border: "1px solid var(--border)", flexShrink: 0 }}>{a.scope}</span>
+                        <span style={{ fontSize: 10, padding: "1px 5px", borderRadius: 999, background: badgeBg, color: "var(--text-muted)", border: "var(--bw) solid var(--border)", flexShrink: 0 }}>{a.scope}</span>
                         {!a.valid ? <AlertCircle size={11} aria-hidden="true" style={{ color: "var(--status-error, #e5484d)" }} /> : null}
                       </span>
                       <span style={{ display: "block", marginTop: 2, fontSize: 11, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.description || "—"}</span>
@@ -323,11 +323,11 @@ export function AgentsConfig({ cwd }: { cwd: string | null }) {
             )}
           </div>
         </div>
-        <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-card)", background: "var(--bg-panel)", overflow: "hidden", display: "flex", flexDirection: "column", minHeight: 380 }}>
+        <div style={{ border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-card)", background: "var(--bg-panel)", overflow: "hidden", display: "flex", flexDirection: "column", minHeight: 380 }}>
           {creating || active ? (
             <>
               {isBundledActive ? (
-                <div style={{ padding: "8px 10px", background: "color-mix(in srgb, var(--accent) 10%, var(--bg-panel))", borderBottom: "1px solid var(--border)", fontSize: 11, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 6 }}>
+                <div style={{ padding: "8px 10px", background: "color-mix(in srgb, var(--accent) 10%, var(--bg-panel))", borderBottom: "var(--bw) solid var(--border)", fontSize: 11, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 6 }}>
                   <AlertCircle size={12} aria-hidden="true" /> {t("agentsConfig.bundledReadOnlyWarning", { scope: canEditProject ? t("agentsConfig.scopeProject") : t("agentsConfig.scopeUser") })}
                 </div>
               ) : null}
@@ -340,7 +340,7 @@ export function AgentsConfig({ cwd }: { cwd: string | null }) {
                     {!creating && active ? (
                       <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 6, font: "11px var(--font-mono)", color: "var(--text-muted)" }}>
                         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{shorten(active.filePath)}</span>
-                        <button type="button" onClick={() => void copyPath(active.filePath)} title={t("agentsConfig.copyFilePath")} style={{ padding: "2px 6px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text-muted)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11 }}>
+                        <button type="button" onClick={() => void copyPath(active.filePath)} title={t("agentsConfig.copyFilePath")} style={{ padding: "2px 6px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text-muted)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11 }}>
                           <Copy size={11} aria-hidden="true" /> {t("agentsConfig.copy")}
                         </button>
                       </div>
@@ -393,13 +393,13 @@ export function AgentsConfig({ cwd }: { cwd: string | null }) {
                   <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder={t("agentsConfig.systemPromptPlaceholder")} rows={6} style={{ ...textareaStyle, minHeight: 140 }} />
                 </label>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <button type="button" onClick={() => void save()} disabled={saving || workspaceCheckPending || activeProjectUnavailable} title={workspaceCheckPending ? t("agentsConfig.loadingAgents") : activeProjectUnavailable ? t("agentsConfig.workspaceUnavailableWarning") : creating ? t("agentsConfig.create") : t("agentsConfig.save")} style={{ padding: "7px 14px", border: "1px solid var(--accent)", borderRadius: "var(--radius-control)", background: "var(--accent)", color: "white", cursor: saving || workspaceCheckPending || activeProjectUnavailable ? "not-allowed" : "pointer", opacity: workspaceCheckPending || activeProjectUnavailable ? 0.65 : 1, display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600 }}>
+                  <button type="button" onClick={() => void save()} disabled={saving || workspaceCheckPending || activeProjectUnavailable} title={workspaceCheckPending ? t("agentsConfig.loadingAgents") : activeProjectUnavailable ? t("agentsConfig.workspaceUnavailableWarning") : creating ? t("agentsConfig.create") : t("agentsConfig.save")} style={{ padding: "7px 14px", border: "var(--bw) solid var(--accent)", borderRadius: "var(--radius-control)", background: "var(--accent)", color: "white", cursor: saving || workspaceCheckPending || activeProjectUnavailable ? "not-allowed" : "pointer", opacity: workspaceCheckPending || activeProjectUnavailable ? 0.65 : 1, display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600 }}>
                     <Check size={13} aria-hidden="true" /> {creating ? t("agentsConfig.create") : t("agentsConfig.save")}
                   </button>
                   {creating ? (
-                    <button type="button" onClick={cancelCreate} disabled={saving} style={{ padding: "7px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)", cursor: "pointer", fontSize: 12 }}>{t("agentsConfig.cancel")}</button>
+                    <button type="button" onClick={cancelCreate} disabled={saving} style={{ padding: "7px 12px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)", cursor: "pointer", fontSize: 12 }}>{t("agentsConfig.cancel")}</button>
                   ) : (
-                    <button type="button" onClick={() => void remove()} disabled={saving || isBundledActive || activeProjectUnavailable} title={isBundledActive ? t("agentsConfig.templatesNotice") : activeProjectUnavailable ? t("agentsConfig.workspaceUnavailableWarning") : t("agentsConfig.remove")} style={{ padding: "7px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: isBundledActive || activeProjectUnavailable ? "var(--text-dim)" : "var(--status-error, #e5484d)", cursor: isBundledActive || saving || activeProjectUnavailable ? "not-allowed" : "pointer", display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+                    <button type="button" onClick={() => void remove()} disabled={saving || isBundledActive || activeProjectUnavailable} title={isBundledActive ? t("agentsConfig.templatesNotice") : activeProjectUnavailable ? t("agentsConfig.workspaceUnavailableWarning") : t("agentsConfig.remove")} style={{ padding: "7px 12px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: isBundledActive || activeProjectUnavailable ? "var(--text-dim)" : "var(--status-error, #e5484d)", cursor: isBundledActive || saving || activeProjectUnavailable ? "not-allowed" : "pointer", display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12 }}>
                       <Trash2 size={13} aria-hidden="true" /> {t("agentsConfig.remove")}
                     </button>
                   )}
@@ -413,7 +413,7 @@ export function AgentsConfig({ cwd }: { cwd: string | null }) {
               <Bot size={22} aria-hidden="true" style={{ color: "var(--text-dim)" }} />
               <div style={{ fontSize: 12 }}>{loading ? t("agentsConfig.loadingAgents") : filtered.length ? t("agentsConfig.selectAgentToEdit") : t("agentsConfig.noAgentsYet")}</div>
               <div style={{ fontSize: 11, color: "var(--text-dim)" }}>{t("agentsConfig.templatesNotice")}</div>
-              <button type="button" onClick={startCreate} disabled={workspaceCheckPending} title={workspaceCheckPending ? t("agentsConfig.loadingAgents") : t("agentsConfig.newAgent")} style={{ marginTop: 6, padding: "6px 12px", border: "1px solid var(--accent)", borderRadius: "var(--radius-control)", background: "var(--accent)", color: "white", cursor: workspaceCheckPending ? "not-allowed" : "pointer", opacity: workspaceCheckPending ? 0.65 : 1, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5 }}>
+              <button type="button" onClick={startCreate} disabled={workspaceCheckPending} title={workspaceCheckPending ? t("agentsConfig.loadingAgents") : t("agentsConfig.newAgent")} style={{ marginTop: 6, padding: "6px 12px", border: "var(--bw) solid var(--accent)", borderRadius: "var(--radius-control)", background: "var(--accent)", color: "white", cursor: workspaceCheckPending ? "not-allowed" : "pointer", opacity: workspaceCheckPending ? 0.65 : 1, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5 }}>
                 <Plus size={13} aria-hidden="true" /> {t("agentsConfig.newAgent")}
               </button>
             </div>

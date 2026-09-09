@@ -144,7 +144,7 @@ function Toaster() {
               gap: 8,
               background: "var(--bg)",
               color: "var(--text)",
-              border: "1px solid var(--border)",
+              border: "var(--bw) solid var(--border)",
               borderRadius: "var(--radius-card)",
               boxShadow: "var(--shadow-pop)",
               padding: "10px 12px",

@@ -36,7 +36,7 @@ export function LoginForm() {
     <main style={{ flex: 1, display: "grid", placeItems: "center", padding: 20, background: "var(--bg)" }}>
       <section
         aria-labelledby="login-title"
-        style={{ width: "min(100%, 380px)", padding: "32px", background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: "var(--radius-modal)", boxShadow: "var(--shadow-modal)" }}
+        style={{ width: "min(100%, 380px)", padding: "32px", background: "var(--bg-panel)", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-modal)", boxShadow: "var(--shadow-modal)" }}
       >
         <div style={{ width: 40, height: 40, display: "grid", placeItems: "center", borderRadius: "50%", background: "var(--user-bg)", color: "var(--accent)", marginBottom: 20 }}>
           <LockKeyhole size={19} aria-hidden="true" />
@@ -56,7 +56,7 @@ export function LoginForm() {
               required
               aria-invalid={error ? true : undefined}
               aria-describedby={error ? "password-error" : undefined}
-              style={{ width: "100%", padding: "9px 10px", border: `1px solid ${error ? "var(--status-error)" : "var(--border)"}`, borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)", fontSize: 14, outline: "none", boxShadow: "none" }}
+              style={{ width: "100%", padding: "9px 10px", border: `var(--bw) solid ${error ? "var(--status-error)" : "var(--border)"}`, borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)", fontSize: 14, outline: "none", boxShadow: "none" }}
             />
           </label>
           {error && <p id="password-error" role="alert" style={{ margin: 0, color: "var(--status-error)", fontSize: 12 }}>{error}</p>}

@@ -14,7 +14,7 @@ type McpUserConfig = { path: string; servers: Array<{ name: string; status: stri
 type McpLiveStatus = "connected" | "connecting" | "not_connected" | "inactive" | "disabled" | "configured";
 type McpLiveServer = { name: string; source: string; status: McpLiveStatus; type?: string };
 
-const inputStyle = { width: "100%", padding: "7px 9px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)", font: "12px var(--font-mono)" } as const;
+const inputStyle = { width: "100%", padding: "7px 9px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)", font: "12px var(--font-mono)" } as const;
 
 const newServer = () => JSON.stringify({ type: "stdio", command: "", args: [] }, null, 2);
 
@@ -164,8 +164,8 @@ export function McpConfig({ cwd, sessionId }: { cwd: string | null; sessionId?: 
   const displayedServers = liveServers ?? inventory;
 
   return <>
-    <section style={{ marginTop: 12, border: "1px solid var(--border)", borderRadius: "var(--radius-card)", overflow: "hidden", background: "var(--bg-panel)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>
+    <section style={{ marginTop: 12, border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-card)", overflow: "hidden", background: "var(--bg-panel)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "var(--bw) solid var(--border)" }}>
         <strong style={{ fontSize: 12, color: "var(--text)" }}>{t("mcpConfig.configuredServers")}</strong>
         <button type="button" title={t("mcpConfig.refreshLiveStatus")} aria-label={t("mcpConfig.refreshLiveStatus")} onClick={() => void load()} disabled={loading} className="ui-focus-ring" style={{ marginLeft: "auto", width: 24, height: 24, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", borderRadius: 4, background: "transparent", color: "var(--text-muted)", cursor: loading ? "wait" : "pointer" }}>
           <RefreshCw size={14} />
@@ -221,8 +221,8 @@ export function McpConfig({ cwd, sessionId }: { cwd: string | null; sessionId?: 
         )}
       </div>
     </section>
-    {cwd && <div style={{ marginTop: 12, border: "1px solid var(--border)", borderRadius: "var(--radius-card)", overflow: "hidden", background: "var(--bg-panel)" }}>
-    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>
+    {cwd && <div style={{ marginTop: 12, border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-card)", overflow: "hidden", background: "var(--bg-panel)" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "var(--bw) solid var(--border)" }}>
       <strong style={{ fontSize: 12, color: "var(--text)", flexShrink: 0 }}>{t("mcpConfig.projectServers")}</strong>
       <code style={{ flex: 1, minWidth: 0, color: "var(--text-dim)", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{path ?? "Loading..."}</code>
       {(() => {
@@ -234,11 +234,11 @@ export function McpConfig({ cwd, sessionId }: { cwd: string | null; sessionId?: 
       })()}
     </div>
     <div className="mcp-editor-grid" style={{ display: "grid", gridTemplateColumns: "minmax(120px, 0.35fr) minmax(0, 1fr)", minHeight: 250 }}>
-      <div style={{ borderRight: "1px solid var(--border)", padding: 6 }}>
+      <div style={{ borderRight: "var(--bw) solid var(--border)", padding: 6 }}>
         {servers.map((server) => {
           const summary = serverSummary(server.config);
           return (
-            <button key={server.name} type="button" onClick={() => choose(server)} title={`${server.name} — ${summary.type} · ${summary.target || "invalid"}`} style={{ display: "block", width: "100%", padding: "7px 8px", border: "none", borderRadius: 5, background: selected === server.name ? "var(--bg-selected)" : "transparent", color: "var(--text)", textAlign: "left", font: "11px var(--font-mono)", cursor: "pointer", overflow: "hidden" }}>
+            <button key={server.name} type="button" onClick={() => choose(server)} title={`${server.name} — ${summary.type} · ${summary.target || "invalid"}`} style={{ display: "block", width: "100%", padding: "7px 8px", border: "none", borderRadius: "var(--radius-control)", background: selected === server.name ? "var(--bg-selected)" : "transparent", color: "var(--text)", textAlign: "left", font: "11px var(--font-mono)", cursor: "pointer", overflow: "hidden" }}>
               <span style={{ display: "flex", alignItems: "center", gap: 5, overflow: "hidden" }}>
                 <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: "50%", flexShrink: 0, background: summary.valid ? (summary.enabled ? "var(--accent)" : "var(--border)") : "var(--status-error)" }} />
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{server.name}</span>
@@ -251,20 +251,20 @@ export function McpConfig({ cwd, sessionId }: { cwd: string | null; sessionId?: 
           );
         })}
         {!loading && servers.length === 0 && <div style={{ padding: "7px 8px", color: "var(--text-dim)", fontSize: 11 }}>{t("mcpConfig.noServers")}</div>}
-        <button type="button" onClick={add} style={{ display: "flex", alignItems: "center", gap: 4, width: "100%", marginTop: 5, padding: "6px 8px", border: "1px dashed var(--border)", borderRadius: 5, background: "transparent", color: "var(--text-muted)", cursor: "pointer", fontSize: 11 }}><Plus size={13} /> {t("mcpConfig.addServer")}</button>
+        <button type="button" onClick={add} style={{ display: "flex", alignItems: "center", gap: 4, width: "100%", marginTop: 5, padding: "6px 8px", border: "1px dashed var(--border)", borderRadius: "var(--radius-control)", background: "transparent", color: "var(--text-muted)", cursor: "pointer", fontSize: 11 }}><Plus size={13} /> {t("mcpConfig.addServer")}</button>
       </div>
       <div style={{ minWidth: 0, padding: 12 }}>
         <label style={{ display: "block", color: "var(--text-muted)", fontSize: 11 }}>{t("mcpConfig.serverName")}<input value={name} onChange={(event) => setName(event.target.value)} placeholder="filesystem" style={{ ...inputStyle, marginTop: 4 }} /></label>
         <label style={{ display: "block", marginTop: 9, color: "var(--text-muted)", fontSize: 11 }}>{t("mcpConfig.serverConfigJson")}<textarea value={source} onChange={(event) => setSource(event.target.value)} spellCheck={false} style={{ ...inputStyle, minHeight: 125, marginTop: 4, resize: "vertical", lineHeight: 1.45 }} /></label>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 9 }}>
-          <button type="button" onClick={() => void check()} disabled={saving} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "6px 9px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "transparent", color: "var(--text)", cursor: saving ? "wait" : "pointer", fontSize: 11 }}>
+          <button type="button" onClick={() => void check()} disabled={saving} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "6px 9px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "transparent", color: "var(--text)", cursor: saving ? "wait" : "pointer", fontSize: 11 }}>
             <Check size={13} /> {t("mcpConfig.check")}
           </button>
           <button type="button" onClick={() => void save()} disabled={saving || !name.trim()} style={{ padding: "6px 9px", border: "none", borderRadius: "var(--radius-control)", background: "var(--accent)", color: "var(--on-accent)", cursor: saving || !name.trim() ? "default" : "pointer", fontSize: 11 }}>
             {saving ? t("mcpConfig.saving") : t("mcpConfig.saveServer")}
           </button>
           {selected && (
-            <button type="button" onClick={() => void remove()} disabled={saving} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "6px 9px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "transparent", color: "var(--text-muted)", cursor: saving ? "wait" : "pointer", fontSize: 11 }}>
+            <button type="button" onClick={() => void remove()} disabled={saving} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "6px 9px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "transparent", color: "var(--text-muted)", cursor: saving ? "wait" : "pointer", fontSize: 11 }}>
               <Trash2 size={13} /> {t("mcpConfig.remove")}
             </button>
           )}

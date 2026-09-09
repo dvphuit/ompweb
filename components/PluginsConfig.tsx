@@ -130,7 +130,7 @@ function ResourceList({ pkg }: { pkg: PluginPackageInfo }) {
         <div
           key={group.kind}
           style={{
-            borderTop: groupIndex === 0 ? "none" : "1px solid var(--border)",
+            borderTop: groupIndex === 0 ? "none" : "var(--bw) solid var(--border)",
             paddingTop: groupIndex === 0 ? 0 : 12,
           }}
         >
@@ -206,8 +206,8 @@ function buttonStyle(disabled?: boolean, danger?: boolean): React.CSSProperties 
   return {
     padding: "6px 12px",
     background: danger ? "color-mix(in srgb, var(--status-error) 8%, transparent)" : "none",
-    border: "1px solid var(--border)",
-    borderRadius: 6,
+    border: "var(--bw) solid var(--border)",
+    borderRadius: "var(--radius-control)",
     color: danger ? "var(--status-error)" : "var(--text-muted)",
     cursor: disabled ? "not-allowed" : "pointer",
     fontSize: 12,
@@ -238,7 +238,7 @@ function Toggle({
         flexShrink: 0,
         width: 40,
         height: 22,
-        borderRadius: 11,
+        borderRadius: "var(--radius-card)",
         border: "none",
         padding: 0,
         cursor: loading ? "wait" : "pointer",
@@ -278,8 +278,8 @@ function SegmentedScope({
     <div
       style={{
         display: "inline-flex",
-        border: "1px solid var(--border)",
-        borderRadius: 7,
+        border: "var(--bw) solid var(--border)",
+        borderRadius: "var(--radius-card)",
         overflow: "hidden",
         height: 30,
       }}
@@ -293,7 +293,7 @@ function SegmentedScope({
             style={{
               width: 76,
               border: "none",
-              borderRight: scope === "global" ? "1px solid var(--border)" : "none",
+              borderRight: scope === "global" ? "var(--bw) solid var(--border)" : "none",
               background: active ? "var(--bg-selected)" : "none",
               color: active ? "var(--text)" : "var(--text-muted)",
               cursor: "pointer",
@@ -361,8 +361,8 @@ function AddPluginPanel({
             width: "100%",
             height: 36,
             padding: "0 11px",
-            border: "1px solid var(--border)",
-            borderRadius: 6,
+            border: "var(--bw) solid var(--border)",
+            borderRadius: "var(--radius-control)",
             background: "var(--bg-panel)",
             color: "var(--text)",
             fontFamily: "var(--font-mono)",
@@ -407,8 +407,8 @@ function AddPluginPanel({
                 minHeight: 30,
                 textAlign: "left",
                 padding: "6px 9px",
-                border: "1px solid var(--border)",
-                borderRadius: 6,
+                border: "var(--bw) solid var(--border)",
+                borderRadius: "var(--radius-control)",
                 background: "var(--bg-panel)",
                 color: "var(--text-dim)",
                 cursor: "pointer",
@@ -764,7 +764,7 @@ export function PluginsConfig({
             alignItems: "center",
             justifyContent: "space-between",
             padding: "12px 18px",
-            borderBottom: "1px solid var(--border)",
+            borderBottom: "var(--bw) solid var(--border)",
             flexShrink: 0,
           }}
         >
@@ -808,8 +808,8 @@ export function PluginsConfig({
             style={{
               width: isMobile ? "100%" : 245,
               maxHeight: isMobile ? "40vh" : undefined,
-              borderRight: isMobile ? "none" : "1px solid var(--border)",
-              borderBottom: isMobile ? "1px solid var(--border)" : "none",
+              borderRight: isMobile ? "none" : "var(--bw) solid var(--border)",
+              borderBottom: isMobile ? "var(--bw) solid var(--border)" : "none",
               display: "flex",
               flexDirection: "column",
               flexShrink: 0,
@@ -861,7 +861,7 @@ export function PluginsConfig({
                             alignItems: "center",
                             gap: 7,
                             padding: "8px 8px",
-                            borderRadius: 5,
+                            borderRadius: "var(--radius-control)",
                             cursor: "pointer",
                             width: "100%",
                             border: "none",
@@ -933,7 +933,7 @@ export function PluginsConfig({
                 ))
               )}
             </div>
-            <div style={{ padding: "8px 6px", borderTop: "1px solid var(--border)", flexShrink: 0 }}>
+            <div style={{ padding: "8px 6px", borderTop: "var(--bw) solid var(--border)", flexShrink: 0 }}>
               <button
                 type="button"
                 onClick={() => {
@@ -946,7 +946,7 @@ export function PluginsConfig({
                   alignItems: "center",
                   gap: 6,
                   padding: "7px 8px",
-                  borderRadius: 5,
+                  borderRadius: "var(--radius-control)",
                   border: "none",
                   width: "100%",
                   cursor: "pointer",
@@ -1022,7 +1022,7 @@ export function PluginsConfig({
             justifyContent: "space-between",
             gap: 12,
             padding: "10px 18px",
-            borderTop: "1px solid var(--border)",
+            borderTop: "var(--bw) solid var(--border)",
             flexShrink: 0,
           }}
         >

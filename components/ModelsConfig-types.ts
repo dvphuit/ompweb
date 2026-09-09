@@ -148,7 +148,7 @@ export const ENDPOINT_PRESETS: EndpointPreset[] = [
 export const presetButtonStyle = {
   padding: "4px 8px",
   fontSize: 11,
-  border: "1px solid var(--border)",
+  border: "var(--bw) solid var(--border)",
   borderRadius: "var(--radius-control)",
   background: "var(--bg)",
   color: "var(--text)",

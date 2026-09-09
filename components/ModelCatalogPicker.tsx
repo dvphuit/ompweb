@@ -126,7 +126,7 @@ export function ModelCatalogPicker({ open, providerName, providerBaseUrl, existi
     display: "flex", flexDirection: "row", alignItems: "center", gap: 10,
     padding: "9px 12px",
     background: "var(--bg-panel)",
-    border: "1px solid var(--border)",
+    border: "var(--bw) solid var(--border)",
     borderRadius: "var(--radius-control)",
     marginBottom: 6,
     minWidth: 0,
@@ -154,7 +154,7 @@ export function ModelCatalogPicker({ open, providerName, providerBaseUrl, existi
             display: "flex", alignItems: "center", gap: 8,
             padding: "6px 10px",
             background: "var(--bg)",
-            border: "1px solid var(--border)",
+            border: "var(--bw) solid var(--border)",
             borderRadius: "var(--radius-control)",
           }}>
             <input
@@ -206,7 +206,7 @@ export function ModelCatalogPicker({ open, providerName, providerBaseUrl, existi
                     </div>
                   </div>
                   {alreadyAdded ? (
-                    <span style={{ flexShrink: 0, padding: "5px 12px", background: "none", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", color: "var(--text-dim)", fontSize: 12 }}>
+                    <span style={{ flexShrink: 0, padding: "5px 12px", background: "none", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", color: "var(--text-dim)", fontSize: 12 }}>
                       {t("modelsConfig.catalogAdded")}
                     </span>
                   ) : (
