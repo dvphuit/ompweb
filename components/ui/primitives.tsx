@@ -53,7 +53,7 @@ export function DialogContent({ children, className, style, ariaLabel }: {
            zIndex: 1001,
           background: "var(--bg)",
           color: "var(--text)",
-          border: "1px solid var(--border)",
+          border: "var(--bw) solid var(--border)",
           borderRadius: "var(--radius-modal)",
           boxShadow: "var(--shadow-modal)",
           padding: 20,
@@ -96,7 +96,7 @@ export function Tooltip({ content, children, side = "top" }: {
               style={{
                 background: "var(--bg-panel)",
                 color: "var(--text)",
-                border: "1px solid var(--border)",
+                border: "var(--bw) solid var(--border)",
                 borderRadius: "var(--radius-control)",
                 boxShadow: "var(--shadow-pop)",
                 padding: "4px 9px",

@@ -46,7 +46,7 @@ function SplitPatchView({ text }: { text: string }) {
           key={fileIndex}
           style={{
             minWidth: 0,
-            borderTop: fileIndex === 0 ? "none" : "1px solid var(--border)",
+            borderTop: fileIndex === 0 ? "none" : "var(--bw) solid var(--border)",
             fontFamily: "var(--font-mono)",
             fontSize: 12,
             lineHeight: 1.55,
@@ -61,7 +61,7 @@ function SplitPatchView({ text }: { text: string }) {
                 top: 0,
                 zIndex: 1,
                 background: "var(--bg-panel)",
-                borderBottom: "1px solid var(--border)",
+                borderBottom: "var(--bw) solid var(--border)",
               }}
             >
               <SplitDiffHeader title={file.oldPath || t("messageView.diffBefore")} side="left" />
@@ -96,7 +96,7 @@ function SplitDiffHeader({ title, side }: { title: string; side: "left" | "right
       style={{
         padding: "5px 10px",
         color: "var(--text-dim)",
-        borderRight: side === "left" ? "1px solid var(--border)" : "none",
+        borderRight: side === "left" ? "var(--bw) solid var(--border)" : "none",
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap",
@@ -127,7 +127,7 @@ function SplitDiffCellView({ cell, side }: { cell: SplitDiffCell; side: "left" |
         display: "flex",
         minWidth: 0,
         background: bg,
-        borderRight: side === "left" ? "1px solid var(--border)" : "none",
+        borderRight: side === "left" ? "var(--bw) solid var(--border)" : "none",
       }}
     >
       <span
@@ -138,7 +138,7 @@ function SplitDiffCellView({ cell, side }: { cell: SplitDiffCell; side: "left" |
           color: "var(--text-dim)",
           userSelect: "none",
           background: "var(--bg-panel)",
-          borderRight: "1px solid var(--border)",
+          borderRight: "var(--bw) solid var(--border)",
           flexShrink: 0,
         }}
       >
@@ -215,7 +215,7 @@ function PatchTextView({ text }: { text: string }) {
                 padding: "0 8px",
                 color: "var(--text-dim)",
                 background: "var(--bg-panel)",
-                borderRight: "1px solid var(--border)",
+                borderRight: "var(--bw) solid var(--border)",
                 textAlign: "right",
                 userSelect: "none",
                 flexShrink: 0,

@@ -69,7 +69,8 @@ export function TodoList({ phases = [], collapsible = false, defaultExpanded = f
   return (
     <section
       aria-label={t("chatWindow.todoList")}
-      className={`overflow-hidden border border-border bg-bg-subtle ${collapsible ? "" : "my-2"}`}
+      className={`composer-panel overflow-hidden border border-border bg-bg-panel ${collapsible ? "" : "my-2"}`}
+      data-collapsed={collapsed ? "true" : "false"}
       style={{ borderRadius: "var(--radius-card)" }}
     >
       {collapsible ? (
@@ -83,7 +84,10 @@ export function TodoList({ phases = [], collapsible = false, defaultExpanded = f
         >
           <ListChecks size={15} strokeWidth={1.8} aria-hidden />
           <strong className="font-medium text-text">{t("chatWindow.todoList")}</strong>
-          <span className="ml-auto">{progress}</span>
+          <span className="composer-chip-progress ml-auto" aria-hidden>
+            <span className="composer-chip-progress-fill" style={{ width: `${tasks.length ? Math.round((done / tasks.length) * 100) : 0}%` }} />
+          </span>
+          <span>{progress}</span>
           <ChevronDown
             size={14}
             strokeWidth={1.8}

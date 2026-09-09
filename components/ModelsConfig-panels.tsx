@@ -60,7 +60,7 @@ export function CodeText({ text }: { text: string }) {
 }
 
 export function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>{children}</div>;
+  return <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--font-display)", marginBottom: 2 }}>{children}</div>;
 }
 
 export function TreeNavButton({ icon: Icon, label, selected, onClick }: { icon: IconComponent; label: string; selected: boolean; onClick: () => void }) {
@@ -137,18 +137,18 @@ export function RetryFallbackDetail({ models }: { models: RuntimeModelEntry[] })
   return <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
     <div><SectionTitle>{t("modelsConfig.retryFallbackTitle")}</SectionTitle><p style={{ margin: "4px 0 0", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>{t("modelsConfig.retryFallbackDesc")}</p></div>
     <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 9 }}>
-      <label style={{ padding: "10px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-card)", background: "var(--bg-panel)", fontSize: 12, color: "var(--text)" }}><input type="checkbox" checked={retry.enabled ?? true} onChange={(event) => void save({ ...settings, retry: { ...retry, enabled: event.target.checked } })} /> {t("modelsConfig.retryTransientErrors")}</label>
-      <label style={{ padding: "10px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-card)", background: "var(--bg-panel)", fontSize: 12, color: "var(--text)" }}><input type="checkbox" checked={retry.modelFallback ?? true} onChange={(event) => void save({ ...settings, retry: { ...retry, modelFallback: event.target.checked } })} /> {t("modelsConfig.allowModelFallback")}</label>
-      <label style={{ padding: "10px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-card)", background: "var(--bg-panel)", color: "var(--text)", fontSize: 12 }}>{t("modelsConfig.retryAttempts")} <select value={retry.maxRetries ?? 10} onChange={(event) => void save({ ...settings, retry: { ...retry, maxRetries: Number(event.target.value) } })} style={{ marginLeft: 8, padding: "4px 8px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)" }}>{[0, 1, 2, 3, 5, 10, 15, 20].map((count) => <option key={count} value={count}>{count}</option>)}</select></label>
-      <label style={{ padding: "10px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius-card)", background: "var(--bg-panel)", color: "var(--text)", fontSize: 12 }}>{t("modelsConfig.returnToPrimary")} <select value={retry.fallbackRevertPolicy ?? "cooldown-expiry"} onChange={(event) => void save({ ...settings, retry: { ...retry, fallbackRevertPolicy: event.target.value as "cooldown-expiry" | "never" } })} style={{ marginLeft: 8, padding: "4px 8px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)" }}><option value="cooldown-expiry">{t("modelsConfig.afterCooldown")}</option><option value="never">{t("modelsConfig.never")}</option></select></label>
+      <label style={{ padding: "10px 12px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-card)", background: "var(--bg-panel)", fontSize: 12, color: "var(--text)" }}><input type="checkbox" checked={retry.enabled ?? true} onChange={(event) => void save({ ...settings, retry: { ...retry, enabled: event.target.checked } })} /> {t("modelsConfig.retryTransientErrors")}</label>
+      <label style={{ padding: "10px 12px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-card)", background: "var(--bg-panel)", fontSize: 12, color: "var(--text)" }}><input type="checkbox" checked={retry.modelFallback ?? true} onChange={(event) => void save({ ...settings, retry: { ...retry, modelFallback: event.target.checked } })} /> {t("modelsConfig.allowModelFallback")}</label>
+      <label style={{ padding: "10px 12px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-card)", background: "var(--bg-panel)", color: "var(--text)", fontSize: 12 }}>{t("modelsConfig.retryAttempts")} <select value={retry.maxRetries ?? 10} onChange={(event) => void save({ ...settings, retry: { ...retry, maxRetries: Number(event.target.value) } })} style={{ marginLeft: 8, padding: "4px 8px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)" }}>{[0, 1, 2, 3, 5, 10, 15, 20].map((count) => <option key={count} value={count}>{count}</option>)}</select></label>
+      <label style={{ padding: "10px 12px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-card)", background: "var(--bg-panel)", color: "var(--text)", fontSize: 12 }}>{t("modelsConfig.returnToPrimary")} <select value={retry.fallbackRevertPolicy ?? "cooldown-expiry"} onChange={(event) => void save({ ...settings, retry: { ...retry, fallbackRevertPolicy: event.target.value as "cooldown-expiry" | "never" } })} style={{ marginLeft: 8, padding: "4px 8px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)" }}><option value="cooldown-expiry">{t("modelsConfig.afterCooldown")}</option><option value="never">{t("modelsConfig.never")}</option></select></label>
     </div>
-    <section style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-card)", overflow: "hidden" }}>
-      <div style={{ padding: "10px 12px", background: "var(--bg-panel)", display: "flex", alignItems: "center", gap: 8 }}><span style={{ color: "var(--text)", fontSize: 12, fontWeight: 600 }}>{t("modelsConfig.fallbackChainFor")}</span><select aria-label={t("modelsConfig.fallbackChainFor")} value={role} onChange={(event) => setRole(event.target.value)} style={{ padding: "4px 8px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)" }}>{NATIVE_MODEL_ROLES.map((value) => <option key={value} value={value}>{value}</option>)}</select></div>
-      <div style={{ padding: 12, display: "flex", gap: 8 }}><select aria-label={t("modelsConfig.selectFallbackModel")} value={candidate} onChange={(event) => setCandidate(event.target.value)} style={{ flex: 1, minWidth: 0, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)" }}><option value="">{t("modelsConfig.selectFallbackModel")}</option>{modelOptions.filter((value) => !chain.includes(value)).map((value) => <option key={value} value={value}>{value}</option>)}</select><button type="button" disabled={!candidate} onClick={() => { updateChain([...chain, candidate]); setCandidate(""); }} style={{ padding: "6px 10px", border: "none", borderRadius: "var(--radius-control)", background: "var(--accent)", color: "white", cursor: "pointer", fontSize: 12 }}>{t("modelsConfig.add")}</button></div>
+    <section style={{ border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-card)", overflow: "hidden" }}>
+      <div style={{ padding: "10px 12px", background: "var(--bg-panel)", display: "flex", alignItems: "center", gap: 8 }}><span style={{ color: "var(--text)", fontSize: 12, fontWeight: 600 }}>{t("modelsConfig.fallbackChainFor")}</span><select aria-label={t("modelsConfig.fallbackChainFor")} value={role} onChange={(event) => setRole(event.target.value)} style={{ padding: "4px 8px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)" }}>{NATIVE_MODEL_ROLES.map((value) => <option key={value} value={value}>{value}</option>)}</select></div>
+      <div style={{ padding: 12, display: "flex", gap: 8 }}><select aria-label={t("modelsConfig.selectFallbackModel")} value={candidate} onChange={(event) => setCandidate(event.target.value)} style={{ flex: 1, minWidth: 0, padding: "6px 8px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)" }}><option value="">{t("modelsConfig.selectFallbackModel")}</option>{modelOptions.filter((value) => !chain.includes(value)).map((value) => <option key={value} value={value}>{value}</option>)}</select><button type="button" disabled={!candidate} onClick={() => { updateChain([...chain, candidate]); setCandidate(""); }} style={{ padding: "6px 10px", border: "none", borderRadius: "var(--radius-control)", background: "var(--accent)", color: "white", cursor: "pointer", fontSize: 12 }}>{t("modelsConfig.add")}</button></div>
       {chain.length === 0 ? (
         <div style={{ padding: "0 12px 12px", color: "var(--text-dim)", fontSize: 12 }}>{t("modelsConfig.noExplicitChain")}</div>
       ) : (
-        <div style={{ borderTop: "1px solid var(--border)" }}>
+        <div style={{ borderTop: "var(--bw) solid var(--border)" }}>
           {chain.map((selector, index) => (
             <div key={selector} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", color: "var(--text-muted)", fontSize: 12 }}>
               <span style={{ width: 18, color: "var(--text-dim)", fontFamily: "var(--font-mono)" }}>{index + 1}</span>
@@ -228,25 +228,25 @@ export function NativeRegistryDetail({ models, connectedProviders, onChanged }: 
       <SectionTitle>{t("modelsConfig.nativeRegistryTitle")}</SectionTitle>
       <p style={{ margin: "4px 0 0", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5 }}>{t("modelsConfig.nativeRegistryDesc")}</p>
     </div>
-    <section style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-card)", overflow: "hidden" }}>
+    <section style={{ border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-card)", overflow: "hidden" }}>
       <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", background: "var(--bg-panel)", color: "var(--text)", fontSize: 12, fontWeight: 600 }}><input type="checkbox" checked={allowListEnabled} disabled={saving || isReadOnly} onChange={(event) => void save({ ...settings, enabledModels: event.target.checked ? allModelKeys : [] })} /> {t("modelsConfig.restrictSelectedModels")}</label>
       <p style={{ margin: 0, padding: "8px 12px", color: "var(--text-muted)", fontSize: 11, lineHeight: 1.45 }}>{allowListEnabled ? t("modelsConfig.uncheckedUnavailable") : t("modelsConfig.allModelsAllowed")}</p>
-      {allowListEnabled && <div style={{ maxHeight: 260, overflowY: "auto", borderTop: "1px solid var(--border)" }}>{models.map((model) => {
+      {allowListEnabled && <div style={{ maxHeight: 260, overflowY: "auto", borderTop: "var(--bw) solid var(--border)" }}>{models.map((model) => {
         const key = `${model.provider}/${model.id}`;
         return <label key={key} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", color: "var(--text-muted)", fontSize: 12 }}><input type="checkbox" checked={enabledModels.has(key)} disabled={saving || isReadOnly} onChange={(event) => { const next = new Set(enabledModels); if (event.target.checked) next.add(key); else next.delete(key); void save({ ...settings, enabledModels: [...next] }); }} /><code>{key}</code></label>;
       })}</div>}
     </section>
-    <section style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-card)", overflow: "hidden" }}>
+    <section style={{ border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-card)", overflow: "hidden" }}>
       <div style={{ padding: "10px 12px", background: "var(--bg-panel)", color: "var(--text)", fontSize: 12, fontWeight: 600 }}>{t("modelsConfig.disabledProviders")}</div>
       <p style={{ margin: 0, padding: "8px 12px", color: "var(--text-muted)", fontSize: 11, lineHeight: 1.45 }}>{t("modelsConfig.disabledProvidersDesc")}</p>
-      <div style={{ borderTop: "1px solid var(--border)" }}>{providers.map((provider) => <label key={provider} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", color: "var(--text-muted)", fontSize: 12 }}><input type="checkbox" checked={disabledProviders.has(provider)} disabled={saving || isReadOnly} onChange={(event) => { const next = new Set(disabledProviders); if (event.target.checked) next.add(provider); else next.delete(provider); void save({ ...settings, disabledProviders: [...next] }); }} /><ProviderIcon id={provider} size={14} /><code>{provider}</code></label>)}</div>
+      <div style={{ borderTop: "var(--bw) solid var(--border)" }}>{providers.map((provider) => <label key={provider} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", color: "var(--text-muted)", fontSize: 12 }}><input type="checkbox" checked={disabledProviders.has(provider)} disabled={saving || isReadOnly} onChange={(event) => { const next = new Set(disabledProviders); if (event.target.checked) next.add(provider); else next.delete(provider); void save({ ...settings, disabledProviders: [...next] }); }} /><ProviderIcon id={provider} size={14} /><code>{provider}</code></label>)}</div>
     </section>
-    <section style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-card)", overflow: "hidden" }}>
+    <section style={{ border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-card)", overflow: "hidden" }}>
       <div style={{ padding: "10px 12px", background: "var(--bg-panel)", color: "var(--text)", fontSize: 12, fontWeight: 600 }}>{t("modelsConfig.providerPreference")}</div>
       <p style={{ margin: 0, padding: "8px 12px", color: "var(--text-muted)", fontSize: 11, lineHeight: 1.45 }}>{t("modelsConfig.providerPreferenceDesc")}</p>
-      <div style={{ borderTop: "1px solid var(--border)" }}>{orderedProviders.map((provider, index) => <div key={provider} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", color: "var(--text-muted)", fontSize: 12 }}><ProviderIcon id={provider} size={14} /><code style={{ flex: 1 }}>{provider}</code><button type="button" disabled={saving || isReadOnly || index === 0} onClick={() => { const next = [...orderedProviders]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; void save({ ...settings, modelProviderOrder: next }); }} title={t("modelsConfig.moveProviderUp")} aria-label={t("modelsConfig.moveProviderUp")} className="ui-focus-ring" style={{ width: 24, height: 24, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", borderRadius: 4, background: "transparent", color: "var(--text-muted)", cursor: "pointer" }}><ArrowUp size={14} /></button><button type="button" disabled={saving || isReadOnly || index === orderedProviders.length - 1} onClick={() => { const next = [...orderedProviders]; [next[index + 1], next[index]] = [next[index], next[index + 1]]; void save({ ...settings, modelProviderOrder: next }); }} title={t("modelsConfig.moveProviderDown")} aria-label={t("modelsConfig.moveProviderDown")} className="ui-focus-ring" style={{ width: 24, height: 24, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", borderRadius: 4, background: "transparent", color: "var(--text-muted)", cursor: "pointer" }}><ArrowDown size={14} /></button></div>)}</div>
+      <div style={{ borderTop: "var(--bw) solid var(--border)" }}>{orderedProviders.map((provider, index) => <div key={provider} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", color: "var(--text-muted)", fontSize: 12 }}><ProviderIcon id={provider} size={14} /><code style={{ flex: 1 }}>{provider}</code><button type="button" disabled={saving || isReadOnly || index === 0} onClick={() => { const next = [...orderedProviders]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; void save({ ...settings, modelProviderOrder: next }); }} title={t("modelsConfig.moveProviderUp")} aria-label={t("modelsConfig.moveProviderUp")} className="ui-focus-ring" style={{ width: 24, height: 24, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", borderRadius: 4, background: "transparent", color: "var(--text-muted)", cursor: "pointer" }}><ArrowUp size={14} /></button><button type="button" disabled={saving || isReadOnly || index === orderedProviders.length - 1} onClick={() => { const next = [...orderedProviders]; [next[index + 1], next[index]] = [next[index], next[index + 1]]; void save({ ...settings, modelProviderOrder: next }); }} title={t("modelsConfig.moveProviderDown")} aria-label={t("modelsConfig.moveProviderDown")} className="ui-focus-ring" style={{ width: 24, height: 24, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", borderRadius: 4, background: "transparent", color: "var(--text-muted)", cursor: "pointer" }}><ArrowDown size={14} /></button></div>)}</div>
     </section>
-    {isReadOnly && <div role="status" style={{ padding: "9px 11px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.45 }}>{t("modelsConfig.pathScopedNotice")}</div>}
+    {isReadOnly && <div role="status" style={{ padding: "9px 11px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.45 }}>{t("modelsConfig.pathScopedNotice")}</div>}
     {error && <div role="alert" style={{ color: "var(--status-error)", fontSize: 12 }}>{error}</div>}
   </div>;
 }
@@ -307,12 +307,12 @@ export function ModelRolesDetail({ models }: { models: RuntimeModelEntry[] }) {
           const model = models.find((item) => `${item.provider}/${item.id}` === selectedModel);
           const modelKnown = !selectedModel || Boolean(model);
           return <>
-            <select aria-label={`Model override for ${role}`} value={selectedModel} onChange={(event) => updateRoleModel(role, event.target.value)} style={{ minWidth: 0, padding: "7px 9px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)", fontSize: 12 }}>
+            <select aria-label={`Model override for ${role}`} value={selectedModel} onChange={(event) => updateRoleModel(role, event.target.value)} style={{ minWidth: 0, padding: "7px 9px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)", fontSize: 12 }}>
               <option value="">{t("modelsConfig.noOverride")}</option>
               {!modelKnown && <option value={selectedModel}>{selectedModel} (not currently available)</option>}
               {models.map((item) => <option key={`${item.provider}:${item.id}`} value={`${item.provider}/${item.id}`}>{item.name || item.id} ({item.provider}/{item.id})</option>)}
             </select>
-            <select aria-label={`Thinking level for ${role}`} value={selectedThinking} disabled={!model} onChange={(event) => updateRoleThinking(role, event.target.value)} style={{ minWidth: 0, padding: "7px 9px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)", fontSize: 12, opacity: model ? 1 : 0.55 }}>
+            <select aria-label={`Thinking level for ${role}`} value={selectedThinking} disabled={!model} onChange={(event) => updateRoleThinking(role, event.target.value)} style={{ minWidth: 0, padding: "7px 9px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text)", fontSize: 12, opacity: model ? 1 : 0.55 }}>
               <option value="">{t("modelsConfig.modelDefault")}</option>
               {(model?.thinkingLevels ?? []).filter((level) => level !== "off").map((level) => <option key={level} value={level}>{level}</option>)}
             </select>
@@ -361,7 +361,7 @@ export function ProviderIcon({ id, size }: { id: string; size: number }) {
       style={{
         width: size,
         height: size,
-        border: "1px solid var(--border)",
+        border: "var(--bw) solid var(--border)",
         borderRadius: 4,
         color: "var(--text-dim)",
         display: "inline-flex",
@@ -408,7 +408,7 @@ export function AddProviderPicker({
     display: "flex", flexDirection: "row", alignItems: "center", gap: 8,
     padding: "10px 12px",
     background: "var(--bg-panel)",
-    border: "1px solid var(--border)",
+    border: "var(--bw) solid var(--border)",
     borderRadius: "var(--radius-control)",
     boxSizing: "border-box",
     cursor: "pointer",
@@ -440,7 +440,7 @@ export function AddProviderPicker({
             display: "flex", alignItems: "center", gap: 8,
             padding: "6px 10px",
             background: "var(--bg)",
-            border: "1px solid var(--border)",
+            border: "var(--bw) solid var(--border)",
             borderRadius: "var(--radius-control)",
           }}>
             <input
@@ -477,7 +477,7 @@ export function AddProviderPicker({
                     <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t("modelsConfig.openaiAnthropicCompatible")}</div>
                     <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>{t("modelsConfig.customEndpointFormat")}</div>
                   </div>
-                  <span style={{ width: 26, height: 26, borderRadius: 5, background: "var(--bg-hover)", border: "1px dashed var(--border)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <span style={{ width: 26, height: 26, borderRadius: "var(--radius-control)", background: "var(--bg-hover)", border: "1px dashed var(--border)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     <Plus size={13} aria-hidden="true" />
                   </span>
                 </button>

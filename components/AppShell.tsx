@@ -278,7 +278,7 @@ export function AppShell() {
                     .then(() => toast.success(translate("appShell.commandCopied")))
                     .catch(() => toast.error(translate("appShell.commandCopyFailed")));
                 }}
-                style={{ padding: "3px 7px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-panel)", color: "var(--text)", cursor: "pointer", fontSize: 11 }}
+                style={{ padding: "3px 7px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-panel)", color: "var(--text)", cursor: "pointer", fontSize: 11 }}
               >
                 {translate("appShell.copyCommand")}
               </button>
@@ -288,7 +288,7 @@ export function AppShell() {
                   setSettingsTab("system");
                   toast.close("app-update-available");
                 }}
-                style={{ padding: "3px 7px", border: "1px solid var(--accent-strong)", borderRadius: "var(--radius-control)", background: "var(--accent-strong)", color: "var(--on-accent)", cursor: "pointer", fontSize: 11, fontWeight: 600 }}
+                style={{ padding: "3px 7px", border: "var(--bw) solid var(--accent-strong)", borderRadius: "var(--radius-control)", background: "var(--accent-strong)", color: "var(--on-accent)", cursor: "pointer", fontSize: 11, fontWeight: 600 }}
               >
                 {translate("settingsConfig.appUpdateAction")}
               </button>
@@ -1389,7 +1389,7 @@ export function AppShell() {
         align-items: center;
         justify-content: center;
         padding: 0;
-        border: 1px solid var(--border);
+        border: var(--bw) solid var(--border);
         border-radius: 6px;
         background: transparent;
         color: var(--text-dim);
@@ -1409,7 +1409,7 @@ export function AppShell() {
       }
       .session-info-metric-card {
         padding: 11px;
-        border: 1px solid var(--border);
+        border: var(--bw) solid var(--border);
         border-radius: var(--radius-card);
         background: var(--bg-subtle);
       }
@@ -1472,7 +1472,7 @@ export function AppShell() {
         inert={mobileSidebarReady && !sidebarOpen ? true : undefined}
         style={{
           background: "var(--bg-panel)",
-          borderRight: "1px solid var(--border)",
+          borderRight: "var(--bw) solid var(--border)",
           display: "flex",
           flexDirection: "column",
           flexShrink: 0,
@@ -1521,7 +1521,7 @@ export function AppShell() {
           alignItems: "center",
           justifyContent: "space-between",
           flexShrink: 0,
-          borderBottom: "1px solid var(--border)",
+          borderBottom: "var(--bw) solid var(--border)",
           height: isMobile ? 44 : 36,
           background: "var(--bg-panel)",
           padding: isMobile ? "0 4px" : "0 8px",
@@ -1638,7 +1638,7 @@ export function AppShell() {
                     padding: "0 8px",
                     borderRadius: "var(--radius-control)",
                     background: "var(--bg-subtle)",
-                    border: "1px solid var(--border)",
+                    border: "var(--bw) solid var(--border)",
                     fontSize: 11,
                     color: "var(--text-muted)",
                     whiteSpace: "nowrap",
@@ -1764,7 +1764,7 @@ export function AppShell() {
                   height: 26,
                   padding: currentProviderUsageText ? "0 8px" : "0 6px",
                   borderRadius: "var(--radius-control)",
-                  border: "1px solid var(--border)",
+                  border: "var(--bw) solid var(--border)",
                   background: activeTopPanel === "usage" ? "var(--bg-selected)" : "var(--bg-subtle)",
                   color: currentProviderUsageText ? currentProviderUsageColor : "var(--text-dim)",
                   fontSize: 11,
@@ -1833,7 +1833,7 @@ export function AppShell() {
                     height: 26,
                     padding: "0 8px",
                     borderRadius: "var(--radius-control)",
-                    border: "1px solid var(--border)",
+                    border: "var(--bw) solid var(--border)",
                     background: activeTopPanel === "session" ? "var(--bg-selected)" : "var(--bg-subtle)",
                     color: "var(--text)",
                     fontSize: 11,
@@ -1846,8 +1846,19 @@ export function AppShell() {
                   }}
                 >
                   {ctxStr && (
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: ctxColor }}>
-                      <span style={{ fontSize: 10, opacity: 0.7 }}>⌂</span>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: ctxColor }}>
+                      <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 10, letterSpacing: "0.08em", color: "var(--text-muted)" }}>CTX</span>
+                      {!isMobile && (
+                        <span className="shell-ctx-bar" aria-hidden="true">
+                          <span
+                            className="shell-ctx-bar-fill"
+                            style={{
+                              width: `${Math.max(2, Math.min(100, contextUsage?.percent ?? 0))}%`,
+                              background: ctxColor === "var(--text-muted)" ? "var(--accent)" : ctxColor,
+                            }}
+                          />
+                        </span>
+                      )}
                       {ctxStr}
                     </span>
                   )}
@@ -1890,7 +1901,7 @@ export function AppShell() {
                     height: 26,
                     padding: "0 8px",
                     borderRadius: "var(--radius-control)",
-                    border: "1px solid var(--border)",
+                    border: "var(--bw) solid var(--border)",
                     background: "var(--bg-subtle)",
                     color: currentSpeedStr ? "var(--accent)" : "var(--text-muted)",
                     fontSize: 11,
@@ -1928,7 +1939,7 @@ export function AppShell() {
               {activeTopPanel === "usage" && (
                 <div className="session-info-popover" style={{
                   background: "var(--bg-panel)",
-                  borderBottom: "1px solid var(--border)",
+                  borderBottom: "var(--bw) solid var(--border)",
                   boxShadow: "var(--shadow-pop)",
                   padding: "14px 16px",
                   minWidth: isMobile ? undefined : 500,
@@ -1955,7 +1966,7 @@ export function AppShell() {
                               padding: "10px 12px",
                               borderRadius: "var(--radius-card)",
                               background: "var(--bg-subtle)",
-                              border: "1px solid var(--border)",
+                              border: "var(--bw) solid var(--border)",
                               display: "flex",
                               flexDirection: "column",
                               gap: 8,
@@ -1969,7 +1980,7 @@ export function AppShell() {
                                   fontSize: 11,
                                   color: "var(--text)",
                                   background: "var(--bg-panel)",
-                                  border: "1px solid var(--border)",
+                                  border: "var(--bw) solid var(--border)",
                                   padding: "2px 6px",
                                   borderRadius: 4,
                                 }}>
@@ -1979,7 +1990,7 @@ export function AppShell() {
                                   {account}
                                 </span>
                                 {report.tier && (
-                                  <span style={{ fontSize: 10, color: "var(--text-dim)", background: "var(--bg-panel)", border: "1px solid var(--border)", padding: "1px 5px", borderRadius: 3 }}>
+                                  <span style={{ fontSize: 10, color: "var(--text-dim)", background: "var(--bg-panel)", border: "var(--bw) solid var(--border)", padding: "1px 5px", borderRadius: 3 }}>
                                     {report.tier}
                                   </span>
                                 )}
@@ -2003,7 +2014,7 @@ export function AppShell() {
                                   const reset = report.fiveHour.resetMinutes !== undefined ? formatUsageReset(report.fiveHour.resetMinutes, "minutes") : null;
                                   const tone = usageTone(pct);
                                   return (
-                                    <div style={{ background: "var(--bg-panel)", padding: "6px 8px", borderRadius: 6, border: "1px solid var(--border)" }}>
+                                    <div style={{ background: "var(--bg-panel)", padding: "6px 8px", borderRadius: "var(--radius-control)", border: "var(--bw) solid var(--border)" }}>
                                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4, fontSize: 10 }}>
                                         <span style={{ color: "var(--text-dim)", fontWeight: 600 }}>5h Window</span>
                                         <span style={{ color: tone, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{pct}%</span>
@@ -2021,7 +2032,7 @@ export function AppShell() {
                                   const reset = report.sevenDay.resetHours !== undefined ? formatUsageReset(report.sevenDay.resetHours, "hours") : null;
                                   const tone = usageTone(pct);
                                   return (
-                                    <div style={{ background: "var(--bg-panel)", padding: "6px 8px", borderRadius: 6, border: "1px solid var(--border)" }}>
+                                    <div style={{ background: "var(--bg-panel)", padding: "6px 8px", borderRadius: "var(--radius-control)", border: "var(--bw) solid var(--border)" }}>
                                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4, fontSize: 10 }}>
                                         <span style={{ color: "var(--text-dim)", fontWeight: 600 }}>7d Window</span>
                                         <span style={{ color: tone, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{pct}%</span>
@@ -2039,7 +2050,7 @@ export function AppShell() {
                                   const reset = report.monthly.resetHours !== undefined ? formatUsageReset(report.monthly.resetHours, "hours") : null;
                                   const tone = usageTone(pct);
                                   return (
-                                    <div style={{ background: "var(--bg-panel)", padding: "6px 8px", borderRadius: 6, border: "1px solid var(--border)" }}>
+                                    <div style={{ background: "var(--bg-panel)", padding: "6px 8px", borderRadius: "var(--radius-control)", border: "var(--bw) solid var(--border)" }}>
                                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4, fontSize: 10 }}>
                                         <span style={{ color: "var(--text-dim)", fontWeight: 600 }}>Monthly</span>
                                         <span style={{ color: tone, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{pct}%</span>
@@ -2071,7 +2082,7 @@ export function AppShell() {
               {activeTopPanel === "system" && (
                 <div className="session-info-popover" style={{
                   background: "var(--bg-panel)",
-                  borderBottom: "1px solid var(--border)",
+                  borderBottom: "var(--bw) solid var(--border)",
                   boxShadow: "var(--shadow-pop)",
                   minWidth: isMobile ? undefined : 420,
                 }}>
@@ -2302,12 +2313,12 @@ export function AppShell() {
         style={{
           display: "flex",
           flexDirection: "column",
-          borderLeft: "1px solid var(--border)",
+          borderLeft: "var(--bw) solid var(--border)",
           background: "var(--bg)",
         }}
       >
         {/* Right panel tab bar */}
-        <div style={{ display: "flex", alignItems: "center", flexShrink: 0, background: "var(--bg-panel)", borderBottom: "1px solid var(--border)", height: 36 }}>
+        <div style={{ display: "flex", alignItems: "center", flexShrink: 0, background: "var(--bg-panel)", borderBottom: "var(--bw) solid var(--border)", height: 36 }}>
           <div style={{ flex: 1, overflow: "hidden" }}>
             <TabBar
               tabs={fileTabs}
@@ -2353,7 +2364,7 @@ export function AppShell() {
         position: "fixed", top: 0, right: 0, zIndex: 300,
         display: "flex", alignItems: "center", justifyContent: "center",
         width: isMobile ? 44 : 36, height: isMobile ? 44 : 36, padding: 0,
-        background: "var(--bg-panel)", border: "none", borderLeft: "1px solid var(--border)", borderBottom: "1px solid var(--border)",
+        background: "var(--bg-panel)", border: "none", borderLeft: "var(--bw) solid var(--border)", borderBottom: "var(--bw) solid var(--border)",
         color: rightPanelOpen ? "var(--text)" : "var(--text-muted)",
         cursor: "pointer", transition: "color var(--dur-fast) var(--ease-out-warm)",
       }}

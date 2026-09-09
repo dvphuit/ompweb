@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ensureLanguageRegistered, isLanguageRegistered, SyntaxHighlighter, vs, vscDarkPlus } from "@/lib/syntax-highlight";
-import { useTheme } from "@/hooks/useTheme";
+import { ensureLanguageRegistered, isLanguageRegistered, SyntaxHighlighter, vscDarkPlus } from "@/lib/syntax-highlight";
 
 interface Props {
   code: string;
@@ -19,8 +18,8 @@ function PlainCode({ code }: { code: string }) {
         lineHeight: 1.62,
         whiteSpace: "pre-wrap",
         wordBreak: "break-word",
-        color: "var(--text)",
-        backgroundColor: "color-mix(in srgb, var(--bg) 88%, var(--bg-panel))",
+        color: "var(--code-text)",
+        backgroundColor: "transparent",
         fontFamily: "var(--font-mono)",
       }}
     >
@@ -30,7 +29,6 @@ function PlainCode({ code }: { code: string }) {
 }
 
 export function SyntaxHighlightedCode({ code, lang }: Props) {
-  const { isDark } = useTheme();
   const [ready, setReady] = useState(() => isLanguageRegistered(lang));
 
   useEffect(() => {
@@ -50,16 +48,18 @@ export function SyntaxHighlightedCode({ code, lang }: Props) {
   return (
     <SyntaxHighlighter
       language={lang || "text"}
-      style={isDark ? vscDarkPlus : vs}
+      // Code blocks always sit on the dark ink surface (--code-bg), in both
+      // light and dark themes, so the dark token palette is the right one.
+      style={vscDarkPlus}
       showLineNumbers
-      lineNumberStyle={{ color: "var(--text-dim)", fontStyle: "normal" }}
+      lineNumberStyle={{ color: "color-mix(in srgb, var(--code-text) 40%, transparent)", fontStyle: "normal" }}
       customStyle={{
         margin: 0,
         padding: "11px 13px",
         fontSize: "var(--chat-code-font-size)",
         lineHeight: 1.62,
         borderRadius: 0,
-        backgroundColor: "color-mix(in srgb, var(--bg) 88%, var(--bg-panel))",
+        backgroundColor: "transparent",
       }}
       codeTagProps={{ style: { fontFamily: "var(--font-mono)" } }}
     >

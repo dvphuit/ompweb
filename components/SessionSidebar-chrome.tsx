@@ -223,7 +223,7 @@ function SidebarPortalMenu({
         zIndex: 1000,
         minWidth,
         padding: 4,
-        border: "1px solid var(--border)",
+        border: "var(--bw) solid var(--border)",
         borderRadius: "var(--radius-control)",
         background: "var(--bg-panel)",
         boxShadow: "var(--shadow-pop)",
@@ -318,16 +318,17 @@ function OmpWebTitle() {
       onClick={handleClick}
       style={{
         background: "none", border: "none", padding: 0, cursor: "pointer",
-        fontWeight: 700, fontSize: 14, letterSpacing: "-0.01em",
-        fontFamily: "var(--font-mono)",
+        fontWeight: 700, fontSize: 16, letterSpacing: "-0.01em",
+        fontFamily: "var(--font-display)",
         minWidth: "6ch",
         lineHeight: 1,
+        display: "inline-flex", alignItems: "center", gap: 2,
       }}
       title={showVersion ? "Show ompweb name" : "Show ompweb version"}
     >
       {!scrambling && !showVersion ? (
         <>
-          <span style={{ color: "var(--accent)" }}>omp</span>
+          <span style={{ background: "var(--accent)", color: "var(--on-accent)", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", padding: "1px 4px", lineHeight: 1.1 }}>omp</span>
           <span style={{ color: "var(--text)" }}>web</span>
         </>
       ) : (

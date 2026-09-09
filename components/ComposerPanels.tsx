@@ -161,7 +161,8 @@ function SubagentsPanel({ subagents, onSelectSubagent, defaultExpanded = false }
   return (
     <section
       aria-label={t("chatWindow.subagentsPanel")}
-      className="overflow-hidden border border-border bg-bg-subtle"
+      className="composer-panel overflow-hidden border border-border bg-bg-panel"
+      data-collapsed={collapsed ? "true" : "false"}
       style={{ borderRadius: "var(--radius-card)" }}
     >
       <button
@@ -173,8 +174,11 @@ function SubagentsPanel({ subagents, onSelectSubagent, defaultExpanded = false }
       >
         <Network size={14} strokeWidth={1.8} aria-hidden />
         <strong className="font-medium text-text">{t("chatWindow.subagentsPanel")}</strong>
+        <span className="composer-chip-progress ml-auto" aria-hidden>
+          <span className="composer-chip-progress-fill" style={{ width: `${Math.round((runningCount / subagents.length) * 100)}%`, background: "var(--accent-3)" }} />
+        </span>
         <span
-          className="ml-auto inline-flex items-center gap-1.5"
+          className="inline-flex items-center gap-1.5"
           aria-label={t("chatWindow.subagentSummary", { running: runningCount, total: subagents.length })}
           title={t("chatWindow.subagentSummary", { running: runningCount, total: subagents.length })}
         >
@@ -211,7 +215,7 @@ function SubagentsPanel({ subagents, onSelectSubagent, defaultExpanded = false }
                 style={{
                   display: "inline-flex", flexDirection: "column", alignItems: "flex-start", gap: 1,
                   maxWidth: 320, padding: "5px 9px",
-                  border: "1px solid color-mix(in srgb, var(--border) 86%, transparent)",
+                  border: "var(--bw) solid var(--border)",
                   borderRadius: "var(--radius-control)",
                   background: "var(--bg)",
                   fontSize: 11.5,
@@ -222,11 +226,9 @@ function SubagentsPanel({ subagents, onSelectSubagent, defaultExpanded = false }
                   transition: "border-color var(--dur-fast) var(--ease-out-warm), background var(--dur-fast) var(--ease-out-warm), opacity var(--dur-fast) var(--ease-out-warm)",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = "color-mix(in srgb, var(--accent) 40%, var(--border))";
                   e.currentTarget.style.background = "var(--bg-hover)";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = "color-mix(in srgb, var(--border) 86%, transparent)";
                   e.currentTarget.style.background = "var(--bg)";
                 }}
               >
@@ -271,7 +273,7 @@ export function ComposerPanels({ todoPhases, subagents, onSelectSubagent, defaul
   const [todoCollapsed, setTodoCollapsed] = useState(() => loadCollapsed(TODO_COLLAPSED_STORAGE_KEY, defaultExpanded));
   if (todoPhases.length === 0 && subagents.length === 0) return null;
   return (
-    <div style={{ display: "grid", gap: 6, marginBottom: 8 }}>
+    <div className="composer-panels" style={{ marginBottom: 8 }}>
       <TodoList
         phases={todoPhases}
         collapsible

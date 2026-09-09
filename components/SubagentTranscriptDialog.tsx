@@ -123,7 +123,7 @@ export function TaskBlock({ task }: { task: string }) {
   const { t } = useI18n();
   if (!task) return null;
   return (
-    <section style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-subtle)", padding: "10px 12px" }}>
+    <section style={{ border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-subtle)", padding: "10px 12px" }}>
       <span style={BLOCK_LABEL_STYLE}>{t("subagentTranscript.taskLabel")}</span>
       <div style={{ marginTop: 6 }}>
         <MarkdownBody className="markdown-subagent-text">{task}</MarkdownBody>
@@ -149,7 +149,7 @@ export function CompletionBlock({ completion, truncated }: { completion: string 
   const keys = parsed ? Object.keys(parsed) : [];
   const singleText = parsed && keys.length === 1 && typeof parsed[keys[0]] === "string" ? parsed[keys[0]] as string : null;
   return (
-    <section style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-panel)", padding: "10px 12px" }}>
+    <section style={{ border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-panel)", padding: "10px 12px" }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
         <span style={BLOCK_LABEL_STYLE}>{t("subagentTranscript.resultLabel")}</span>
         {truncated && <span style={{ fontSize: 10.5, color: "var(--text-dim)" }}>{t("subagentTranscript.completionTruncated")}</span>}
@@ -420,7 +420,7 @@ export function SubagentTranscriptDialog({ subagent, sessionId, transcriptVersio
                   gap: 2,
                   marginBottom: 8,
                   padding: "6px 10px",
-                  border: "1px solid var(--border)",
+                  border: "var(--bw) solid var(--border)",
                   borderRadius: "var(--radius-control)",
                   background: "var(--bg-panel)",
                 }}
@@ -484,7 +484,7 @@ export function SubagentTranscriptDialog({ subagent, sessionId, transcriptVersio
                       display: "grid",
                       gap: 8,
                       padding: "10px 12px",
-                      border: "1px solid var(--border)",
+                      border: "var(--bw) solid var(--border)",
                       borderRadius: "var(--radius-card)",
                       background: "var(--bg-panel)",
                       maxHeight: "50dvh",
@@ -492,7 +492,7 @@ export function SubagentTranscriptDialog({ subagent, sessionId, transcriptVersio
                     }}
                   >
                     {transcriptError && transcriptMessages.length > 0 && (
-                      <div style={{ padding: "6px 8px", border: "1px solid color-mix(in srgb, var(--status-error) 40%, var(--border))", borderRadius: "var(--radius-control)", fontSize: 12, color: "var(--status-error)" }}>{transcriptError}</div>
+                      <div style={{ padding: "6px 8px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", fontSize: 12, color: "var(--status-error)" }}>{transcriptError}</div>
                     )}
                     {transcriptMessages.length === 0 && !transcriptLoading ? (
                       <div style={{ fontSize: 12, color: transcriptError ? "var(--status-error)" : "var(--text-dim)", fontStyle: transcriptError ? "normal" : "italic" }}>{transcriptError ?? t("subagentTranscript.noMessages")}</div>

@@ -45,7 +45,7 @@ export default function ErrorBoundary({
             fontSize: "0.75rem",
             color: "var(--text-dim)",
             background: "var(--bg-panel)",
-            border: "1px solid var(--border)",
+            border: "var(--bw) solid var(--border)",
             padding: "0.25rem 0.5rem",
             borderRadius: "var(--radius-control)",
           }}

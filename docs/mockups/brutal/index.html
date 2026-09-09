@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-preset="signal">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ompweb — Neo-Brutalist mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   TOKENS — sẽ chuyển sang app/globals.css khi được duyệt
+   ============================================================ */
+:root{
+  --font-display:"Space Grotesk",Inter,system-ui,sans-serif;
+  --font-sans:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --r-sm:4px;--r-md:6px;--r-lg:8px;   /* brutal: góc gần vuông */
+  --bw:2px;                            /* border weight */
+  --shadow-1:3px 3px 0 var(--ink);
+  --shadow-2:5px 5px 0 var(--ink);
+  --shadow-3:8px 8px 0 var(--ink);
+  --dur:120ms;
+}
+/* ---- Preset: SIGNAL (vàng/đen — mặc định) ---- */
+[data-preset="signal"][data-theme="light"]{
+  --bg:#F5F2EA;--bg-panel:#FFFFFF;--bg-hover:#F0ECDF;--bg-selected:#FFE14D;
+  --ink:#111111;--border:#111111;--text:#111111;--text-muted:#4A4A4A;--text-dim:#7A7A7A;
+  --accent:#FFD400;--accent-ink:#111111;--accent-2:#FF5C00;--accent-3:#2F6BFF;--accent-4:#21C55D;
+  --user-bg:#FFF3B0;--tool-bg:#FFFFFF;--code-bg:#111111;--code-text:#F5F2EA;
+  --ok:#21C55D;--warn:#FF9F0A;--err:#FF3B30;
+}
+[data-preset="signal"][data-theme="dark"]{
+  --bg:#141414;--bg-panel:#1C1C1C;--bg-hover:#262626;--bg-selected:#FFD400;
+  --ink:#F5F2EA;--border:#F5F2EA;--text:#F5F2EA;--text-muted:#BDBDBD;--text-dim:#8A8A8A;
+  --accent:#FFD400;--accent-ink:#111111;--accent-2:#FF6A1A;--accent-3:#5B8CFF;--accent-4:#3DDC84;
+  --user-bg:#2A2611;--tool-bg:#1C1C1C;--code-bg:#0A0A0A;--code-text:#F5F2EA;
+  --ok:#3DDC84;--warn:#FFB020;--err:#FF5C57;
+}
+/* ---- Preset: CORAL ---- */
+[data-preset="coral"][data-theme="light"]{
+  --bg:#FBF3EE;--bg-panel:#FFFFFF;--bg-hover:#F6E7DF;--bg-selected:#FF7A59;
+  --ink:#1A1A1A;--border:#1A1A1A;--text:#1A1A1A;--text-muted:#4E4A48;--text-dim:#837C79;
+  --accent:#FF7A59;--accent-ink:#1A1A1A;--accent-2:#FFD400;--accent-3:#3A86FF;--accent-4:#06D6A0;
+  --user-bg:#FFE3D8;--tool-bg:#FFFFFF;--code-bg:#1A1A1A;--code-text:#FBF3EE;
+  --ok:#06D6A0;--warn:#FFB020;--err:#EF233C;
+}
+[data-preset="coral"][data-theme="dark"]{
+  --bg:#161314;--bg-panel:#1F1A1B;--bg-hover:#2A2324;--bg-selected:#FF7A59;
+  --ink:#FBF3EE;--border:#FBF3EE;--text:#FBF3EE;--text-muted:#C9BDB8;--text-dim:#8E837F;
+  --accent:#FF7A59;--accent-ink:#1A1A1A;--accent-2:#FFD400;--accent-3:#6FA3FF;--accent-4:#2EE6B0;
+  --user-bg:#33221D;--tool-bg:#1F1A1B;--code-bg:#0B0909;--code-text:#FBF3EE;
+  --ok:#2EE6B0;--warn:#FFB020;--err:#FF5C57;
+}
+/* ---- Preset: MINT ---- */
+[data-preset="mint"][data-theme="light"]{
+  --bg:#EEF6F1;--bg-panel:#FFFFFF;--bg-hover:#DFEEE5;--bg-selected:#5CE0A8;
+  --ink:#0F1A14;--border:#0F1A14;--text:#0F1A14;--text-muted:#3F4F46;--text-dim:#6F7F76;
+  --accent:#5CE0A8;--accent-ink:#0F1A14;--accent-2:#FF5C8A;--accent-3:#3A86FF;--accent-4:#FFD400;
+  --user-bg:#D3F5E4;--tool-bg:#FFFFFF;--code-bg:#0F1A14;--code-text:#EEF6F1;
+  --ok:#21C55D;--warn:#FF9F0A;--err:#FF3B30;
+}
+[data-preset="mint"][data-theme="dark"]{
+  --bg:#0F1512;--bg-panel:#161E1A;--bg-hover:#1F2A24;--bg-selected:#5CE0A8;
+  --ink:#EEF6F1;--border:#EEF6F1;--text:#EEF6F1;--text-muted:#B6C6BD;--text-dim:#7F8F86;
+  --accent:#5CE0A8;--accent-ink:#0F1A14;--accent-2:#FF7AA2;--accent-3:#6FA3FF;--accent-4:#FFD400;
+  --user-bg:#173226;--tool-bg:#161E1A;--code-bg:#080B09;--code-text:#EEF6F1;
+  --ok:#3DDC84;--warn:#FFB020;--err:#FF5C57;
+}
+/* ---- Preset: ELECTRIC ---- */
+[data-preset="electric"][data-theme="light"]{
+  --bg:#EEF1FB;--bg-panel:#FFFFFF;--bg-hover:#E0E6F8;--bg-selected:#4F7CFF;
+  --ink:#0B0F1F;--border:#0B0F1F;--text:#0B0F1F;--text-muted:#3F475F;--text-dim:#727A92;
+  --accent:#4F7CFF;--accent-ink:#FFFFFF;--accent-2:#FFD400;--accent-3:#FF5C00;--accent-4:#21C55D;
+  --user-bg:#DCE5FF;--tool-bg:#FFFFFF;--code-bg:#0B0F1F;--code-text:#EEF1FB;
+  --ok:#21C55D;--warn:#FF9F0A;--err:#FF3B30;
+}
+[data-preset="electric"][data-theme="dark"]{
+  --bg:#0E1120;--bg-panel:#151A2E;--bg-hover:#1E2440;--bg-selected:#4F7CFF;
+  --ink:#EEF1FB;--border:#EEF1FB;--text:#EEF1FB;--text-muted:#B7BFDA;--text-dim:#7C86A8;
+  --accent:#6B90FF;--accent-ink:#0B0F1F;--accent-2:#FFD400;--accent-3:#FF7A3D;--accent-4:#3DDC84;
+  --user-bg:#1B2650;--tool-bg:#151A2E;--code-bg:#070912;--code-text:#EEF1FB;
+  --ok:#3DDC84;--warn:#FFB020;--err:#FF5C57;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font:14px/1.55 var(--font-sans);color:var(--text);background:var(--bg);
+  background-image:radial-gradient(color-mix(in srgb,var(--ink) 12%,transparent) 1px,transparent 1px);
+  background-size:18px 18px;}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
+kbd{font:600 11px var(--font-mono);border:var(--bw) solid var(--ink);padding:0 5px;border-radius:var(--r-sm);box-shadow:2px 2px 0 var(--ink);background:var(--bg-panel)}
+code{font:12.5px var(--font-mono);background:color-mix(in srgb,var(--ink) 10%,transparent);padding:1px 5px;border-radius:var(--r-sm)}
+
+/* ============ Shell ============ */
+.app{display:grid;grid-template-columns:280px 1fr auto;height:100vh;gap:0}
+.brut{border:var(--bw) solid var(--ink);background:var(--bg-panel)}
+.card{border:var(--bw) solid var(--ink);background:var(--bg-panel);border-radius:var(--r-md);box-shadow:var(--shadow-1)}
+.btn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border:var(--bw) solid var(--ink);border-radius:var(--r-md);background:var(--bg-panel);box-shadow:var(--shadow-1);font-weight:600;font-size:13px;transition:transform var(--dur),box-shadow var(--dur)}
+.btn:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+.btn:active{transform:translate(2px,2px);box-shadow:0 0 0 var(--ink)}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.icon{width:32px;padding:0;justify-content:center}
+.btn.ghost{border-color:transparent;box-shadow:none;background:transparent}
+.btn.ghost:hover{background:var(--bg-hover);transform:none}
+.tag{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border:var(--bw) solid var(--ink);border-radius:var(--r-sm);font:600 11px var(--font-mono);letter-spacing:.02em;background:var(--bg-panel)}
+.tag.fill{background:var(--accent);color:var(--accent-ink)}
+.tag.dot::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ok);border:1.5px solid var(--ink)}
+.h{font-family:var(--font-display);font-weight:700;letter-spacing:-.01em}
+
+/* ============ Sidebar ============ */
+.sidebar{display:flex;flex-direction:column;border-right:var(--bw) solid var(--ink);background:var(--bg-panel);min-height:0}
+.logo{display:flex;align-items:center;justify-content:space-between;height:52px;padding:0 14px;border-bottom:var(--bw) solid var(--ink)}
+.logo .h{font-size:18px}
+.logo .h b{background:var(--accent);color:var(--accent-ink);padding:0 4px;border:var(--bw) solid var(--ink);border-radius:var(--r-sm);margin-right:2px}
+.side-actions{display:flex;gap:6px}
+.new-session{margin:12px 14px}
+.new-session .btn{width:100%;height:38px;justify-content:center;font-size:14px}
+.sec{display:flex;align-items:center;justify-content:space-between;padding:10px 14px 6px;font:700 11px var(--font-display);letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted)}
+.sec .side-actions .btn{height:24px;width:24px}
+.search{margin:0 14px 8px;display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;border:var(--bw) solid var(--ink);border-radius:var(--r-md);background:var(--bg)}
+.search input{border:0;background:transparent;outline:0;flex:1;font:inherit;color:inherit}
+.search kbd{box-shadow:none;border-width:1.5px}
+.tree{overflow:auto;flex:1;padding:0 8px 8px}
+.ws{margin:6px 6px 8px}
+.ws-head{display:flex;align-items:center;gap:8px;height:34px;padding:0 8px;border:var(--bw) solid var(--ink);border-radius:var(--r-md);background:var(--bg-panel);box-shadow:var(--shadow-1);font-weight:700;font-family:var(--font-display)}
+.ws-head.active{background:var(--accent);color:var(--accent-ink)}
+.ws-head .av{width:20px;height:20px;border:var(--bw) solid var(--ink);border-radius:var(--r-sm);display:grid;place-items:center;font:700 11px var(--font-mono);background:var(--bg-panel);color:var(--text)}
+.ws-head .branch{font:500 11px var(--font-mono);opacity:.8;margin-left:auto}
+.ws-head .chev{margin-left:4px;opacity:.6}
+.sess{list-style:none;margin:8px 0 0 10px;padding:0 0 0 10px;border-left:var(--bw) dashed color-mix(in srgb,var(--ink) 40%,transparent)}
+.sess li{display:flex;align-items:center;gap:8px;height:30px;padding:0 8px;border-radius:var(--r-sm);font-size:13px;cursor:pointer;border:var(--bw) solid transparent}
+.sess li:hover{background:var(--bg-hover)}
+.sess li.active{background:var(--bg-selected);border-color:var(--ink);color:var(--accent-ink);font-weight:600}
+.sess .t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sess .when{font:500 11px var(--font-mono);color:var(--text-dim)}
+.sess li.active .when{color:inherit;opacity:.7}
+.sess .live{width:8px;height:8px;border-radius:50%;background:var(--ok);border:1.5px solid var(--ink);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 30%,transparent);animation:pulse 1.4s infinite}
+.sess .unread{width:8px;height:8px;border-radius:50%;background:var(--accent-2);border:1.5px solid var(--ink)}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 2px color-mix(in srgb,var(--ok) 40%,transparent)}50%{box-shadow:0 0 0 5px transparent}}
+.explorer{border-top:var(--bw) solid var(--ink);display:flex;flex-direction:column;min-height:220px;max-height:38%}
+.files{overflow:auto;padding:0 14px 8px;font-size:13px}
+.files div{display:flex;align-items:center;gap:8px;height:26px;color:var(--text)}
+.files .d::before{content:"▸";width:12px;color:var(--text-dim)}
+.files .f::before{content:"";width:12px}
+.files .mod{margin-left:auto;width:7px;height:7px;background:var(--warn);border:1.5px solid var(--ink);border-radius:2px}
+.footer{border-top:var(--bw) solid var(--ink);display:flex;align-items:center;gap:10px;padding:10px 14px;font-weight:600}
+.footer .avatar{width:28px;height:28px;border:var(--bw) solid var(--ink);border-radius:var(--r-sm);background:var(--accent-3);color:#fff;display:grid;place-items:center;font:700 12px var(--font-display);box-shadow:2px 2px 0 var(--ink)}
+.footer .spacer{flex:1}
+.footer .upd{width:8px;height:8px;border-radius:50%;background:var(--accent-2);border:1.5px solid var(--ink)}
+
+/* ============ Main ============ */
+.main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.topbar{height:52px;display:flex;align-items:center;gap:8px;padding:0 14px;border-bottom:var(--bw) solid var(--ink);background:var(--bg-panel)}
+.crumb{display:flex;align-items:center;gap:8px;font-family:var(--font-display);font-weight:700;font-size:14px;margin-left:6px}
+.crumb .sep{color:var(--text-dim);font-weight:400}
+.crumb .name{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.topbar .grow{flex:1}
+.usage{display:inline-flex;align-items:center;gap:8px;height:28px;padding:0 10px;border:var(--bw) solid var(--ink);border-radius:var(--r-md);font:600 11.5px var(--font-mono);background:var(--bg);position:relative;cursor:default;box-shadow:var(--shadow-1)}
+.usage .bar{width:64px;height:8px;border:1.5px solid var(--ink);border-radius:2px;overflow:hidden;background:var(--bg-panel)}
+.usage .bar i{display:block;height:100%;width:38%;background:var(--accent)}
+.usage .tip{display:none;position:absolute;top:36px;right:0;z-index:5;padding:10px 12px;font:500 12px var(--font-mono);white-space:nowrap;line-height:1.7}
+.usage:hover .tip{display:block}
+.chat{flex:1;overflow:auto;padding:24px 0 12px;scroll-behavior:smooth}
+.chat-inner{max-width:860px;margin:0 auto;padding:0 24px}
+.msg{margin:0 0 22px;position:relative}
+.stamp{font:500 11px var(--font-mono);color:var(--text-dim);margin-bottom:6px;display:flex;gap:8px;align-items:center}
+.stamp .who{font:700 11px var(--font-display);letter-spacing:.08em;text-transform:uppercase;color:var(--text)}
+.user{display:flex;justify-content:flex-end}
+.user .stamp{justify-content:flex-end}
+.user .bubble{max-width:78%;background:var(--user-bg);border:var(--bw) solid var(--ink);border-radius:var(--r-lg);padding:12px 16px;box-shadow:var(--shadow-2);white-space:pre-wrap}
+.assist .body{font-size:14.5px;line-height:1.65}
+.assist .body p{margin:0 0 12px}
+.assist .body h3{font-family:var(--font-display);font-size:16px;margin:16px 0 8px;display:flex;align-items:center;gap:8px}
+.assist .body h3::before{content:"";width:12px;height:12px;background:var(--accent);border:var(--bw) solid var(--ink)}
+.assist .body ul{margin:0 0 12px;padding-left:18px}
+.assist .body li{margin:3px 0}
+.assist .body li::marker{color:var(--accent-2);font-weight:700}
+.mark{background:var(--accent);color:var(--accent-ink);padding:0 4px;border-radius:2px;font-weight:600}
+pre.code{margin:10px 0 14px;background:var(--code-bg);color:var(--code-text);border:var(--bw) solid var(--ink);border-radius:var(--r-md);box-shadow:var(--shadow-1);overflow:hidden}
+pre.code .bar{display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1.5px solid color-mix(in srgb,var(--code-text) 20%,transparent);font:600 11px var(--font-mono);color:color-mix(in srgb,var(--code-text) 70%,transparent)}
+pre.code .bar .lang{background:var(--accent);color:var(--accent-ink);padding:0 6px;border-radius:2px}
+pre.code .bar .cp{margin-left:auto;cursor:pointer}
+pre.code .src{margin:0;padding:12px 14px;font:12.5px/1.6 var(--font-mono);white-space:pre;overflow:auto}
+.k{color:var(--accent-2)}.s{color:var(--accent)}.c{opacity:.55}
+
+/* ---- Tool calls ---- */
+.tools{margin:6px 0 18px;border:var(--bw) solid var(--ink);border-radius:var(--r-md);background:var(--tool-bg);box-shadow:var(--shadow-1);overflow:hidden}
+.tools .grp{display:flex;align-items:center;gap:10px;height:34px;padding:0 12px;border-bottom:var(--bw) solid var(--ink);background:var(--bg);font:600 12px var(--font-mono);cursor:pointer}
+.tools .grp .n{background:var(--ink);color:var(--bg-panel);padding:0 6px;border-radius:2px;font-size:11px}
+.tools .grp .sum{color:var(--text-muted);font-weight:500}
+.tools .grp .tgl{margin-left:auto;color:var(--text-dim)}
+.tc{display:flex;align-items:center;gap:10px;height:32px;padding:0 12px;border-bottom:1.5px dashed color-mix(in srgb,var(--ink) 30%,transparent);font:12.5px var(--font-mono);cursor:pointer}
+.tc:last-child{border-bottom:0}
+.tc:hover{background:var(--bg-hover)}
+.tc .ic{width:18px;height:18px;border:var(--bw) solid var(--ink);border-radius:var(--r-sm);display:grid;place-items:center;font:700 10px var(--font-display);flex-shrink:0}
+.tc .ic.read{background:var(--accent-3);color:#fff}.tc .ic.edit{background:var(--warn);color:#111}.tc .ic.bash{background:var(--ink);color:var(--bg-panel)}.tc .ic.grep{background:var(--accent-4);color:#111}.tc .ic.task{background:var(--accent-2);color:#fff}
+.tc .nm{font-weight:600;min-width:44px}
+.tc .arg{color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.tc .st{font-size:11px;font-weight:600}
+.tc .st.ok{color:var(--ok)}.tc .st.run{color:var(--warn)}
+.tc .ms{font-size:11px;color:var(--text-dim);min-width:40px;text-align:right}
+.tc.open{background:var(--bg-hover)}
+.tc-body{padding:10px 12px 12px 40px;border-bottom:1.5px dashed color-mix(in srgb,var(--ink) 30%,transparent);font:12px/1.6 var(--font-mono);background:var(--bg-hover)}
+.diff{border:1.5px solid var(--ink);border-radius:var(--r-sm);overflow:hidden;background:var(--bg-panel)}
+.diff div{padding:0 10px;white-space:pre}
+.diff .a{background:color-mix(in srgb,var(--ok) 25%,transparent)}
+.diff .r{background:color-mix(in srgb,var(--err) 22%,transparent)}
+.diff .h{font-family:var(--font-mono);font-weight:400;opacity:.6}
+
+/* ---- Composer ---- */
+.composer{padding:8px 24px 18px;background:linear-gradient(to top,var(--bg) 60%,transparent)}
+.composer-inner{max-width:860px;margin:0 auto}
+.chips{display:flex;gap:8px;margin-bottom:10px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:8px;height:28px;padding:0 10px;border:var(--bw) solid var(--ink);border-radius:var(--r-md);background:var(--bg-panel);font:600 12px var(--font-mono);box-shadow:2px 2px 0 var(--ink);cursor:pointer;position:relative}
+.chip:hover{transform:translate(-1px,-1px);box-shadow:3px 3px 0 var(--ink)}
+.chip .prog{width:46px;height:7px;border:1.5px solid var(--ink);border-radius:2px;overflow:hidden;background:var(--bg)}
+.chip .prog i{display:block;height:100%;background:var(--accent-4)}
+.chip .pop{display:none;position:absolute;bottom:36px;left:0;z-index:6;min-width:300px;padding:10px 12px;font:500 12.5px var(--font-sans);text-align:left}
+.chip:hover .pop{display:block}
+.pop .row{display:flex;gap:8px;align-items:center;height:26px}
+.pop .row .box{width:14px;height:14px;border:var(--bw) solid var(--ink);border-radius:2px;background:var(--bg-panel)}
+.pop .row .box.done{background:var(--accent-4)}
+.pop .row .box.cur{background:var(--accent)}
+.chips .grow{flex:1}
+.chips .hint{font:500 11px var(--font-mono);color:var(--text-dim)}
+.box-input{border:var(--bw) solid var(--ink);border-radius:var(--r-lg);background:var(--bg-panel);box-shadow:var(--shadow-3);transition:box-shadow var(--dur),transform var(--dur)}
+.box-input:focus-within{box-shadow:var(--shadow-3),0 0 0 3px color-mix(in srgb,var(--accent) 60%,transparent)}
+.box-input textarea{width:100%;border:0;outline:0;resize:none;background:transparent;font:15px/1.5 var(--font-sans);color:var(--text);padding:14px 16px 6px;min-height:58px}
+.box-input textarea::placeholder{color:var(--text-dim)}
+.box-actions{display:flex;align-items:center;gap:6px;padding:6px 8px 8px;border-top:1.5px dashed color-mix(in srgb,var(--ink) 30%,transparent)}
+.pill{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:var(--bw) solid var(--ink);border-radius:var(--r-md);font:600 12px var(--font-mono);background:var(--bg)}
+.pill .sw{width:8px;height:8px;border-radius:50%;background:var(--accent-4);border:1.5px solid var(--ink)}
+.box-actions .grow{flex:1}
+.send{height:32px;padding:0 14px;background:var(--accent);color:var(--accent-ink)}
+
+/* ---- Minimap rail (ẩn mặc định, hover mép phải) ---- */
+.rail{width:0;position:relative;border-left:var(--bw) solid var(--ink);background:var(--bg-panel);transition:width 160ms}
+.rail:hover,.rail.pin{width:48px}
+.rail .hot{position:absolute;left:-10px;top:0;bottom:0;width:14px}
+.rail .marks{position:absolute;inset:60px 0 20px;opacity:0;transition:opacity 120ms}
+.rail:hover .marks,.rail.pin .marks{opacity:1}
+.rail .m{position:absolute;left:50%;transform:translateX(-50%);width:16px;height:5px;border:1.5px solid var(--ink);border-radius:1px;background:var(--bg)}
+.rail .m.u{background:var(--accent);width:22px}
+.rail .m.t{background:var(--text-dim);width:10px}
+.rail .m.cur{outline:2px solid var(--accent-2);outline-offset:1px}
+
+/* ---- Toast / status ---- */
+.toast{position:fixed;right:20px;bottom:110px;z-index:20;display:flex;gap:10px;align-items:center;padding:10px 12px;max-width:340px;font-weight:500}
+.toast .ic{width:24px;height:24px;border:var(--bw) solid var(--ink);border-radius:var(--r-sm);background:var(--accent-4);display:grid;place-items:center;font-weight:800;font-size:13px;color:#111}
+.toast .x{margin-left:auto;font-weight:700;opacity:.6}
+
+/* ---- Demo control bar (chỉ cho mockup) ---- */
+.demo{position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:50;display:flex;gap:8px;align-items:center;padding:6px 8px;font:600 12px var(--font-mono)}
+.demo .sw{width:20px;height:20px;border:var(--bw) solid var(--ink);border-radius:var(--r-sm);cursor:pointer;box-shadow:2px 2px 0 var(--ink)}
+.demo .sw.on{outline:2px solid var(--accent-2);outline-offset:1px}
+.demo .sep{width:var(--bw);height:18px;background:var(--ink);margin:0 4px}
+
+/* ---- Dialog preview ---- */
+.dlg-back{position:fixed;inset:0;background:color-mix(in srgb,var(--ink) 45%,transparent);display:none;place-items:center;z-index:40}
+.dlg-back.show{display:grid}
+.dlg{width:720px;max-width:92vw;border:var(--bw) solid var(--ink);border-radius:var(--r-lg);background:var(--bg-panel);box-shadow:var(--shadow-3);overflow:hidden}
+.dlg-h{display:flex;align-items:center;gap:10px;height:52px;padding:0 16px;border-bottom:var(--bw) solid var(--ink);background:var(--accent);color:var(--accent-ink)}
+.dlg-h .h{font-size:16px}
+.dlg-h .x{margin-left:auto;width:28px;height:28px;border:var(--bw) solid var(--ink);border-radius:var(--r-sm);background:var(--bg-panel);color:var(--text);display:grid;place-items:center;font-weight:800;box-shadow:2px 2px 0 var(--ink)}
+.dlg-body{display:grid;grid-template-columns:180px 1fr;min-height:380px}
+.dlg-nav{border-right:var(--bw) solid var(--ink);padding:10px;display:flex;flex-direction:column;gap:4px;background:var(--bg)}
+.dlg-nav button{text-align:left;height:32px;padding:0 10px;border-radius:var(--r-sm);font-weight:600;border:var(--bw) solid transparent}
+.dlg-nav button.on{background:var(--bg-panel);border-color:var(--ink);box-shadow:2px 2px 0 var(--ink)}
+.dlg-nav button:hover:not(.on){background:var(--bg-hover)}
+.dlg-pane{padding:18px 20px;display:flex;flex-direction:column;gap:16px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font:700 11px var(--font-display);letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted)}
+.field .in{height:34px;border:var(--bw) solid var(--ink);border-radius:var(--r-md);padding:0 10px;display:flex;align-items:center;background:var(--bg);font-family:var(--font-mono);font-size:13px}
+.field .help{font-size:12px;color:var(--text-dim)}
+.seg{display:inline-flex;border:var(--bw) solid var(--ink);border-radius:var(--r-md);overflow:hidden;box-shadow:2px 2px 0 var(--ink);width:max-content}
+.seg button{height:30px;padding:0 12px;font-weight:600;border-right:var(--bw) solid var(--ink)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--accent);color:var(--accent-ink)}
+.swatches{display:flex;gap:10px;flex-wrap:wrap}
+.swatch{width:96px;border:var(--bw) solid var(--ink);border-radius:var(--r-md);overflow:hidden;box-shadow:2px 2px 0 var(--ink);cursor:pointer}
+.swatch.on{outline:3px solid var(--accent-2);outline-offset:2px}
+.swatch .p{height:40px;display:grid;grid-template-columns:1fr 1fr}
+.swatch .n{font:600 11px var(--font-mono);padding:5px 8px;border-top:var(--bw) solid var(--ink)}
+.toggle{width:44px;height:24px;border:var(--bw) solid var(--ink);border-radius:var(--r-sm);background:var(--bg);position:relative;cursor:pointer}
+.toggle i{position:absolute;top:2px;left:2px;width:16px;height:16px;background:var(--ink);transition:left var(--dur)}
+.toggle.on{background:var(--accent-4)}.toggle.on i{left:22px}
+.row-set{display:flex;align-items:center;gap:12px}
+.row-set .grow{flex:1}
+.row-set .lbl{font-weight:600}
+.row-set .sub{font-size:12px;color:var(--text-dim)}
+</style>
+</head>
+<body>
+
+<!-- ===== demo control bar ===== -->
+<div class="demo card">
+  <span>MOCKUP</span><span class="sep"></span>
+  <button class="btn" style="height:26px;padding:0 8px" onclick="toggleTheme()">☾ / ☀</button>
+  <span class="sep"></span>
+  <span class="sw on" style="background:#FFD400" data-p="signal" title="Signal"></span>
+  <span class="sw" style="background:#FF7A59" data-p="coral" title="Coral"></span>
+  <span class="sw" style="background:#5CE0A8" data-p="mint" title="Mint"></span>
+  <span class="sw" style="background:#4F7CFF" data-p="electric" title="Electric"></span>
+  <span class="sep"></span>
+  <button class="btn" style="height:26px;padding:0 8px" onclick="document.getElementById('dlg').classList.add('show')">Settings dialog</button>
+  <button class="btn" style="height:26px;padding:0 8px" onclick="document.getElementById('rail').classList.toggle('pin')">Pin minimap</button>
+</div>
+
+<div class="app">
+  <!-- ================= SIDEBAR ================= -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="h"><b>omp</b>web</div>
+      <div class="side-actions">
+        <button class="btn icon ghost" title="Archive">▤</button>
+        <button class="btn icon ghost" title="Import">⤓</button>
+      </div>
+    </div>
+    <div class="new-session"><button class="btn primary">＋ New session <kbd style="margin-left:auto;border-width:1.5px;box-shadow:none">⌘N</kbd></button></div>
+
+    <div class="sec">Workspaces
+      <div class="side-actions"><button class="btn icon ghost" title="Filter">☰</button><button class="btn icon ghost" title="Add">＋</button></div>
+    </div>
+    <div class="search">🔍<input placeholder="Search sessions…"><kbd>/</kbd></div>
+
+    <div class="tree">
+      <div class="ws">
+        <div class="ws-head active"><span class="av">P</span>pi-gui<span class="branch">⎇ main</span><span class="chev">▾</span></div>
+        <ul class="sess">
+          <li class="active"><span class="live"></span><span class="t">Implement right sidebar rail</span><span class="when">1d</span></li>
+        </ul>
+      </div>
+      <div class="ws">
+        <div class="ws-head"><span class="av" style="background:var(--accent-2);color:#fff">O</span>omp-web<span class="branch">⎇ dev</span><span class="chev">▾</span></div>
+        <ul class="sess">
+          <li><span class="live"></span><span class="t">updating the omp window chrome</span><span class="when">now</span></li>
+          <li><span class="unread"></span><span class="t">analyze the app</span><span class="when">3m</span></li>
+          <li><span class="t">make it smaller</span><span class="when">1d</span></li>
+          <li><span class="t">Perform pre-release audit</span><span class="when">1d</span></li>
+        </ul>
+      </div>
+      <div class="ws">
+        <div class="ws-head"><span class="av" style="background:var(--accent-3);color:#fff">A</span>AegisCore<span class="chev" style="margin-left:auto">▸</span></div>
+      </div>
+    </div>
+
+    <div class="explorer">
+      <div class="sec">Explorer
+        <div class="side-actions"><button class="btn icon ghost">🔍</button><button class="btn icon ghost">⤒</button><button class="btn icon ghost">↻</button></div>
+      </div>
+      <div class="files">
+        <div class="d">.agents</div><div class="d">.github</div><div class="d">.pi<span class="mod"></span></div><div class="d">apps<span class="mod"></span></div>
+        <div class="d">docs</div><div class="d">packages<span class="mod"></span></div><div class="d">scripts</div><div class="d">tools</div>
+        <div class="f">.gitignore</div><div class="f">AGENTS.md</div><div class="f">CLAUDE.md</div><div class="f">package.json</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span class="avatar">N</span><span>Settings</span><span class="upd" title="Update available"></span><span class="spacer"></span><kbd>⌘,</kbd>
+    </div>
+  </aside>
+
+  <!-- ================= MAIN ================= -->
+  <section class="main">
+    <header class="topbar">
+      <button class="btn icon ghost" title="Toggle sidebar">◧</button>
+      <div class="crumb"><span>pi-gui</span><span class="sep">/</span><span class="name">Implement right sidebar rail</span><span class="tag dot" style="margin-left:6px">running</span></div>
+      <div class="grow"></div>
+      <div class="usage" title="Context">
+        <span>CTX</span><span class="bar"><i></i></span><span>38%</span><span style="color:var(--text-dim)">·</span><span>25.6 t/s</span>
+        <div class="tip card">↑ input&nbsp;&nbsp;&nbsp;35.5M<br>↓ output&nbsp;&nbsp;149k<br>⟳ cache&nbsp;&nbsp;&nbsp;108.1M<br>ctx&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;76k / 200k<br>cost&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$4.12</div>
+      </div>
+      <button class="btn icon" title="History">⟲</button>
+      <button class="btn icon" title="Branches">⑂</button>
+      <button class="btn icon" title="Terminal">▮</button>
+      <button class="btn icon" title="Command palette">⌘</button>
+    </header>
+
+    <div class="chat">
+      <div class="chat-inner">
+
+        <div class="msg user">
+          <div>
+            <div class="stamp"><span>Aug 21 · 09:34 PM</span><span class="who">You</span></div>
+            <div class="bubble">rework this area !
+the minimize, resize and exit are none functions
+some icon are misaligned
+some icon is over a text</div>
+          </div>
+        </div>
+
+        <div class="msg assist">
+          <div class="stamp"><span class="who">omp</span><span>opencode-go/ox-alpha-free</span><span>·</span><span>Aug 21 · 10:09 PM</span></div>
+
+          <div class="tools">
+            <div class="grp" onclick="this.parentElement.classList.toggle('collapsed')"><span class="n">22</span>tool calls<span class="sum">read 9 · grep 4 · edit 6 · bash 3 · 41s</span><span class="tgl">▾</span></div>
+            <div class="tc"><span class="ic read">R</span><span class="nm">read</span><span class="arg">apps/desktop/src/topbar/TopBar.tsx</span><span class="st ok">✓</span><span class="ms">12ms</span></div>
+            <div class="tc"><span class="ic grep">G</span><span class="nm">grep</span><span class="arg">-webkit-app-region  apps/desktop/src/**</span><span class="st ok">✓ 7 hits</span><span class="ms">80ms</span></div>
+            <div class="tc open" onclick="var b=this.nextElementSibling;b.style.display=b.style.display==='none'?'block':'none'"><span class="ic edit">E</span><span class="nm">edit</span><span class="arg">apps/desktop/src/topbar/topbar.css  +3 −1</span><span class="st ok">✓</span><span class="ms">4ms</span></div>
+            <div class="tc-body">
+              <div class="diff"><div class="h">@@ -41,6 +41,8 @@ .topbar {</div><div>  -webkit-app-region: drag;</div><div class="a">+ .topbar__window-controls,</div><div class="a">+ .topbar__window-controls * {</div><div class="a">+   -webkit-app-region: no-drag;</div><div class="r">- .topbar__toggle { -webkit-app-region: no-drag; }</div><div>  }</div></div>
+            </div>
+            <div class="tc"><span class="ic bash">$</span><span class="nm">bash</span><span class="arg">pnpm -F desktop build && pnpm -F desktop start</span><span class="st ok">✓ exit 0</span><span class="ms">18.2s</span></div>
+            <div class="tc"><span class="ic task">T</span><span class="nm">task</span><span class="arg">verify-window-controls — subagent (explorer)</span><span class="st run">● running</span><span class="ms">…</span></div>
+          </div>
+
+          <div class="body">
+            <p>All three issues fixed and verified on the live app:</p>
+            <h3>Minimize / Maximize / Close were dead buttons</h3>
+            <p>Root cause: the top bar is a window-drag region (<code>-webkit-app-region: drag</code>) and the min/max/close cluster sat outside the <code>no-drag</code> exemption — so every click was swallowed by window-dragging. Added <code>.topbar__window-controls</code> to the <code>no-drag</code> rule. Verified live: clicking <b>Minimize</b> → OS reports <code>iconic=True</code>.</p>
+            <pre class="code"><div class="bar"><span class="lang">css</span>topbar.css<span class="cp">copy</span></div><div class="src"><span class="k">.topbar__window-controls</span>,
+<span class="k">.topbar__window-controls</span> * {
+  <span class="s">-webkit-app-region</span>: no-drag; <span class="c">/* was swallowed by drag region */</span>
+}</div></pre>
+            <h3>Icon misalignment — fixed</h3>
+            <p>Measured geometry after rebuild: breadcrumb ends at x=848, sidebar toggle at x=1333, window controls at x=1375–1472 — <span class="mark">no overlaps</span>, both clusters vertically aligned (y=8, h=28).</p>
+            <h3>Right sidebar duplication</h3>
+            <ul>
+              <li>One toggle button instead of 4 scattered icons</li>
+              <li>Rail hosts Terminal / Changes / Files / Prompts as tabs; panels render <b>only inside it</b></li>
+              <li>Bottom status bar removed</li>
+            </ul>
+            <p>Typecheck + build green. The app is running with all fixes — try the buttons now.</p>
+          </div>
+        </div>
+
+        <div class="msg user">
+          <div>
+            <div class="stamp"><span>Aug 21 · 10:11 PM</span><span class="who">You</span></div>
+            <div class="bubble">relaunch</div>
+          </div>
+        </div>
+
+        <div class="msg assist">
+          <div class="stamp"><span class="who">omp</span><span>·</span><span class="tag" style="height:18px;font-size:10px;background:var(--warn);color:#111">thinking</span></div>
+          <div class="tools">
+            <div class="grp"><span class="n">2</span>tool calls<span class="sum">bash 2 · running</span><span class="tgl">▾</span></div>
+            <div class="tc"><span class="ic bash">$</span><span class="nm">bash</span><span class="arg">pkill -f desktop-app || true</span><span class="st ok">✓ exit 0</span><span class="ms">31ms</span></div>
+            <div class="tc"><span class="ic bash">$</span><span class="nm">bash</span><span class="arg">pnpm -F desktop start</span><span class="st run">● running</span><span class="ms">2.1s</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="composer">
+      <div class="composer-inner">
+        <div class="chips">
+          <div class="chip">☑ Tasks <span class="prog"><i style="width:33%"></i></span>1/3
+            <div class="pop card">
+              <div class="row"><span class="box done"></span>Fix window-control drag region</div>
+              <div class="row"><span class="box cur"></span>Relaunch and verify controls</div>
+              <div class="row"><span class="box"></span>Commit + write changelog entry</div>
+            </div>
+          </div>
+          <div class="chip">⚇ Subagents <span class="prog"><i style="width:57%;background:var(--accent-3)"></i></span>4/7
+            <div class="pop card">
+              <div class="row"><span class="tag dot" style="height:18px;font-size:10px">running</span>verify-window-controls</div>
+              <div class="row"><span class="tag" style="height:18px;font-size:10px;background:var(--accent-4)">done</span>audit-css-regions</div>
+              <div class="row"><span class="tag" style="height:18px;font-size:10px;background:var(--accent-4)">done</span>measure-geometry</div>
+              <div class="row"><span class="tag" style="height:18px;font-size:10px">queued</span>write-tests ×3</div>
+            </div>
+          </div>
+          <div class="chip" style="box-shadow:none;border-style:dashed;background:transparent">⎇ 3 files changed</div>
+          <div class="grow"></div>
+          <span class="hint">/ commands · @ files · ⇧⏎ newline</span>
+        </div>
+        <div class="box-input">
+          <textarea placeholder="Message omp…"></textarea>
+          <div class="box-actions">
+            <button class="btn icon ghost" title="Attach">📎</button>
+            <button class="btn icon ghost" title="Tools preset">⚙</button>
+            <span class="pill"><span class="sw"></span>Ox Alpha Free ▾</span>
+            <span class="pill">🧠 Auto ▾</span>
+            <div class="grow"></div>
+            <button class="btn icon ghost" title="Compact">⤢</button>
+            <button class="btn send">Send <span style="opacity:.7;font-family:var(--font-mono);font-size:11px">⏎</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= MINIMAP RAIL ================= -->
+  <aside class="rail" id="rail">
+    <div class="hot"></div>
+    <div class="marks">
+      <span class="m u" style="top:2%"></span><span class="m t" style="top:6%"></span><span class="m" style="top:9%"></span><span class="m" style="top:12%"></span><span class="m" style="top:15%"></span>
+      <span class="m u" style="top:24%"></span><span class="m t" style="top:28%"></span><span class="m" style="top:31%"></span>
+      <span class="m u" style="top:44%"></span><span class="m t" style="top:48%"></span><span class="m" style="top:51%"></span><span class="m" style="top:54%"></span><span class="m" style="top:57%"></span>
+      <span class="m u cur" style="top:70%"></span><span class="m t" style="top:74%"></span>
+    </div>
+  </aside>
+</div>
+
+<!-- toast -->
+<div class="toast card"><span class="ic">✓</span><span><b>Build green.</b> Typecheck, lint & 572 tests passed.</span><span class="x">✕</span></div>
+
+<!-- ================= SETTINGS DIALOG PREVIEW ================= -->
+<div class="dlg-back" id="dlg" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="dlg">
+    <div class="dlg-h"><span class="h">Settings</span><span class="tag" style="background:var(--bg-panel);color:var(--text)">v0.4.2</span><span class="x" onclick="document.getElementById('dlg').classList.remove('show')">✕</span></div>
+    <div class="dlg-body">
+      <nav class="dlg-nav">
+        <button class="on">Appearance</button><button>Models</button><button>Providers</button><button>MCP</button><button>Skills</button><button>Plugins</button><button>Usage</button><button>Update <span class="upd" style="display:inline-block;width:7px;height:7px;background:var(--accent-2);border:1.5px solid var(--ink);border-radius:50%;margin-left:6px"></span></button>
+      </nav>
+      <div class="dlg-pane">
+        <div class="field"><label>Theme</label>
+          <div class="seg"><button>Light</button><button class="on">Dark</button><button>System</button></div>
+        </div>
+        <div class="field"><label>Color preset</label>
+          <div class="swatches">
+            <div class="swatch on" data-p="signal"><div class="p"><i style="background:#FFD400"></i><i style="background:#F5F2EA"></i></div><div class="n">Signal</div></div>
+            <div class="swatch" data-p="coral"><div class="p"><i style="background:#FF7A59"></i><i style="background:#FBF3EE"></i></div><div class="n">Coral</div></div>
+            <div class="swatch" data-p="mint"><div class="p"><i style="background:#5CE0A8"></i><i style="background:#EEF6F1"></i></div><div class="n">Mint</div></div>
+            <div class="swatch" data-p="electric"><div class="p"><i style="background:#4F7CFF"></i><i style="background:#EEF1FB"></i></div><div class="n">Electric</div></div>
+          </div>
+        </div>
+        <div class="field"><label>Font size</label><div class="seg"><button>S</button><button class="on">M</button><button>L</button><button>XL</button></div></div>
+        <div class="row-set"><div><div class="lbl">Show minimap</div><div class="sub">Scroll minimap on the right edge (hover to reveal when off)</div></div><div class="grow"></div><div class="toggle" onclick="this.classList.toggle('on')"><i></i></div></div>
+        <div class="row-set"><div><div class="lbl">Completion sound</div><div class="sub">Play a sound when the agent finishes a run</div></div><div class="grow"></div><div class="toggle on" onclick="this.classList.toggle('on')"><i></i></div></div>
+        <div class="field"><label>Default working directory</label><div class="in">~/projects</div><div class="help">Used when creating a session without picking a workspace.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const root=document.documentElement;
+function toggleTheme(){root.dataset.theme=root.dataset.theme==='light'?'dark':'light'}
+document.querySelectorAll('.demo .sw,.swatch').forEach(el=>el.addEventListener('click',()=>{
+  root.dataset.preset=el.dataset.p;
+  document.querySelectorAll('.demo .sw').forEach(s=>s.classList.toggle('on',s.dataset.p===el.dataset.p));
+  document.querySelectorAll('.swatch').forEach(s=>s.classList.toggle('on',s.dataset.p===el.dataset.p));
+}));
+document.addEventListener('keydown',e=>{if(e.key==='d')toggleTheme()});
+</script>
+</body>
+</html>

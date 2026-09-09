@@ -27,7 +27,7 @@ export function QueuedActionButton({
         flexShrink: 0,
         padding: "4px 8px", minHeight: 24,
         border: "none",
-        borderRadius: 6,
+        borderRadius: "var(--radius-control)",
         background: "transparent",
         color: accent ? "var(--accent)" : "var(--text-dim)",
         cursor: "pointer",
@@ -124,8 +124,8 @@ export function ComposerModeStatus({ goal, plan, onClearGoal }: { goal?: ActiveG
             display: "flex", alignItems: expanded ? "flex-start" : "center", gap: 8,
             minWidth: 0, flex: 1, padding: "6px 9px",
             border: isCompleted
-              ? "1px solid color-mix(in srgb, var(--status-success) 35%, var(--border))"
-              : "1px solid color-mix(in srgb, var(--accent) 32%, var(--border))",
+              ? "var(--bw) solid var(--border)"
+              : "var(--bw) solid var(--border)",
             borderRadius: "var(--radius-control)",
             background: isCompleted
               ? "color-mix(in srgb, var(--status-success) 5%, var(--bg-panel))"
@@ -163,7 +163,7 @@ export function ComposerModeStatus({ goal, plan, onClearGoal }: { goal?: ActiveG
               width: 24,
               height: 24,
               flexShrink: 0,
-              border: "1px solid var(--border)",
+              border: "var(--bw) solid var(--border)",
               borderRadius: "var(--radius-control)",
               background: "transparent",
               color: "var(--text-dim)",
@@ -176,7 +176,7 @@ export function ComposerModeStatus({ goal, plan, onClearGoal }: { goal?: ActiveG
         </div>
       )}
       {plan && (
-        <div role="status" aria-live="polite" style={{ display: "flex", alignItems: "center", gap: 7, padding: "5px 9px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-panel)", color: "var(--text-muted)", fontSize: 12 }}>
+        <div role="status" aria-live="polite" style={{ display: "flex", alignItems: "center", gap: 7, padding: "5px 9px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-panel)", color: "var(--text-muted)", fontSize: 12 }}>
           <ListChecks size={14} strokeWidth={2} style={{ flexShrink: 0, color: "var(--accent)" }} aria-hidden="true" />
           <span style={{ fontWeight: 600 }}>{t("chatInput.planningInProgress")}</span>
           <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-dim)" }}>{plan.objective}</span>

@@ -21,7 +21,7 @@ test("SettingsConfig defines search indexing and controls for appearance and col
   assert.match(source, /role="radiogroup"/);
   assert.match(source, /role="radio"/);
 
-  assert.equal(THEME_PRESETS.length, 6);
+  assert.equal(THEME_PRESETS.length, 4);
   assert.equal(THEME_PRESETS[0].id, DEFAULT_THEME_PRESET);
   for (const preset of THEME_PRESETS) {
     assert.ok(preset.name, `Preset ${preset.id} must have a display name`);

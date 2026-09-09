@@ -92,7 +92,7 @@ export function ExtensionDialog({
         className={attached ? undefined : "animate-scale-in"}
         style={{
           width: attached ? "100%" : "min(560px, 100%)",
-          border: "1px solid var(--border)",
+          border: "var(--bw) solid var(--border)",
           borderRadius: attached ? "var(--radius-card)" : "var(--radius-modal)",
           background: "var(--bg)",
           boxShadow: attached ? "var(--shadow-card)" : "var(--shadow-modal)",
@@ -101,7 +101,7 @@ export function ExtensionDialog({
           maxHeight: attached ? "min(420px, 60vh)" : undefined,
         }}
       >
-        <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)" }}>
+        <div style={{ padding: "12px 14px", borderBottom: "var(--bw) solid var(--border)" }}>
           <div style={{ color: "var(--text)", fontSize: 14, fontWeight: 650 }}>{request.title}</div>
           <div style={{ marginTop: 3, color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)" }}>{t("chatWindow.extensionRequest")}</div>
         </div>
@@ -122,8 +122,8 @@ export function ExtensionDialog({
                     style={{
                       width: "100%",
                       padding: "9px 10px",
-                      borderRadius: 7,
-                      border: `1px solid ${selected ? "var(--accent)" : "var(--border)"}`,
+                      borderRadius: "var(--radius-card)",
+                      border: `var(--bw) solid ${selected ? "var(--accent)" : "var(--border)"}`,
                       background: selected ? "color-mix(in srgb, var(--accent) 10%, var(--bg-panel))" : "var(--bg-panel)",
                       color: "var(--text)",
                       cursor: "pointer",
@@ -153,8 +153,8 @@ export function ExtensionDialog({
               style={{
                 width: "100%",
                 padding: "9px 10px",
-                borderRadius: 7,
-                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-card)",
+                border: "var(--bw) solid var(--border)",
                 background: "var(--bg-panel)",
                 color: "var(--text)",
                 outline: "none",
@@ -175,8 +175,8 @@ export function ExtensionDialog({
                 width: "100%",
                 minHeight: 220,
                 padding: 10,
-                borderRadius: 7,
-                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-card)",
+                border: "var(--bw) solid var(--border)",
                 background: "var(--bg-panel)",
                 color: "var(--text)",
                 outline: "none",
@@ -189,13 +189,13 @@ export function ExtensionDialog({
           )}
         </div>
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "10px 14px", borderTop: "1px solid var(--border)", background: "var(--bg-panel)" }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "10px 14px", borderTop: "var(--bw) solid var(--border)", background: "var(--bg-panel)" }}>
           <button
             onClick={cancel}
             style={{
               padding: "6px 10px",
-              borderRadius: 6,
-              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-control)",
+              border: "var(--bw) solid var(--border)",
               background: "var(--bg)",
               color: "var(--text-muted)",
               cursor: "pointer",
@@ -211,8 +211,8 @@ export function ExtensionDialog({
               onClick={submitValue}
               style={{
                 padding: "6px 10px",
-                borderRadius: 6,
-                border: "1px solid var(--accent)",
+                borderRadius: "var(--radius-control)",
+                border: "var(--bw) solid var(--accent)",
                 background: "var(--accent)",
                 color: "var(--on-accent)",
                 cursor: "pointer",
@@ -229,8 +229,8 @@ export function ExtensionDialog({
               disabled={!selectedOption}
               style={{
                 padding: "6px 10px",
-                borderRadius: 6,
-                border: "1px solid var(--accent)",
+                borderRadius: "var(--radius-control)",
+                border: "var(--bw) solid var(--accent)",
                 background: selectedOption ? "var(--accent)" : "var(--bg-subtle)",
                 color: selectedOption ? "var(--on-accent)" : "var(--text-dim)",
                 cursor: selectedOption ? "pointer" : "not-allowed",
@@ -244,8 +244,8 @@ export function ExtensionDialog({
               onClick={submitValue}
               style={{
                 padding: "6px 10px",
-                borderRadius: 6,
-                border: "1px solid var(--accent)",
+                borderRadius: "var(--radius-control)",
+                border: "var(--bw) solid var(--accent)",
                 background: "var(--accent)",
                 color: "var(--on-accent)",
                 cursor: "pointer",

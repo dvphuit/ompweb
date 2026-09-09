@@ -205,7 +205,7 @@ function getToolCallsFromMessage(msg: AgentMessage): ToolCallContent[] {
 function ProcessDetailsGroup({ messageCount, toolCallCount, durationSeconds, totalTokens, totalCost, toolBreakdown, fileSummary, children }: { messageCount: number; toolCallCount: number; durationSeconds?: number; totalTokens?: number; totalCost?: number; toolBreakdown?: string; fileSummary?: string; children: ReactNode }) {
   const { t, tn } = useI18n();
   const [expanded, setExpanded] = useState(false);
-  const parts = [t("chatWindow.processDetails"), tn("chatWindow.messageCount", messageCount)];
+  const parts = [tn("chatWindow.messageCount", messageCount)];
   if (toolCallCount > 0) parts.push(tn("chatWindow.toolCallCount", toolCallCount));
   if (durationSeconds != null && durationSeconds > 0) parts.push(t("messageView.durationSeconds", { seconds: durationSeconds }));
   if (totalTokens != null && totalTokens > 0) {
@@ -215,7 +215,7 @@ function ProcessDetailsGroup({ messageCount, toolCallCount, durationSeconds, tot
   if (totalCost != null && totalCost > 0) parts.push(`$${totalCost.toFixed(totalCost < 0.01 ? 4 : 2)}`);
 
   return (
-    <div style={{ marginBottom: 4 }}>
+    <div className="process-details" data-expanded={expanded ? "true" : "false"} style={{ marginBottom: 6 }}>
       <button
         type="button"
         aria-expanded={expanded}
@@ -223,28 +223,28 @@ function ProcessDetailsGroup({ messageCount, toolCallCount, durationSeconds, tot
         className="process-details-toggle"
         title={expanded ? t("chatWindow.collapseProcessDetails") : t("chatWindow.expandProcessDetails")}
       >
+        <span className="process-details-count" aria-hidden="true">{toolCallCount > 0 ? toolCallCount : messageCount}</span>
+        <span className="process-details-label">
+          <span className="process-details-title">{t("chatWindow.processDetails")}</span>
+          <span className="process-details-meta">{parts.join(" · ")}</span>
+          {toolBreakdown && <span className="process-details-breakdown">{toolBreakdown}</span>}
+        </span>
         <ChevronDown
-          size={12}
-          strokeWidth={1.8}
+          size={13}
+          strokeWidth={2}
           aria-hidden="true"
+          className="process-details-chevron"
           style={{
             flexShrink: 0,
             transform: expanded ? "rotate(180deg)" : "none",
             transition: "transform var(--dur-fast) var(--ease-out-warm)",
           }}
         />
-        <span className="process-details-label">
-          {parts.join(" · ")}
-        </span>
       </button>
       {expanded && (
-        <div style={{ marginTop: 3 }}>
-          {(toolBreakdown || fileSummary) && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 6, padding: "6px 8px", background: "var(--bg-subtle)", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", fontSize: 11, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
-              {toolBreakdown && <span>{toolBreakdown}</span>}
-              {toolBreakdown && fileSummary && <span style={{ opacity: 0.5 }}>·</span>}
-              {fileSummary && <span>{fileSummary}</span>}
-            </div>
+        <div className="process-details-body">
+          {fileSummary && (
+            <div className="process-details-files">{fileSummary}</div>
           )}
           {children}
         </div>
@@ -1231,7 +1231,7 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
               <div
                 style={{
                   display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
-                  marginBottom: 8, padding: "7px 10px", border: "1px solid var(--border)",
+                  marginBottom: 8, padding: "7px 10px", border: "var(--bw) solid var(--border)",
                   borderRadius: "var(--radius-control)", background: "var(--bg-subtle)",
                 }}
               >
@@ -1242,7 +1242,7 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
                   type="button"
                   onClick={togglePreCompactionHistory}
                   style={{
-                    flexShrink: 0, padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)",
+                    flexShrink: 0, padding: "4px 8px", borderRadius: "var(--radius-control)", border: "var(--bw) solid var(--border)",
                     background: "var(--bg)", color: "var(--text)", cursor: "pointer", fontSize: 12,
                   }}
                 >
@@ -1321,7 +1321,7 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
           </div>
         </div>
         {isMobile ? null : (
-          <div style={{ position: "absolute", top: 0, bottom: 0, right: 0, zIndex: 30, display: "flex" }}>
+          <div className="chat-minimap-rail" style={{ position: "absolute", top: 0, bottom: 0, right: 0, zIndex: 30, display: "flex" }}>
             <ChatMinimap
               messages={messages}
               scrollContainer={scrollContainerRef}
@@ -1416,7 +1416,7 @@ function ExtensionStatusBar({ statuses }: { statuses: Array<{ key: string; text:
             gap: 6,
             maxWidth: "100%",
             padding: "4px 8px",
-            border: "1px solid color-mix(in srgb, var(--accent) 24%, var(--border))",
+            border: "var(--bw) solid var(--border)",
             borderRadius: "var(--radius-control)",
             background: "color-mix(in srgb, var(--accent) 7%, var(--bg))",
             color: "var(--text-muted)",
@@ -1440,13 +1440,13 @@ function ExtensionWidgets({ widgets }: { widgets: Array<{ key: string; lines: st
           key={widget.key}
           className="ui-compact-surface"
           style={{
-            border: "1px solid var(--border)",
+            border: "var(--bw) solid var(--border)",
             borderRadius: "var(--radius-control)",
             background: "var(--bg-panel)",
             overflow: "hidden",
           }}
         >
-          <div style={{ padding: "5px 9px", borderBottom: "1px solid var(--border)", color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)" }}>
+          <div style={{ padding: "5px 9px", borderBottom: "var(--bw) solid var(--border)", color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)" }}>
             {widget.key}
           </div>
           <pre style={{ margin: 0, padding: "8px 9px", color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word", fontFamily: "var(--font-mono)" }}>
@@ -1495,7 +1495,7 @@ function NoticeShelf({ notices, onDismiss, floating = false, align = "left" }: {
               marginBottom: index === notices.length - 1 ? 0 : 4,
               overflow: "hidden",
               borderRadius: "var(--radius-control)",
-              border: `1px solid ${isError ? "color-mix(in srgb, var(--status-error) 35%, var(--border))" : "color-mix(in srgb, var(--border) 70%, transparent)"}`,
+              border: `var(--bw) solid ${isError ? "color-mix(in srgb, var(--status-error) 35%, var(--border))" : "color-mix(in srgb, var(--border) 70%, transparent)"}`,
               background: isError ? "color-mix(in srgb, var(--status-error) 7%, var(--bg))" : "var(--bg)",
               color: isError ? "var(--text)" : "var(--text-muted)",
               width: "fit-content",
@@ -1618,8 +1618,8 @@ function ExtensionCustomPanel({
           position: "relative",
           width: "min(920px, 100%)",
           maxHeight: "min(760px, calc(100vh - 40px))",
-          border: "1px solid var(--border)",
-          borderRadius: 8,
+          border: "var(--bw) solid var(--border)",
+          borderRadius: "var(--radius-card)",
           background: "var(--bg)",
           boxShadow: "var(--shadow-modal)",
           overflow: "hidden",
@@ -1674,14 +1674,14 @@ function ExtensionCustomPanel({
             pointerEvents: "none",
           }}
         />
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 12px", borderBottom: "var(--bw) solid var(--border)" }}>
           <div style={{ color: "var(--text)", fontSize: 13, fontWeight: 650 }}>{t("chatWindow.extensionPanel")}</div>
           <button
             onClick={() => onInput(request, "\x03")}
             style={{
               padding: "5px 9px",
-              borderRadius: 6,
-              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-control)",
+              border: "var(--bw) solid var(--border)",
               background: "var(--bg-panel)",
               color: "var(--text-muted)",
               cursor: "pointer",
@@ -1822,7 +1822,7 @@ const MinimizedComposerBar = memo(function MinimizedComposerBar({ draftKey, isSt
                 marginRight: 5,
                 background: "var(--accent-strong)",
                 border: "none",
-                borderRadius: 7,
+                borderRadius: "var(--radius-card)",
                 color: "var(--on-accent)",
                 cursor: "pointer",
                 fontSize: 12,

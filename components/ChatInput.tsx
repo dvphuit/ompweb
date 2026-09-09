@@ -1313,7 +1313,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           <div style={{
             marginBottom: 8, padding: "5px 10px",
             background: "color-mix(in srgb, var(--status-warning) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--status-warning) 25%, transparent)",
-            borderRadius: 6, fontSize: 12, color: "var(--status-warning)",
+            borderRadius: "var(--radius-control)", fontSize: 12, color: "var(--status-warning)",
             display: "flex", alignItems: "center", gap: 6,
           }}>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
@@ -1333,7 +1333,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   color: "var(--status-warning)",
                   background: "transparent",
                   border: "1px solid color-mix(in srgb, var(--status-warning) 45%, transparent)",
-                  borderRadius: 6,
+                  borderRadius: "var(--radius-control)",
                   cursor: "pointer",
                   whiteSpace: "nowrap",
                   transition: "background var(--dur-fast) var(--ease-out-warm)",
@@ -1350,7 +1350,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           <div style={{
             marginBottom: 8, padding: "5px 10px",
             background: "color-mix(in srgb, var(--status-success) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--status-success) 24%, transparent)",
-            borderRadius: 6, fontSize: 12, color: "var(--status-success)",
+            borderRadius: "var(--radius-control)", fontSize: 12, color: "var(--status-success)",
             display: "flex", alignItems: "center", gap: 6,
           }}>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
@@ -1364,7 +1364,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           <div role="alert" style={{
             marginBottom: 8, padding: "5px 10px",
             background: "color-mix(in srgb, var(--status-error) 7%, transparent)", border: "1px solid color-mix(in srgb, var(--status-error) 30%, transparent)",
-            borderRadius: 6, fontSize: 12, color: "var(--status-error)",
+            borderRadius: "var(--radius-control)", fontSize: 12, color: "var(--status-error)",
           }}>
             {attachError}
           </div>
@@ -1377,7 +1377,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 <img
                   src={img.previewUrl}
                   alt=""
-                  style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 6, border: "1px solid var(--border)", display: "block" }}
+                  style={{ width: 56, height: 56, objectFit: "cover", borderRadius: "var(--radius-control)", border: "var(--bw) solid var(--border)", display: "block" }}
                 />
                 <button
                   onClick={() => removeImage(i)}
@@ -1386,7 +1386,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   style={{
                     position: "absolute", top: -5, right: -5,
                     width: 24, height: 24, borderRadius: "50%",
-                    background: "var(--bg-panel)", border: "1px solid var(--border)",
+                    background: "var(--bg-panel)", border: "var(--bw) solid var(--border)",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     cursor: "pointer", padding: 0, color: "var(--text-muted)",
                     transition: "color var(--dur-fast) var(--ease-out-warm), background var(--dur-fast) var(--ease-out-warm)",
@@ -1411,8 +1411,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   display: "flex", alignItems: "center", gap: 7,
                   maxWidth: 260, height: 30,
                   padding: "0 6px 0 9px",
-                  border: "1px solid var(--border)",
-                  borderRadius: 6,
+                  border: "var(--bw) solid var(--border)",
+                  borderRadius: "var(--radius-control)",
                   background: "var(--bg-panel)",
                   fontSize: 12,
                   color: "var(--text)",
@@ -1480,7 +1480,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 style={{
                   height: 30,
                   padding: "0 10px",
-                  borderBottom: "1px solid var(--border)",
+                  borderBottom: "var(--bw) solid var(--border)",
                   display: "flex",
                   alignItems: "center",
                   color: "var(--text-dim)",
@@ -1524,7 +1524,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                         gap: 8,
                         padding: "7px 8px",
                         border: "none",
-                        borderRadius: 6,
+                        borderRadius: "var(--radius-control)",
                         background: active ? "var(--bg-selected)" : "none",
                         color: "var(--text)",
                         cursor: "pointer",
@@ -1560,7 +1560,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               <div
                 style={{
                   padding: "8px 10px",
-                  borderBottom: "1px solid var(--border)",
+                  borderBottom: "var(--bw) solid var(--border)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
@@ -1631,8 +1631,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                                 gap: 4,
                                 justifyContent: "center",
                                 padding: "9px 10px",
-                                border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
-                                borderRadius: 7,
+                                border: `var(--bw) solid ${active ? "var(--accent)" : "var(--border)"}`,
+                                borderRadius: "var(--radius-card)",
                                 background: active ? "var(--bg-selected)" : "var(--bg-panel)",
                                 color: dormant ? "var(--text-dim)" : "var(--text)",
                                 cursor: "pointer",
@@ -1698,7 +1698,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 <div
                   style={{
                     padding: "8px 10px",
-                    borderBottom: "1px solid var(--border)",
+                    borderBottom: "var(--bw) solid var(--border)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
@@ -1743,7 +1743,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                             gap: 8,
                             padding: "6px 8px",
                             border: "none",
-                            borderRadius: 6,
+                            borderRadius: "var(--radius-control)",
                             background: active ? "var(--bg-selected)" : "none",
                             color: "var(--text)",
                             cursor: "pointer",
@@ -1774,7 +1774,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           <div
             aria-label={t("chatInput.queuedPrompts")}
             style={{
-              border: "1px solid var(--border)",
+              border: "var(--bw) solid var(--border)",
               borderBottom: "none",
               borderRadius: "var(--radius-card) var(--radius-card) 0 0",
               background: "var(--bg-panel)",
@@ -1794,7 +1794,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   fontSize: 10,
                   fontWeight: 600,
                   letterSpacing: "0.06em",
-                  textTransform: "uppercase",
+                  textTransform: "uppercase", fontFamily: "var(--font-display)",
                   color: "var(--text-muted)",
                 }}>
                   {firstQueued?.kind === "steer" ? t("chatInput.queuedSteer") : t("chatInput.queuedFollowUp")}
@@ -1831,7 +1831,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   alignItems: "center",
                   justifyContent: "space-between",
                   gap: 8,
-                  borderBottom: queueExpanded ? "1px solid var(--border)" : "none",
+                  borderBottom: queueExpanded ? "var(--bw) solid var(--border)" : "none",
                 }}>
                   <button
                     type="button"
@@ -1933,7 +1933,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                           padding: "1px 4px",
                           borderRadius: 4,
                           background: entry.kind === "steer" ? "color-mix(in srgb, var(--accent) 15%, transparent)" : "var(--bg)",
-                          border: `1px solid ${entry.kind === "steer" ? "var(--accent)" : "var(--border)"}`,
+                          border: `var(--bw) solid ${entry.kind === "steer" ? "var(--accent)" : "var(--border)"}`,
                           color: entry.kind === "steer" ? "var(--accent)" : "var(--text-muted)",
                         }}>
                           {entry.kind === "steer" ? t("chatInput.queuedSteer") : t("chatInput.queuedFollowUp")}
@@ -1978,7 +1978,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             role="status"
             aria-live="polite"
             style={{
-              border: `1px solid ${bashMode ? "var(--tool-bg)" : "color-mix(in srgb, var(--border) 70%, transparent)"}`,
+              border: `var(--bw) solid ${bashMode ? "var(--tool-bg)" : "color-mix(in srgb, var(--border) 70%, transparent)"}`,
               borderBottom: "none",
               borderRadius: queuedCount > 0 ? 0 : "var(--radius-card) var(--radius-card) 0 0",
               background: "var(--bg-panel)",
@@ -2003,7 +2003,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               display: "flex",
               flexDirection: "column",
               background: "var(--bg)",
-              border: `1px solid ${bashMode ? "var(--tool-bg)" : "color-mix(in srgb, var(--border) 70%, transparent)"}`,
+              border: `var(--bw) solid ${bashMode ? "var(--tool-bg)" : "color-mix(in srgb, var(--border) 70%, transparent)"}`,
               borderRadius: (queuedCount > 0 || Boolean(statusText)) ? "0 0 var(--radius-card) var(--radius-card)" : "var(--radius-card)",
               padding: "12px 12px 10px 14px",
               boxShadow: "var(--shadow-card)",
@@ -2074,7 +2074,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
                 width: 28, height: 28, padding: 0,
                 background: "none", border: "none",
-                borderRadius: 7,
+                borderRadius: "var(--radius-card)",
                 color: (attachedImages.length || attachedTextFiles.length) ? "var(--accent)" : "var(--text-muted)",
                 cursor: isStreaming ? "not-allowed" : "pointer",
                 opacity: isStreaming ? 0.5 : 1,
@@ -2113,7 +2113,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
                   width: 28, height: 28, padding: 0,
                   background: "none", border: "none",
-                  borderRadius: 7,
+                  borderRadius: "var(--radius-card)",
                   color: advisorEnabled ? "var(--accent)" : "var(--text-muted)",
                   cursor: "pointer",
                   transition: "background var(--dur-fast) var(--ease-out-warm), color var(--dur-fast) var(--ease-out-warm)",
@@ -2139,7 +2139,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     overflow: "hidden",
                     background: modelDropdownOpen ? "var(--bg-hover)" : "none",
                     border: "none",
-                    borderRadius: 7,
+                    borderRadius: "var(--radius-card)",
                     color: "var(--text-muted)",
                     cursor: modelSelectorDisabled ? "not-allowed" : "pointer",
                     fontSize: 12,
@@ -2264,7 +2264,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   style={{
                     display: "flex", alignItems: "center", gap: 5,
                     height: 28, padding: "0 8px", background: thinkingDropdownOpen ? "var(--bg-hover)" : "none",
-                    border: "none", borderRadius: 7, color: "var(--text-muted)", cursor: isStreaming ? "not-allowed" : "pointer",
+                    border: "none", borderRadius: "var(--radius-card)", color: "var(--text-muted)", cursor: isStreaming ? "not-allowed" : "pointer",
                     opacity: isStreaming ? 0.5 : 1, fontSize: 12,
                     transition: "background var(--dur-fast) var(--ease-out-warm), color var(--dur-fast) var(--ease-out-warm)",
                   }}
@@ -2340,7 +2340,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   style={{
                     display: "flex", alignItems: "center", gap: 5,
                     height: 28, padding: "0 8px", background: toolPresetDropdownOpen ? "var(--bg-hover)" : "none",
-                    border: "none", borderRadius: 7, color: "var(--text-muted)", cursor: "pointer",
+                    border: "none", borderRadius: "var(--radius-card)", color: "var(--text-muted)", cursor: "pointer",
                     fontSize: 12,
                     transition: "background var(--dur-fast) var(--ease-out-warm), color var(--dur-fast) var(--ease-out-warm)",
                   }}
@@ -2412,7 +2412,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   padding: "0 8px",
                   background: fastModeEnabled ? "var(--bg-selected)" : "none",
                   border: "none",
-                  borderRadius: 7,
+                  borderRadius: "var(--radius-card)",
                   color: fastModeEnabled && fastModeActive === false ? "var(--status-warning)" : fastModeEnabled ? "var(--accent)" : "var(--text-muted)",
                   cursor: isStreaming ? "not-allowed" : "pointer",
                   opacity: isStreaming ? 0.5 : 1,
@@ -2459,7 +2459,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   display: "flex", alignItems: "center", justifyContent: "center",
                   width: 28, height: 28, padding: 0,
                   background: "none", border: "none",
-                  borderRadius: 7,
+                  borderRadius: "var(--radius-card)",
                   color: isCompacting ? "var(--accent)" : "var(--text-muted)",
                   cursor: isStreaming && !isCompacting ? "not-allowed" : "pointer",
                   opacity: isStreaming && !isCompacting ? 0.5 : 1,
@@ -2484,7 +2484,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   padding: "0 14px",
                   background: "var(--accent-strong)",
                   border: "none",
-                  borderRadius: 8,
+                  borderRadius: "var(--radius-card)",
                   color: "var(--on-accent)",
                   cursor: "pointer",
                   fontSize: 12,
@@ -2506,7 +2506,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   padding: "0 14px",
                   background: "var(--accent-strong)",
                   border: "none",
-                  borderRadius: 8,
+                  borderRadius: "var(--radius-card)",
                   color: "var(--on-accent)",
                   cursor: "pointer",
                   fontSize: 12,
@@ -2528,15 +2528,15 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   display: "flex", alignItems: "center", gap: 6,
                   height: 28,
                   padding: "0 14px",
-                  background: (value.trim() || attachedImages.length || attachedTextFiles.length) ? "var(--accent-strong)" : "var(--bg-panel)",
-                  border: "none",
-                  borderRadius: 8,
+                  background: (value.trim() || attachedImages.length || attachedTextFiles.length) ? "var(--accent)" : "var(--bg-panel)",
+                  border: "var(--bw) solid var(--border)",
+                  borderRadius: "var(--radius-control)",
+                  fontFamily: "var(--font-display)",
                   color: (value.trim() || attachedImages.length || attachedTextFiles.length) ? "var(--on-accent)" : "var(--text-dim)",
                   cursor: (value.trim() || attachedImages.length || attachedTextFiles.length) ? "pointer" : "not-allowed",
                   fontSize: 12,
-                  fontWeight: 600,
-                  boxShadow: (value.trim() || attachedImages.length || attachedTextFiles.length) ? "var(--shadow-card)" : "none",
-                  transition: "background var(--dur-fast) var(--ease-out-warm), box-shadow var(--dur-fast) var(--ease-out-warm)",
+                  fontWeight: 700,
+                  transition: "background var(--dur-fast) var(--ease-out-warm)",
                 }}
               >
                 <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
