@@ -1,7 +1,7 @@
 "use client";
 import { registerAbortHandler } from "@/hooks/useKeyboardShortcuts";
-import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, Folder } from "lucide-react";
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
+import { ChevronDown, ChevronUp, Folder, Paperclip, Square } from "lucide-react";
 import type { AgentMessage, AssistantContentBlock, AssistantMessage, BashExecutionMessage, CustomMessage, ExtensionUiRequest, SessionInfo, SessionTreeNode, ToolResultMessage, ToolCallContent } from "@/lib/types";
 import { translate, useI18n } from "@/lib/i18n";
 import { countToolCallBlocks, getDisplayableAssistantBlocks, splitFinalAssistantBlocks } from "@/lib/message-display";
@@ -12,12 +12,13 @@ import { ExtensionDialog } from "./ExtensionDialog";
 import { SubagentTranscriptDialog } from "./SubagentTranscriptDialog";
 import { ChatMinimap, useMessageRefs } from "./ChatMinimap";
 import { ComposerPanels } from "./ComposerPanels";
-import { CHAT_COLUMN_MAX_WIDTH } from "@/lib/chat-layout";
+import { CHAT_COLUMN_MAX_WIDTH, MINIMAP_WIDTH } from "@/lib/chat-layout";
 import { useAgentSession, type AgentPhase, type NoticeItem, type SubagentInfo } from "@/hooks/useAgentSession";
 import { useAudio } from "@/hooks/useAudio";
 import { useDragDrop } from "@/hooks/useDragDrop";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import type { SessionStatsInfo, GenerationSpeedInfo } from "@/lib/pi-types";
+import type { ProviderUsageContext } from "@/lib/provider-usage-types";
 import { normalizeCustomPanelLines, parseAnsiLine } from "@/lib/ansi";
 import { resolveAvailableThinkingLevels } from "@/lib/thinking-levels";
 import { asBracketedPaste, toTerminalKeyData } from "@/lib/terminal-input";
@@ -28,6 +29,7 @@ import {
   VISIBLE_PAGE_SIZE,
 } from "@/lib/chat-lazy-load";
 import { getFileName } from "@/lib/file-paths";
+import { getDraftSummary } from "@/lib/draft-store";
 
 interface Props {
   session: SessionInfo | null;
@@ -43,6 +45,7 @@ interface Props {
   onSystemPromptLoaderChange?: (loader: (() => Promise<void>) | null) => void;
   onSessionStatsChange?: (stats: SessionStatsInfo | null) => void;
   onSessionStatsPanelOpen?: () => void;
+  onProviderUsageContextChange?: (context: ProviderUsageContext | null) => void;
   onContextUsageChange?: (usage: { percent: number | null; contextWindow: number; tokens: number | null } | null) => void;
   onModelCapacityChange?: (capacity: { contextWindow?: number; maxTokens?: number } | null) => void;
   onOpenFile?: (filePath: string) => void;
@@ -62,6 +65,10 @@ function phaseLabel(phase: AgentPhase): string {
 }
 
 const CHAT_COLUMN_PADDING = 16;
+// Symmetric centering halves maxWidth reduction across both sides; compensate
+// so the right clearance (padding + half-reduction) equals the minimap width.
+const MINIMAP_CLEARANCE = 2 * (MINIMAP_WIDTH - CHAT_COLUMN_PADDING);
+const CHAT_COLUMN_MAX_WIDTH_DESKTOP = `min(${CHAT_COLUMN_MAX_WIDTH}px, calc(100% - ${MINIMAP_CLEARANCE}px))`;
 // Trigger the next history page while the sentinel is still this far below
 // the top edge, so a normal upward scroll seamlessly continues into the newly
 // loaded messages. Triggering only at the very top made the load invisible:
@@ -256,7 +263,7 @@ interface CommittedTranscriptProps {
   isNew: boolean;
   forkingEntryId: string | null;
   handleFork: (entryId: string) => void;
-  handleNavigate: (entryId: string) => void;
+  handleNavigate: (entryId: string) => boolean | Promise<boolean>;
   handleEditContent: (content: string) => void;
   modelNames: Record<string, string>;
   messageCwd: string | undefined;
@@ -517,7 +524,7 @@ const CommittedTranscript = memo(function CommittedTranscript({
   );
 });
 
-export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed = true, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemPromptLoaderChange, onSessionStatsChange, onSessionStatsPanelOpen, onContextUsageChange, onModelCapacityChange, onGenerationSpeedChange, onOpenFile }: Props) {
+export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed = true, onAgentEnd, onSessionCreated, onSessionForked, modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemPromptLoaderChange, onSessionStatsChange, onSessionStatsPanelOpen, onProviderUsageContextChange, onContextUsageChange, onModelCapacityChange, onGenerationSpeedChange, onOpenFile }: Props) {
   const { t, tn } = useI18n();
   const { playDoneSound, unlockAudio } = useAudio();
   const isMobile = useIsMobile();
@@ -534,7 +541,7 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
     onAgentEnd?.();
   }, [onAgentEnd]);
 
-  // 稳定化 onEditContent 引用，配合 React.memo 防止历史消息重渲染
+  // Stabilize the onEditContent ref; pairs with React.memo to avoid re-rendering history messages
   const handleEditContent = useCallback((content: string) => {
     chatInputRef?.current?.insertIfEmpty(content);
   }, [chatInputRef]);
@@ -542,11 +549,12 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
   const {
     loading, error, messages, entryIds, showPreCompactionHistory, streamState,
     agentRunning, bashRunning, pendingBash, modelNames, modelList, modelsLoading, modelError, modelThinkingLevels, modelThinkingLevelMaps, thinkingLevel, fastModeEnabled, fastModeActive,
+    toolPreset,
     liveModelMeta,
     retryInfo, contextUsage, forkingEntryId,
     isCompacting, compactResult, tokensPerSecond, displayModel: displayModelValue, sessionStats,
     slashCommands, slashCommandsLoading, queuedMessages, advisorActive, advisorEnabled, handleAdvisorChange,
-    notices, extensionDialog, extensionCustomUi, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput,
+    notices, dismissNotice, extensionDialog, extensionCustomUi, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput,
     isAutoModelSelection,
     agentPhase, activeGoal, activePlan, handleClearGoal,
     subagents, subagentEvents, subagentTranscriptVersions, activeSubagentCount, currentTodoPhase, todoPhases,
@@ -557,6 +565,7 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
     removeQueuedMessage, promoteQueuedToSteer,
     handleBuiltinSlashCommand, togglePreCompactionHistory,
     handleThinkingLevelChange, handleFastModeChange, handleCycleModel, handleCycleThinkingLevel, handleAbortRetry, loadSlashCommands,
+    handleToolPresetChange,
   } = useAgentSession({
     session, newSessionCwd, onAgentEnd: wrappedOnAgentEnd, onSessionCreated, onSessionForked,
     modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemPromptLoaderChange, onSessionStatsPanelOpen,
@@ -577,7 +586,17 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
   const modelCapacityRef = useRef(modelCapacity);
   modelCapacityRef.current = modelCapacity;
   useEffect(() => { onModelCapacityChange?.(modelCapacityRef.current); }, [modelCapacityKey, onModelCapacityChange]);
-  const hasCompaction = messages.some((message) => message.role === "custom" && (message as CustomMessage).customType === "compaction");
+  const providerUsageContext = useMemo<ProviderUsageContext | null>(
+    () => displayModelValue ? { provider: displayModelValue.provider, modelId: displayModelValue.modelId } : null,
+    // Deps are the primitive identity of the model — a new wrapper object
+    // per streaming frame must not re-create the context.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [displayModelValue?.provider, displayModelValue?.modelId],
+  );
+  useEffect(() => {
+    onProviderUsageContextChange?.(providerUsageContext);
+    return () => onProviderUsageContextChange?.(null);
+  }, [onProviderUsageContextChange, providerUsageContext]);
   const [generationSpeed, setGenerationSpeed] = useState<GenerationSpeedInfo | null>(null);
   const speedSamplesRef = useRef<number[]>([]);
   // Source of truth is omp's own get_state.tokensPerSecond (polled by the
@@ -693,11 +712,14 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
         if (el) el.scrollTop = el.scrollHeight;
       });
     }
-  }, [sessionKeyForPaging, scrollContainerRef]);
+  }, [sessionKeyForPaging]);
+  const [composerMinimized, setComposerMinimized] = useState(false);
+  const minimizedExpandRef = useRef<HTMLButtonElement | null>(null);
   // True while the viewport is at/near the conversation bottom. Drives the
   // anchored render window in CommittedTranscript.
   const [nearBottom, setNearBottom] = useState(true);
   useEffect(() => {
+    if (loading) return;
     const el = scrollContainerRef.current;
     if (!el) return;
     let raf: number | null = null;
@@ -715,7 +737,7 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
       el.removeEventListener("scroll", onScroll);
       if (raf !== null) cancelAnimationFrame(raf);
     };
-  }, [scrollContainerRef]);
+  }, [loading, scrollContainerRef]);
   const sentinelRef = useRef<HTMLButtonElement>(null);
   const prevScrollDistanceRef = useRef<number | null>(null);
   // "auto" (observer fired while scrolling) anchors the viewport to the old
@@ -861,16 +883,17 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
   const conversationMeta = useMemo(() => {
     const toolResultsMap = new Map<string, ToolResultMessage>();
     let lastAnchorIdx = -1;
+    let hasCompaction = false;
     const visibleRefIndexByMessage = new Map<number, number>();
     let refIdx = 0;
 
     messages.forEach((message, index) => {
       if (message.role === "toolResult") toolResultsMap.set((message as ToolResultMessage).toolCallId, message as ToolResultMessage);
+      if (message.role === "custom" && message.customType === "compaction") hasCompaction = true;
       if (isGroupAnchor(message)) lastAnchorIdx = index;
       if (message.role === "user" || message.role === "assistant") visibleRefIndexByMessage.set(index, refIdx++);
     });
-
-    return { toolResultsMap, lastAnchorIdx, visibleRefIndexByMessage };
+    return { toolResultsMap, lastAnchorIdx, hasCompaction, visibleRefIndexByMessage };
   }, [messages]);
   // The ref array is sized by the count of user/assistant messages — exactly
   // what conversationMeta's visibleRefIndexByMessage already tallies, so no
@@ -901,15 +924,25 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
   }, [agentPhase, committedToolCallIds, streamState.streamingMessage]);
 
   const isEmptyNew = isNew && messages.length === 0 && !streamState.isStreaming && !sessionBusy;
+  // Reset minimized state on session switch (session-scoped)
+  useEffect(() => { setComposerMinimized(false); }, [sessionKeyForPaging]);
+  // The extension dialog renders inside the collapsible composer wrapper;
+  // never let a pending approval prompt sit hidden behind the minimized pill.
+  useEffect(() => { if (extensionDialog) setComposerMinimized(false); }, [extensionDialog]);
   const messageCwd = session?.cwd ?? newSessionCwd ?? undefined;
 
-  const availableThinkingLevels = displayModelValue
-    ? resolveAvailableThinkingLevels(
-        modelThinkingLevels[`${displayModelValue.provider}:${displayModelValue.modelId}`],
-        displayModelValue,
-        liveModelMeta,
-      )
-    : null;
+  const displayModelKey = displayModelValue ? `${displayModelValue.provider}:${displayModelValue.modelId}` : "";
+  const availableThinkingLevels = useMemo(
+    () =>
+      displayModelValue
+        ? resolveAvailableThinkingLevels(
+            modelThinkingLevels[displayModelKey],
+            displayModelValue,
+            liveModelMeta,
+          )
+        : null,
+    [displayModelKey, displayModelValue, modelThinkingLevels, liveModelMeta],
+  );
 
   const currentThinkingLevelMap = displayModelValue
     ? (modelThinkingLevelMaps[`${displayModelValue.provider}:${displayModelValue.modelId}`] ?? null)
@@ -944,6 +977,37 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
     };
   }, [advisorRoleSelector, modelList]);
 
+  const handleMinimize = useCallback(() => {
+    setComposerMinimized(true);
+    /* Focus the pill's expand button after React commits the visibility change */
+    requestAnimationFrame(() => minimizedExpandRef.current?.focus());
+  }, []);
+  const handleExpand = useCallback(() => {
+    setComposerMinimized(false);
+    /* Focus the textarea after React commits the visibility change */
+    requestAnimationFrame(() => chatInputRef?.current?.focus());
+  }, [chatInputRef]);
+  const composerStatusText = useMemo(() => {
+    if (bashRunning && !pendingBash) {
+      return t("chatWindow.runningCommand");
+    }
+    if (isCompacting || (agentRunning && !streamState.streamingMessage && pendingToolHeaders.length === 0)) {
+      return [
+        phaseLabel(agentPhase),
+        activeSubagentCount > 0 ? tn("chatWindow.subagentCount", activeSubagentCount) : null,
+        isCompacting ? t("chatWindow.compactingContext") : null,
+        currentTodoPhase
+          ? t("chatWindow.todoPhaseStatus", {
+              name: currentTodoPhase.name,
+              done: currentTodoPhase.done,
+              total: currentTodoPhase.total,
+            })
+          : null,
+      ].filter(Boolean).join(" · ");
+    }
+    return null;
+  }, [bashRunning, pendingBash, isCompacting, agentRunning, streamState.streamingMessage, pendingToolHeaders.length, agentPhase, activeSubagentCount, currentTodoPhase, t, tn]);
+
 
   const chatInputElement = (
     <ChatInput
@@ -966,6 +1030,8 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
       compactResult={compactResult}
       thinkingLevel={thinkingLevel}
       onThinkingLevelChange={session || isNew ? handleThinkingLevelChange : undefined}
+      toolPreset={toolPreset}
+      onToolPresetChange={handleToolPresetChange}
       fastModeEnabled={fastModeEnabled}
       fastModeActive={fastModeActive}
       fastModeSupported={Boolean(displayModelValue && modelList.some((entry) => entry.provider === displayModelValue.provider && entry.id === displayModelValue.modelId && entry.supportsFastMode))}
@@ -994,6 +1060,11 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
       onAudioUnlock={unlockAudio}
       draftKey={session?.id ?? (newSessionCwd ? `new:${newSessionCwd}` : undefined)}
       cwd={session?.cwd ?? newSessionCwd}
+      /* The pill bar and chevron only render in the non-empty layout; don't
+         accept Escape-to-minimize in the fresh-chat branch where there is
+         nothing to collapse. */
+      onMinimize={isEmptyNew ? undefined : handleMinimize}
+      statusText={composerStatusText}
     />
   );
 
@@ -1124,7 +1195,7 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
                 <OmpRuntimeVersion />
               </div>
             </div>
-            <NoticeShelf notices={notices} align="right" />
+            <NoticeShelf notices={notices} onDismiss={dismissNotice} align="right" />
             {chatInputElement}
           </div>
         </div>
@@ -1143,8 +1214,8 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
             pointerEvents: "none",
           }}
         >
-          <div style={{ maxWidth: CHAT_COLUMN_MAX_WIDTH, margin: "0 auto" }}>
-            <NoticeShelf notices={notices} floating align="right" />
+          <div style={{ maxWidth: isMobile ? CHAT_COLUMN_MAX_WIDTH : CHAT_COLUMN_MAX_WIDTH_DESKTOP, margin: "0 auto" }}>
+            <NoticeShelf notices={notices} onDismiss={dismissNotice} floating align="right" />
           </div>
         </div>
         {/* Hide the Firefox scrollbar on desktop only: ChatMinimap provides the
@@ -1152,11 +1223,11 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
             users need the scrollbar (Chrome's overlay scrollbar still shows). */}
         <div ref={scrollContainerRef} className={`flex-1 overflow-y-auto pt-6` + (isMobile ? "" : " [scrollbar-width:none]")}>
           <div style={{ padding: `0 ${CHAT_COLUMN_PADDING}px` }}>
-            <div style={{ maxWidth: CHAT_COLUMN_MAX_WIDTH, margin: "0 auto" }}>
+            <div style={{ maxWidth: isMobile ? CHAT_COLUMN_MAX_WIDTH : CHAT_COLUMN_MAX_WIDTH_DESKTOP, margin: "0 auto" }}>
               <ExtensionStatusBar statuses={extensionStatuses} />
               <ExtensionWidgets widgets={aboveEditorWidgets} />
 
-            {hasCompaction && (
+            {conversationMeta.hasCompaction && (
               <div
                 style={{
                   display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
@@ -1203,8 +1274,8 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
             />
             {streamState.isStreaming && streamState.streamingMessage && (
               <MessageView
+                key={streamState.streamingMessage.timestamp ?? "stream"}
                 message={streamState.streamingMessage as AgentMessage}
-                isStreaming
                 modelNames={modelNames}
                 cwd={messageCwd}
                 onOpenFile={onOpenFile}
@@ -1232,38 +1303,6 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
               </div>
             ))}
 
-            {(isCompacting || (agentRunning && !streamState.streamingMessage && pendingToolHeaders.length === 0)) && (
-              <div role="status" aria-live="polite" className="py-2 text-[13px] text-text-muted flex items-center gap-2">
-                <span
-                  aria-hidden
-                  className="live-status-dot live-pulse inline-block h-2 w-2 shrink-0 rounded-full bg-accent"
-                />
-                <span>
-                  {[
-                    phaseLabel(agentPhase),
-                    activeSubagentCount > 0 ? tn("chatWindow.subagentCount", activeSubagentCount) : null,
-                    isCompacting ? t("chatWindow.compactingContext") : null,
-                    currentTodoPhase
-                      ? t("chatWindow.todoPhaseStatus", {
-                          name: currentTodoPhase.name,
-                          done: currentTodoPhase.done,
-                          total: currentTodoPhase.total,
-                        })
-                      : null,
-                  ].filter(Boolean).join(" · ")}
-                </span>
-              </div>
-            )}
-
-            {bashRunning && !pendingBash && (
-              <div role="status" aria-live="polite" className="py-2 text-[13px] text-text-muted flex items-center gap-2">
-                <span
-                  aria-hidden
-                  className="live-status-dot live-pulse inline-block h-2 w-2 shrink-0 rounded-full bg-accent"
-                />
-                <span>{t("chatWindow.runningCommand")}</span>
-              </div>
-            )}
 
             {pendingBash && (
               <MessageView
@@ -1292,7 +1331,46 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
         )}
       </div>
 
-      <div className="relative" style={{ flexShrink: 0 }}>
+      {/* Minimized pill bar - shown when composer is collapsed */}
+      {composerMinimized && (
+        <MinimizedComposerBar
+          draftKey={session?.id ?? (newSessionCwd ? `new:${newSessionCwd}` : undefined)}
+          isStreaming={sessionBusy}
+          isCompacting={isCompacting}
+          statusText={composerStatusText}
+          expandRef={minimizedExpandRef}
+          onExpand={handleExpand}
+          onAbort={handleAbort}
+          onAbortCompaction={handleAbortCompaction}
+        />
+      )}
+
+      {/* Full composer - always mounted; hidden when minimized to preserve ref + state */}
+      <div className="relative" style={{ flexShrink: 0, display: composerMinimized ? "none" : undefined }}>
+        {/* Minimize chevron above the composer area */}
+        <div style={{ padding: `0 ${CHAT_COLUMN_PADDING}px` }}>
+          <div style={{ maxWidth: CHAT_COLUMN_MAX_WIDTH, margin: "0 auto", display: "flex", justifyContent: "center" }}>
+            <button
+              type="button"
+              onClick={handleMinimize}
+              title={t("chatWindow.minimizeComposer")}
+              aria-label={t("chatWindow.minimizeComposer")}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                width: 44, height: 24,
+                background: "none", border: "none",
+                color: "var(--text-dim)",
+                cursor: "pointer", padding: 0,
+                borderRadius: 4,
+                transition: "color var(--dur-fast) var(--ease-out-warm), background var(--dur-fast) var(--ease-out-warm)",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text-muted)"; e.currentTarget.style.background = "var(--bg-hover)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-dim)"; e.currentTarget.style.background = "none"; }}
+            >
+              <ChevronDown size={14} strokeWidth={1.8} />
+            </button>
+          </div>
+        </div>
         <div
           style={{
             padding: `0 ${CHAT_COLUMN_PADDING}px`,
@@ -1380,7 +1458,7 @@ function ExtensionWidgets({ widgets }: { widgets: Array<{ key: string; lines: st
   );
 }
 
-function NoticeShelf({ notices, floating = false, align = "left" }: { notices: NoticeItem[]; floating?: boolean; align?: "left" | "right" }) {
+function NoticeShelf({ notices, onDismiss, floating = false, align = "left" }: { notices: NoticeItem[]; onDismiss?: (id: string) => void; floating?: boolean; align?: "left" | "right" }) {
   if (notices.length === 0) return null;
   return (
     <div
@@ -1391,6 +1469,7 @@ function NoticeShelf({ notices, floating = false, align = "left" }: { notices: N
         flexDirection: "column",
         alignItems: align === "right" ? "flex-end" : "stretch",
         marginBottom: floating ? 0 : 10,
+        pointerEvents: floating ? "auto" : undefined,
       }}
     >
       {notices.map((notice, index) => {
@@ -1401,33 +1480,34 @@ function NoticeShelf({ notices, floating = false, align = "left" }: { notices: N
             : notice.type === "success"
               ? "var(--status-success)"
               : "var(--accent)";
+        const isError = notice.type === "error";
         return (
           <div
             key={notice.id}
             className="notice-shelf-item"
             style={{
               display: "flex",
-              alignItems: "center",
+              alignItems: isError ? "flex-start" : "center",
               gap: 8,
               minHeight: 36,
-              height: 36,
-              maxHeight: 48,
+              height: isError ? "auto" : 36,
+              maxHeight: isError ? 96 : 48,
               marginBottom: index === notices.length - 1 ? 0 : 4,
               overflow: "hidden",
               borderRadius: "var(--radius-control)",
-              border: "1px solid color-mix(in srgb, var(--border) 70%, transparent)",
-              background: "var(--bg)",
-              color: "var(--text-muted)",
+              border: `1px solid ${isError ? "color-mix(in srgb, var(--status-error) 35%, var(--border))" : "color-mix(in srgb, var(--border) 70%, transparent)"}`,
+              background: isError ? "color-mix(in srgb, var(--status-error) 7%, var(--bg))" : "var(--bg)",
+              color: isError ? "var(--text)" : "var(--text-muted)",
               width: "fit-content",
-              maxWidth: "min(100%, 620px)",
+              maxWidth: "min(100%, 640px)",
               boxShadow: floating ? "var(--shadow-pop)" : "var(--shadow-card)",
               fontSize: 12,
-              lineHeight: 1.35,
+              lineHeight: 1.4,
               transformOrigin: "top center",
               animation: notice.exiting
                 ? "notice-shelf-out var(--dur-med) ease-in forwards"
                 : "notice-shelf-in var(--dur-med) var(--ease-out-warm) both",
-              padding: "0 10px",
+              padding: isError ? "8px 8px 8px 10px" : "0 10px",
             }}
           >
             <span
@@ -1437,11 +1517,51 @@ function NoticeShelf({ notices, floating = false, align = "left" }: { notices: N
                 borderRadius: "50%",
                 background: color,
                 flexShrink: 0,
+                marginTop: isError ? 6 : 0,
               }}
             />
-            <span style={{ padding: "8px 0", minWidth: 0, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <span
+              style={{
+                padding: isError ? "0" : "8px 0",
+                minWidth: 0,
+                maxWidth: "100%",
+                overflow: "hidden",
+                display: isError ? "-webkit-box" : "block",
+                WebkitLineClamp: isError ? 3 : undefined,
+                WebkitBoxOrient: isError ? "vertical" as const : undefined,
+                overflowWrap: "anywhere",
+                whiteSpace: isError ? "normal" : "nowrap",
+                textOverflow: isError ? "clip" : "ellipsis",
+                flex: 1,
+              }}
+              title={notice.message}
+            >
               {notice.message}
             </span>
+            {onDismiss && (
+              <button
+                type="button"
+                onClick={() => onDismiss(notice.id)}
+                aria-label="Dismiss"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 18,
+                  height: 18,
+                  padding: 0,
+                  border: 0,
+                  borderRadius: "var(--radius-control)",
+                  background: "transparent",
+                  color: "var(--text-dim)",
+                  cursor: "pointer",
+                  flexShrink: 0,
+                  marginTop: isError ? 1 : 0,
+                }}
+              >
+                <span aria-hidden style={{ fontSize: 12, lineHeight: 1 }}>×</span>
+              </button>
+            )}
           </div>
         );
       })}
@@ -1596,3 +1716,126 @@ function ExtensionCustomPanel({
     </div>
   );
 }
+
+/** Slim pill bar replacing the full composer when minimized. */
+const MinimizedComposerBar = memo(function MinimizedComposerBar({ draftKey, isStreaming, isCompacting, statusText, expandRef, onExpand, onAbort, onAbortCompaction }: {
+  draftKey?: string;
+  isStreaming: boolean;
+  isCompacting?: boolean;
+  statusText?: string | null;
+  expandRef?: Ref<HTMLButtonElement>;
+  onExpand: () => void;
+  onAbort: () => void;
+  onAbortCompaction?: () => void;
+}) {
+  const { t } = useI18n();
+
+  /* Read draft summary for preview without cloning attachment payloads */
+  const summary = draftKey ? getDraftSummary(draftKey) : null;
+  const draftText = summary?.text?.trim() || null;
+  const hasAttachments = summary?.hasAttachments ?? false;
+  return (
+    <div style={{ flexShrink: 0, padding: "4px 16px calc(6px + env(safe-area-inset-bottom))" }}>
+      <div style={{ maxWidth: CHAT_COLUMN_MAX_WIDTH, margin: "0 auto" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 0,
+            height: 36,
+            background: "var(--bg)",
+            border: "1px solid color-mix(in srgb, var(--border) 70%, transparent)",
+            borderRadius: "var(--radius-card)",
+            boxShadow: "var(--shadow-card)",
+            overflow: "hidden",
+          }}
+        >
+          {/* Expand button - fills remaining space */}
+          <button
+            ref={expandRef}
+            type="button"
+            onClick={onExpand}
+            title={t("chatWindow.expandComposer")}
+            aria-label={t("chatWindow.expandComposer")}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              flex: 1,
+              minWidth: 0,
+              height: "100%",
+              padding: "0 14px",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              textAlign: "left",
+            }}
+          >
+            <ChevronUp size={14} strokeWidth={1.8} style={{ flexShrink: 0, color: "var(--text-dim)" }} />
+            {hasAttachments && (
+              <Paperclip size={13} strokeWidth={1.8} style={{ flexShrink: 0, color: "var(--text-muted)" }} />
+            )}
+            {statusText ? (
+              <span style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 7,
+                flex: 1,
+                minWidth: 0,
+                fontSize: 13,
+                color: "var(--text-muted)",
+              }}>
+                <span aria-hidden className="live-status-dot live-pulse inline-block h-2 w-2 shrink-0 rounded-full bg-accent" />
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {statusText}
+                </span>
+              </span>
+            ) : (
+              <span style={{
+                flex: 1,
+                minWidth: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                fontSize: 14,
+                color: draftText ? "var(--text)" : "var(--text-dim)",
+              }}>
+                {draftText ?? t("chatInput.placeholder")}
+              </span>
+            )}
+          </button>
+
+          {/* Stop button - sibling, only when agent is running */}
+          {isStreaming && (
+            <button
+              type="button"
+              onClick={() => {
+                if (isCompacting && onAbortCompaction) onAbortCompaction();
+                else onAbort();
+              }}
+              title={t("chatInput.stopAgent")}
+              aria-label={t("chatInput.stopAgent")}
+              style={{
+                display: "flex", alignItems: "center", gap: 5,
+                height: 26,
+                padding: "0 12px",
+                marginRight: 5,
+                background: "var(--accent-strong)",
+                border: "none",
+                borderRadius: 7,
+                color: "var(--on-accent)",
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 600,
+                flexShrink: 0,
+              }}
+            >
+              <Square size={9} strokeWidth={0} fill="currentColor" aria-hidden="true" />
+              {t("chatInput.stop")}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+});

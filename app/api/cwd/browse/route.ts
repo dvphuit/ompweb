@@ -10,7 +10,7 @@ import {
   shouldShowWindowsDrivePicker,
 } from "@/lib/directory-browser";
 
-// GET /api/cwd/browse?path=...：列出文件系统中的可读子目录。
+// GET /api/cwd/browse?path=... — lists readable subdirectories in the filesystem.
 export async function GET(request: NextRequest) {
   try {
     const requested = request.nextUrl.searchParams.get("path")?.trim();

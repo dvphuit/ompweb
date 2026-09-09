@@ -21,12 +21,30 @@ interface TodoListProps {
   collapsible?: boolean;
   /** Initial expansion when `collapsible` (default: collapsed). */
   defaultExpanded?: boolean;
+  /** Controlled collapse state (ComposerPanels persists it in localStorage).
+   * When omitted the component keeps its own uncontrolled state. */
+  collapsed?: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
 }
 
-export function TodoList({ phases = [], collapsible = false, defaultExpanded = false }: TodoListProps) {
+/** Collapsed-preview window order: in_progress tasks first, then completed,
+ * so a long first phase can't hide the live work behind "Show all". */
+function previewTaskOrder(status: TodoItem["status"]): number {
+  if (status === "in_progress") return 0;
+  if (status === "completed") return 1;
+  return 2;
+}
+
+export function TodoList({ phases = [], collapsible = false, defaultExpanded = false, collapsed: collapsedProp, onCollapsedChange }: TodoListProps) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
-  const [collapsed, setCollapsed] = useState(collapsible ? !defaultExpanded : false);
+  const [collapsedState, setCollapsedState] = useState(collapsible ? !defaultExpanded : false);
+  const collapsed = collapsedProp ?? collapsedState;
+  const setCollapsed = (value: boolean | ((prev: boolean) => boolean)) => {
+    const next = typeof value === "function" ? value(collapsed) : value;
+    onCollapsedChange?.(next);
+    setCollapsedState(next);
+  };
 
   if (phases.length === 0) return null;
 
@@ -34,7 +52,11 @@ export function TodoList({ phases = [], collapsible = false, defaultExpanded = f
   const done = tasks.filter((task) => task.status === "completed").length;
   let remainingPreviewTasks = 5;
   const displayedPhases = (expanded ? phases : phases.slice(0, 4)).map((phase) => {
-    const displayedTasks = expanded ? phase.tasks : phase.tasks.slice(0, remainingPreviewTasks);
+    if (expanded) return phase;
+    // Surface the live work: in_progress first, then completed, within the
+    // same 5-task preview budget.
+    const orderedTasks = [...phase.tasks].sort((a, b) => previewTaskOrder(a.status) - previewTaskOrder(b.status));
+    const displayedTasks = orderedTasks.slice(0, Math.max(0, remainingPreviewTasks));
     remainingPreviewTasks -= displayedTasks.length;
     return { ...phase, tasks: displayedTasks };
   }).filter((phase) => phase.tasks.length > 0);
@@ -82,7 +104,24 @@ export function TodoList({ phases = [], collapsible = false, defaultExpanded = f
       )}
       {!collapsed && (
         <>
-      <div className="grid gap-3 px-3 py-2.5 animate-slide-down">
+      {/* Capped and scrolled like the sibling subagents panel in
+          ComposerPanels. Both panels are pinned above the composer, outside the
+          chat scroller, so an uncapped list runs its own rows off-screen with
+          nothing able to reach them — a 56-task plan was unreadable past the
+          first screenful. The Show all/less footer sits outside this element so
+          it stays put instead of scrolling away with the list.
+          Unlike the subagents panel, whose cards are buttons and therefore
+          reachable by Tab, todo rows are static text: without an explicit
+          tabIndex a keyboard-only reader could not scroll this at all. Its name
+          differs from the section's so a screen reader does not announce
+          "Tasks" twice on the way in. */}
+      <div
+        className="grid gap-3 px-3 py-2.5 animate-slide-down"
+        style={{ maxHeight: "min(30vh, 240px)", overflowY: "auto" }}
+        role="group"
+        aria-label={t("chatWindow.todoPlanScroll")}
+        tabIndex={0}
+      >
         {displayedPhases.map((phase, phaseIndex) => (
           <div key={phase.id ?? `${phase.name}-${phaseIndex}`} className="grid gap-1.5">
             <div className="text-[11px] font-medium text-text-muted">{phase.name}</div>

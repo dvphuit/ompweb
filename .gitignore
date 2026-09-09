@@ -83,3 +83,12 @@ Desktop.ini
 # local tooling cruft
 /.commandcode/
 /patch-paths.mjs
+
+# .NET / native build artifacts
+native/tray/bin/
+native/tray/obj/
+bin/tray-publish/
+*.pdb
+
+# npm packaging archives
+*.tgz

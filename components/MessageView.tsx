@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useState, useRef, useEffect, useMemo, useCallback, type ComponentProps } from "react";
-import { Copy, Check, GitFork, CornerUpLeft, ChevronRight, ChevronDown, Brain, EyeOff, LoaderCircle, FileText, FilePlus, Pencil, Terminal, Search, FolderSearch, ListTodo, Bot, MessageCircleQuestion, Plug, Wrench, Hash } from "lucide-react";
+import { Copy, Check, GitFork, CornerUpLeft, ChevronRight, ChevronDown, Brain, EyeOff, CircleAlert, CircleSlash, LoaderCircle, FileText, FilePlus, Pencil, Terminal, Search, FolderSearch, ListTodo, Bot, MessageCircleQuestion, Plug, Wrench, Hash } from "lucide-react";
 import { MarkdownBody } from "./MarkdownBody";
 import { ClickableImage } from "./ImageLightbox";
 import { translate, useI18n, type Locale } from "@/lib/i18n";
@@ -9,11 +9,12 @@ import { parseCompactionSummary } from "@/lib/compaction-summary";
 import { isEmptyThinkingBlock } from "@/lib/message-display";
 import { Tooltip, Collapsible, CollapsibleTrigger } from "./ui/primitives";
 import { useCopyFeedback } from "@/hooks/useCopyFeedback";
-import { SubagentStatusIcon } from "./SubagentStatusIcon";
-import { formatCost, formatDuration, formatTokens, shortModel } from "@/lib/subagent-format";
-import { parseUnifiedPatch, type SplitDiffCell } from "@/lib/patch";
 import { formatCompactNumber } from "@/lib/format";
 import { getToolDisplay } from "@/lib/tool-display";
+import { TaskResultPanel } from "./MessageView-task-panel";
+import { getResultDiff, PairedDiffResult, PairedResult } from "./MessageView-diff-view";
+import { getToolPreview, formatToolCommand, formatToolOutput, getToolResultMeta } from "./MessageView-tool-format";
+export { TaskResultPanel } from "./MessageView-task-panel";
 import type {
   AgentMessage,
   UserMessage,
@@ -136,7 +137,7 @@ interface Props {
   entryId?: string;
   onFork?: (entryId: string) => void;
   forking?: boolean;
-  onNavigate?: (entryId: string) => void;
+  onNavigate?: (entryId: string) => boolean | Promise<boolean>;
   prevAssistantEntryId?: string;
   onEditContent?: (content: string) => void;
   showTimestamp?: boolean;
@@ -219,8 +220,21 @@ export const MessageView = memo(function MessageView({ message, isStreaming, too
     && prev.prevTimestamp === next.prevTimestamp
     && prev.sessionId === next.sessionId
     && prev.toolCallsDefaultCollapsed === next.toolCallsDefaultCollapsed
-    && prev.liveTokensPerSecond === next.liveTokensPerSecond;
+    && (!prev.isStreaming || prev.liveTokensPerSecond === next.liveTokensPerSecond);
 });
+
+// lib/types.ts ImageContent uses the Anthropic-style {source:{type,data,media_type,url}}
+// shape; pi-ai on-disk format uses flat {data, mimeType} — handle both.
+function imageBlockSrc(img: ImageContent): string {
+  const flat = img as unknown as { data?: string; mimeType?: string };
+  return img.source
+    ? img.source.type === "base64"
+      ? `data:${img.source.media_type};base64,${img.source.data}`
+      : img.source.url ?? ""
+    : flat.data
+      ? `data:${flat.mimeType};base64,${flat.data}`
+      : "";
+}
 
 function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, onNavigate, prevAssistantEntryId, onEditContent }: {  message: UserMessage;
   cwd?: string;
@@ -228,7 +242,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
   entryId?: string;
   onFork?: (entryId: string) => void;
   forking?: boolean;
-  onNavigate?: (entryId: string) => void;
+  onNavigate?: (entryId: string) => boolean | Promise<boolean>;
   prevAssistantEntryId?: string;
   onEditContent?: (content: string) => void;
 }) {
@@ -275,8 +289,8 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
             borderRadius: "var(--radius-card)",
             boxShadow: "var(--shadow-card)",
             padding: "8px 12px",
-            fontSize: 14,
-            lineHeight: 1.6,
+            fontSize: "var(--chat-user-font-size)",
+            lineHeight: "var(--chat-line-height)",
             color: "var(--text)",
             wordBreak: "break-word",
             maxHeight: USER_BUBBLE_MAX_HEIGHT,
@@ -288,14 +302,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
               {imageBlocks.map((img, i) => {
                 // lib/types.ts ImageContent uses {source:{type,data,media_type,url}}
                 // pi-ai on-disk format uses flat {data, mimeType} — handle both
-                const flat = img as unknown as { data?: string; mimeType?: string };
-                const src = img.source
-                  ? img.source.type === "base64"
-                    ? `data:${img.source.media_type};base64,${img.source.data}`
-                    : img.source.url ?? ""
-                  : flat.data
-                    ? `data:${flat.mimeType};base64,${flat.data}`
-                    : "";
+                const src = imageBlockSrc(img);
                 return (
                   <ClickableImage
                     key={i}
@@ -312,7 +319,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
 
         {/* Bottom row: action buttons + timestamp — inside the bubble's column,
             spanning its width, so the timestamp aligns with its right edge. */}
-        {(time || canFork || canNavigate || true) && (
+        {(time || canFork || canNavigate) && (
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "flex-end",
             gap: 6, marginTop: 3, width: "100%",
@@ -364,7 +371,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
               {canNavigate && (
                 <Tooltip content={t("messageView.editFromHereTitle")}>
                   <button
-                    onClick={() => { onNavigate!(prevAssistantEntryId!); onEditContent?.(content); }}
+                    onClick={async () => { if (!(await onNavigate!(prevAssistantEntryId!))) return; onEditContent?.(content); }}
                     aria-label={t("messageView.editFromHereTitle")}
                     style={{
                       display: "flex", alignItems: "center", gap: 4,
@@ -491,15 +498,19 @@ function AssistantMessageView({
   // toolResult timestamp = when tool execution finished
   const toolCallDurations = useMemo<Map<string, number>>(() => {
     const map = new Map<string, number>();
-    if (!toolResults || !message.timestamp) return map;
-    for (const [callId, result] of toolResults) {
-      if (result.timestamp && message.timestamp) {
-        const secs = Math.round((result.timestamp - message.timestamp) / 1000);
-        if (secs > 0) map.set(callId, secs);
+    if (!toolResults || !message.timestamp || !Array.isArray(message.content)) return map;
+    for (const block of message.content) {
+      if (block.type === "toolCall") {
+        const tc = block as ToolCallContent;
+        const result = toolResults.get(tc.toolCallId);
+        if (result?.timestamp && message.timestamp) {
+          const secs = Math.round((result.timestamp - message.timestamp) / 1000);
+          if (secs > 0) map.set(tc.toolCallId, secs);
+        }
       }
     }
     return map;
-  }, [toolResults, message.timestamp]);
+  }, [toolResults, message.content, message.timestamp]);
   useEffect(() => {
     if (!isStreaming) {
       // Finalise any un-finished thinking block durations on stream end
@@ -984,6 +995,17 @@ const TOOL_ICONS = {
   Hash,
 } as const;
 
+// message_update frames re-parse toolCall blocks each frame, so input objects
+// are never reference-equal; shallow-compare the small input objects instead.
+function inputsShallowEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== "object" || a === null || typeof b !== "object" || b === null) return false;
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  return keysA.every((k) => (a as Record<string, unknown>)[k] === (b as Record<string, unknown>)[k]);
+}
+
 const ToolCallBlock = memo(function ToolCallBlock({ block, result, duration, isStreaming, defaultCollapsed = true }: { block: ToolCallContent; result?: ToolResultMessage; duration?: number; isStreaming?: boolean; defaultCollapsed?: boolean }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(Boolean(isStreaming) && !defaultCollapsed);
@@ -995,6 +1017,9 @@ const ToolCallBlock = memo(function ToolCallBlock({ block, result, duration, isS
             .map((b) => b.text)
             .join("\n"))
     : null;
+  const resultImages = result && Array.isArray(result.content)
+    ? result.content.filter((b): b is ImageContent => b.type === "image")
+    : [];
   const resultIsEmpty = resultText === null ? false : (resultText.trim() === "(no output)" || resultText.trim() === "");
   const isError = result?.isError ?? false;
   const resultDiff = expanded && result && !isError ? getResultDiff(result) : null;
@@ -1011,6 +1036,17 @@ const ToolCallBlock = memo(function ToolCallBlock({ block, result, duration, isS
         <CollapsibleTrigger className="activity-row-trigger" aria-label={`${block.toolName} ${statusLabel}`}>
           <span className="tool-icon-badge" aria-hidden>
             <ToolIcon size={11} strokeWidth={1.9} />
+          </span>
+          <span className={`activity-row-indicator${isError ? " activity-row-indicator-error" : ""}`} aria-hidden>
+            {isError ? (
+              <CircleAlert size={12} strokeWidth={1.8} />
+            ) : result ? (
+              <Check size={12} strokeWidth={2} />
+            ) : isStreaming ? (
+              <LoaderCircle size={12} strokeWidth={1.8} className="activity-row-spinner" />
+            ) : (
+              <CircleSlash size={12} strokeWidth={1.8} style={{ opacity: 0.5 }} />
+            )}
           </span>
           {!result && !isError ? (
             <span className="activity-row-indicator" aria-hidden>
@@ -1046,7 +1082,23 @@ const ToolCallBlock = memo(function ToolCallBlock({ block, result, duration, isS
               resultDiff ? (
                 <PairedDiffResult diff={resultDiff} />
               ) : (
-                <PairedResult text={formatToolOutput(resultText ?? "", block.toolName)} isEmpty={resultIsEmpty} isError={isError} />
+                <>
+                  {resultImages.length > 0 && (
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {resultImages.map((img, i) => (
+                        <ClickableImage
+                          key={i}
+                          src={imageBlockSrc(img)}
+                          alt=""
+                          style={{ maxWidth: 240, maxHeight: 240, borderRadius: 6, objectFit: "contain", display: "block", border: "1px solid color-mix(in srgb, var(--accent) 18%, transparent)" }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {!(resultIsEmpty && resultImages.length > 0) && (
+                    <PairedResult text={formatToolOutput(resultText ?? "", block.toolName)} isEmpty={resultIsEmpty} isError={isError} />
+                  )}
+                </>
               )
             ) : null}
           </div>
@@ -1057,364 +1109,12 @@ const ToolCallBlock = memo(function ToolCallBlock({ block, result, duration, isS
 }, (prev, next) => (
   prev.block.toolCallId === next.block.toolCallId
   && prev.block.toolName === next.block.toolName
-  && prev.block.input === next.block.input
+  && inputsShallowEqual(prev.block.input, next.block.input)
   && prev.result === next.result
   && prev.duration === next.duration
   && prev.defaultCollapsed === next.defaultCollapsed
 ));
 
-
-type TaskResultRowLike = Record<string, unknown>;
-
-function taskRowStatus(row: TaskResultRowLike): "started" | "completed" | "failed" | "aborted" {
-  if (row.aborted === true) return "aborted";
-  if (typeof row.error === "string" && row.error) return "failed";
-  if (typeof row.exitCode === "number") return row.exitCode === 0 ? "completed" : "failed";
-  const status = row.status;
-  if (status === "completed") return "completed";
-  if (status === "failed") return "failed";
-  if (status === "aborted") return "aborted";
-  return "started";
-}
-
-function TaskResultStatusIcon({ status }: { status: "started" | "completed" | "failed" | "aborted" }) {
-  return <SubagentStatusIcon status={status} />;
-}
-
-/**
- * Compact per-subagent summary rendered inside an expanded `task` tool call.
- * Feeds off the size-bounded task details allowlisted by the session reader
- * (lib/session-reader.ts stripToolResultDetails): settled results when
- * present, otherwise the mid-run progress snapshot.
- */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-export function TaskResultPanel({ details }: { details: unknown }) {
-  const { t, tn } = useI18n();
-  if (!isRecord(details)) return null;
-  const results = (Array.isArray(details.results) ? details.results : []).filter(isRecord);
-  const progress = (Array.isArray(details.progress) ? details.progress : []).filter(isRecord);
-  const asyncInfo = isRecord(details.async) ? details.async : null;
-  if (results.length === 0 && progress.length === 0 && !asyncInfo) return null;
-
-  // Settled results win; otherwise the mid-run progress snapshot; a bare
-  // async marker (spawn recorded, no rows yet) still names the job.
-  const rows = results.length > 0
-    ? results
-    : progress.length > 0
-      ? progress
-      : asyncInfo && typeof asyncInfo.jobId === "string"
-        ? [{ id: asyncInfo.jobId, agent: "task", status: "started", task: asyncInfo.jobId } as TaskResultRowLike]
-        : [];
-  const totalTokens = rows.reduce((sum, row) => sum + (typeof row.tokens === "number" ? row.tokens : 0), 0);
-  const totalCost = rows.reduce((sum, row) => sum + (typeof row.cost === "number" ? row.cost : 0), 0);
-  const totalDurationMs = typeof details.totalDurationMs === "number" ? details.totalDurationMs : undefined;
-  const totalTokensLabel = formatTokens(totalTokens);
-  const totalParts = [
-    tn("chatWindow.subagentCount", rows.length),
-    totalTokensLabel ? t("chatWindow.tokensUnit", { count: totalTokensLabel }) : null,
-    formatCost(totalCost),
-    formatDuration(totalDurationMs),
-  ].filter(Boolean);
-
-  return (
-    <div
-      style={{
-        borderTop: "1px solid var(--border)",
-        background: "var(--bg-subtle)",
-        padding: "8px 10px",
-        display: "grid",
-        gap: 4,
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "var(--text-muted)" }}>
-        <span style={{ fontWeight: 600, color: "var(--text)" }}>{t("messageView.taskSubagents")}</span>
-        <span style={{ marginLeft: "auto", fontFamily: "var(--font-mono)", color: "var(--text-dim)", fontSize: 10.5 }}>
-          {totalParts.join(" · ")}
-        </span>
-        {asyncInfo && (
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-dim)" }}>⤴</span>
-        )}
-      </div>
-      {rows.map((row, index) => {
-        const id = typeof row.id === "string" ? row.id : `row-${index}`;
-        const status = taskRowStatus(row);
-        const task = typeof row.task === "string" && row.task ? row.task : (typeof row.assignment === "string" ? row.assignment : null);
-        const rowTokens = formatTokens(typeof row.tokens === "number" ? row.tokens : undefined);
-        const rowParts = [
-          rowTokens ? t("chatWindow.tokensUnit", { count: rowTokens }) : null,
-          formatCost(typeof row.cost === "number" ? row.cost : undefined),
-          status !== "started" ? formatDuration(typeof row.durationMs === "number" ? row.durationMs : undefined) : null,
-          shortModel(typeof row.resolvedModel === "string" ? row.resolvedModel : undefined),
-        ].filter(Boolean);
-        return (
-          <div
-            key={id}
-            aria-label={`${typeof row.agent === "string" ? row.agent : "subagent"}: ${t(`chatWindow.subagentState.${status}`)}${task ? ` — ${task}` : ""}`}
-            style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, fontSize: 11.5 }}
-          >
-            <TaskResultStatusIcon status={status} />
-            <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, fontSize: 10.5, color: "var(--accent)", flexShrink: 0 }}>
-              {typeof row.agent === "string" ? row.agent : "subagent"}
-            </span>
-            <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, color: "var(--text)" }}>
-              {task ?? ""}
-            </span>
-            {rowParts.length > 0 && (
-              <span style={{ flexShrink: 0, fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-dim)" }}>
-                {rowParts.join(" · ")}
-              </span>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-interface ResultDiff {
-  text: string;
-}
-
-function getResultDiff(result: ToolResultMessage): ResultDiff | null {
-  const details = (result as ToolResultMessage & { details?: unknown }).details;
-  if (typeof details !== "object" || details === null || Array.isArray(details)) return null;
-  const record = details as Record<string, unknown>;
-  const patch = typeof record.patch === "string" ? record.patch : null;
-  if (patch) return { text: patch };
-  const diff = typeof record.diff === "string" ? record.diff : null;
-  if (diff) return { text: diff };
-  return null;
-}
-
-function PairedDiffResult({ diff }: { diff: ResultDiff }) {
-  return (
-    <div
-      style={{
-        borderTop: "1px solid color-mix(in srgb, var(--status-success) 15%, transparent)",
-        background: "var(--bg)",
-      }}
-    >
-      <SplitPatchView text={diff.text} />
-    </div>
-  );
-}
-
-function SplitPatchView({ text }: { text: string }) {
-  const { t } = useI18n();
-  const files = useMemo(() => parseUnifiedPatch(text), [text]);
-  if (!files) return <PatchTextView text={text} />;
-  const showFileHeaders = files.length > 1;
-
-  return (
-    <div style={{ maxHeight: 560, overflowY: "auto", overflowX: "hidden", background: "var(--bg)" }}>
-      {files.map((file, fileIndex) => (
-        <div
-          key={fileIndex}
-          style={{
-            minWidth: 0,
-            borderTop: fileIndex === 0 ? "none" : "1px solid var(--border)",
-            fontFamily: "var(--font-mono)",
-            fontSize: 12,
-            lineHeight: 1.55,
-          }}
-        >
-          {showFileHeaders && (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-                position: "sticky",
-                top: 0,
-                zIndex: 1,
-                background: "var(--bg-panel)",
-                borderBottom: "1px solid var(--border)",
-              }}
-            >
-              <SplitDiffHeader title={file.oldPath || t("messageView.diffBefore")} side="left" />
-              <SplitDiffHeader title={file.newPath || t("messageView.diffAfter")} side="right" />
-            </div>
-          )}
-
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)" }}>
-            {file.rows.map((row, rowIndex) => {
-              if (row.type === "hunk") {
-                return null;
-              }
-
-              return (
-                <div key={rowIndex} style={{ display: "contents" }}>
-                  <SplitDiffCellView cell={row.left} side="left" />
-                  <SplitDiffCellView cell={row.right} side="right" />
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function SplitDiffHeader({ title, side }: { title: string; side: "left" | "right" }) {
-  return (
-    <div
-      title={title}
-      style={{
-        padding: "5px 10px",
-        color: "var(--text-dim)",
-        borderRight: side === "left" ? "1px solid var(--border)" : "none",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap",
-      }}
-    >
-      {title}
-    </div>
-  );
-}
-
-function SplitDiffCellView({ cell, side }: { cell: SplitDiffCell; side: "left" | "right" }) {
-  const bg =
-    cell.type === "added"
-      ? "color-mix(in srgb, var(--status-success) 12%, transparent)"
-      : cell.type === "removed"
-      ? "color-mix(in srgb, var(--status-error) 13%, transparent)"
-      : cell.type === "empty"
-      ? "var(--bg-subtle)"
-      : "transparent";
-  const marker =
-    cell.type === "added" ? "+" : cell.type === "removed" ? "-" : " ";
-  const markerColor =
-    cell.type === "added" ? "var(--status-success)" : cell.type === "removed" ? "var(--status-error)" : "var(--text-dim)";
-
-  return (
-    <div
-      style={{
-        display: "flex",
-        minWidth: 0,
-        background: bg,
-        borderRight: side === "left" ? "1px solid var(--border)" : "none",
-      }}
-    >
-      <span
-        style={{
-          width: 42,
-          padding: "0 6px",
-          textAlign: "right",
-          color: "var(--text-dim)",
-          userSelect: "none",
-          background: "var(--bg-panel)",
-          borderRight: "1px solid var(--border)",
-          flexShrink: 0,
-        }}
-      >
-        {cell.lineNo ?? ""}
-      </span>
-      <span
-        style={{
-          width: 18,
-          padding: "0 5px",
-          color: markerColor,
-          userSelect: "none",
-          fontWeight: cell.type === "context" || cell.type === "empty" ? 400 : 700,
-          flexShrink: 0,
-        }}
-      >
-        {marker}
-      </span>
-      <span
-        style={{
-          flex: 1,
-          minWidth: 0,
-          padding: "0 10px 0 0",
-          color: cell.type === "empty" ? "var(--text-dim)" : "var(--text)",
-          whiteSpace: "pre-wrap",
-          overflowWrap: "anywhere",
-        }}
-      >
-        {cell.text || "\u00a0"}
-      </span>
-    </div>
-  );
-}
-
-function PatchTextView({ text }: { text: string }) {
-  const lines = text.split(/\r?\n/);
-
-  return (
-    <div style={{ maxHeight: 520, overflowY: "auto", overflowX: "hidden", fontFamily: "var(--font-mono)", fontSize: 12, lineHeight: 1.55, minWidth: 0 }}>
-      {lines.map((line, i) => {
-        const kind =
-          line.startsWith("@@") ? "hunk" :
-          line.startsWith("+") && !line.startsWith("+++") ? "added" :
-          line.startsWith("-") && !line.startsWith("---") ? "removed" :
-          "context";
-        const bg =
-          kind === "added" ? "color-mix(in srgb, var(--status-success) 12%, transparent)" :
-          kind === "removed" ? "color-mix(in srgb, var(--status-error) 13%, transparent)" :
-          kind === "hunk" ? "color-mix(in srgb, var(--accent) 12%, transparent)" :
-          "transparent";
-        const color =
-          kind === "added" ? "var(--status-success)" :
-          kind === "removed" ? "var(--status-error)" :
-          kind === "hunk" ? "var(--accent)" :
-          "var(--text)";
-
-        return (
-          <div
-            key={i}
-            style={{
-              display: "flex",
-              background: bg,
-              borderLeft: kind === "added"
-                ? "3px solid var(--status-success)"
-                : kind === "removed"
-                ? "3px solid var(--status-error)"
-                : kind === "hunk"
-                ? "3px solid var(--accent)"
-                : "3px solid transparent",
-            }}
-          >
-            <span
-              style={{
-                width: 48,
-                padding: "0 8px",
-                color: "var(--text-dim)",
-                background: "var(--bg-panel)",
-                borderRight: "1px solid var(--border)",
-                textAlign: "right",
-                userSelect: "none",
-                flexShrink: 0,
-              }}
-            >
-              {i + 1}
-            </span>
-            <span style={{ padding: "0 10px", whiteSpace: "pre-wrap", overflowWrap: "anywhere", color }}>
-              {line || "\u00a0"}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function PairedResult({ text, isEmpty, isError }: {
-  text: string;
-  isEmpty: boolean;
-  isError: boolean;
-}) {
-  const { t } = useI18n();
-  return (
-    <div className={`tool-call-output${isError ? " tool-call-output-error" : ""}`}>
-      <pre className="tool-call-output-text" data-tool-output="true">
-        {isEmpty ? t("messageView.noOutput") : text}
-      </pre>
-    </div>
-  );
-}
 
 function CompactionMessageView({ message }: { message: CustomMessage }) {
   const { t, locale } = useI18n();
@@ -1926,73 +1626,6 @@ function previewText(text: string): string {
   const normalized = text.replace(/\s+/g, " ").trim();
   if (!normalized) return translate("messageView.showExtensionMessage");
   return normalized.length > 140 ? `${normalized.slice(0, 140)}...` : normalized;
-}
-
-
-function getToolPreview(block: ToolCallContent): string {
-  const input = block.input;
-  if (!input || typeof input !== "object") return "";
-  const keys = Object.keys(input);
-  if (keys.length === 0) return "";
-
-  // Common tool input patterns
-  if ("command" in input) return String(input.command).slice(0, 120);
-  if ("path" in input) return String(input.path).slice(0, 120);
-  if ("file_path" in input) return String(input.file_path).slice(0, 120);
-  if ("pattern" in input) return String(input.pattern).slice(0, 120);
-  if ("query" in input) return String(input.query).slice(0, 120);
-
-  const first = input[keys[0]];
-  return String(first).slice(0, 120);
-}
-function formatToolCommand(block: ToolCallContent): string {
-  const input = block.input;
-  if (input && typeof input.command === "string") return input.command;
-  if (input && typeof input.path === "string") return `${block.toolName} ${input.path}`;
-  if (input && typeof input.file_path === "string") return `${block.toolName} ${input.file_path}`;
-  if (input && typeof input.query === "string") return `${block.toolName} ${input.query}`;
-  try {
-    return `${block.toolName} ${JSON.stringify(input)}`;
-  } catch {
-    return block.toolName;
-  }
-}
-
-function formatToolOutput(text: string, toolName: string): string {
-  if (!isReadToolName(toolName)) return text;
-  return text
-    .split("\n")
-    .map((line) => line.replace(/^\s*\d+:\s?/, ""))
-    .join("\n");
-}
-
-function isReadToolName(toolName: string): boolean {
-  const name = toolName.toLowerCase();
-  return name === "read" || name.endsWith(".read") || name.endsWith("_read");
-}
-
-function getToolResultMeta(result: ToolResultMessage | undefined): string | null {
-  if (!result || !isRecord(result.details)) return null;
-  const details = result.details;
-  const usage = isRecord(details.usage) ? details.usage : details;
-  const readNumber = (...keys: string[]): number | undefined => {
-    for (const key of keys) {
-      const value = usage[key];
-      if (typeof value === "number" && Number.isFinite(value) && value > 0) return value;
-    }
-    return undefined;
-  };
-  const input = readNumber("input", "inputTokens", "input_tokens");
-  const output = readNumber("output", "outputTokens", "output_tokens");
-  const cacheRead = readNumber("cacheRead", "cache_read", "cacheReadTokens");
-  const cacheWrite = readNumber("cacheWrite", "cache_write", "cacheWriteTokens");
-  const parts = [
-    input ? `in ${formatCompactNumber(input)}` : null,
-    output ? `out ${formatCompactNumber(output)}` : null,
-    cacheRead ? `cache R ${formatCompactNumber(cacheRead)}` : null,
-    cacheWrite ? `cache W ${formatCompactNumber(cacheWrite)}` : null,
-  ].filter((part): part is string => Boolean(part));
-  return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 function BashExecutionView({ message, sessionId }: { message: BashExecutionMessage; sessionId?: string }) {

@@ -11,20 +11,6 @@ import { isRecord } from "../type-guards";
  * web editor round-trips; unknown fields are preserved untouched.
  */
 
-export const MODEL_API_OPTIONS = [
-  "openai-completions",
-  "openai-responses",
-  "openai-codex-responses",
-  "azure-openai-responses",
-  "anthropic-messages",
-  "bedrock-converse-stream",
-  "google-generative-ai",
-  "google-gemini-cli",
-  "google-vertex",
-] as const;
-
-export const THINKING_EFFORTS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
-
 export interface ModelThinkingConfig {
   mode?: string;
   efforts?: string[];

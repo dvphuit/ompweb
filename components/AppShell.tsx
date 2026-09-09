@@ -11,7 +11,7 @@ import { ChatWindow } from "./ChatWindow";
 import { TabBar, type Tab } from "./TabBar";
 import { BranchNavigator } from "./BranchNavigator";
 import { LanguageSwitcher } from "./LanguageSwitcher";
-import { ArrowDown, ArrowUp, ArrowUpRight, Bot, Check, CheckCheck, Copy, Database, DollarSign, Gauge, Hash, History, Menu, Moon, PanelLeft, Percent, Sun, Terminal, User, Wand2, Wrench, Zap } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpRight, Bot, Check, CheckCheck, CircleCheck, Copy, Database, DollarSign, Folder, Gauge, Hash, History, Menu, Moon, PanelLeft, Percent, Sun, Terminal, User, Wand2, Wrench, Zap } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 import { formatCompactNumber, formatPercent, getCacheHitRate } from "@/lib/format";
 import { translate, useI18n } from "@/lib/i18n";
@@ -23,11 +23,50 @@ import { buildAtMentionText, buildFileLineMentionText } from "@/lib/file-fuzzy";
 import { getInitialNavigation } from "@/lib/initial-navigation";
 import { comparableProjectPath } from "@/lib/comparable-path";
 import { showCompletionNotification } from "@/lib/browser-notifications";
+import {
+  APP_UPDATE_COMPLETED_RELOAD_MS,
+  APP_UPDATE_POLL_MS,
+  APP_UPDATE_PREPARING_MIN_MS,
+  APP_UPDATE_STOPPING_POLL_MS,
+  APP_UPDATE_TIMEOUT_MS,
+  APP_UPDATE_VISIBLE_STAGE_MIN_MS,
+  AppUpdateTransportError,
+  COMPLETED_APP_UPDATE_KEY,
+  DISMISSED_APP_UPDATE_KEY,
+  fetchAppUpdateJson,
+  isExactLegacyTargetCompletion,
+  sanitizeAppUpdateError,
+  waitForAppUpdateDwell,
+} from "./AppShell-app-update";
+import {
+  PanelLoadingFallback,
+  SIDEBAR_DEFAULT_WIDTH,
+  SIDEBAR_WIDTH_STORAGE_KEY,
+  clampSidebarWidth,
+  loadSidebarWidth,
+  projectLabel,
+} from "./AppShell-layout";
+import {
+  formatProviderUsageReport,
+  formatUsageReset,
+  usageTone,
+  useProviderUsage,
+} from "./AppShell-provider-usage";
 import type { SessionInfo, SessionTreeNode } from "@/lib/types";
 import type { ChatInputHandle } from "./ChatInput";
 import type { SessionStatsInfo, GenerationSpeedInfo } from "@/lib/pi-types";
+import type { ProviderUsageContext } from "@/lib/provider-usage-types";
 import type { SettingsTab } from "./SettingsTabs";
 import { SettingsConfig } from "./SettingsConfig";
+import {
+  AppUpdateDialog,
+  getAppUpdateStageIndex,
+  getNextAppUpdateStage,
+  getMonotonicAppUpdateStage,
+  type AppUpdateInfo,
+  type AppUpdatePhase,
+  type AppUpdateStage,
+} from "./AppUpdateDialog";
 import { ArchiveBrowser } from "./ArchiveBrowser";
 import { publishSessionsChanged } from "@/lib/session-change-bus";
 import { ContextMenuProvider } from "./ContextMenuContext";
@@ -37,41 +76,12 @@ const FileViewer = dynamic(() => import("./FileViewer").then((m) => m.FileViewer
   loading: () => <PanelLoadingFallback />,
 });
 
-// Resizable desktop sidebar: the width is stored on the container as the
-// --sidebar-width CSS variable (globals.css) and persisted between sessions.
-const SIDEBAR_WIDTH_STORAGE_KEY = "omp-web:sidebar-width";
 const TOOL_CALLS_COLLAPSED_STORAGE_KEY = "omp-web:tool-calls-collapsed";
-const SIDEBAR_MIN_WIDTH = 200;
-const SIDEBAR_MAX_WIDTH = 520;
-const SIDEBAR_DEFAULT_WIDTH = 260;
+const PROVIDER_USAGE_VISIBLE_STORAGE_KEY = "omp-web:provider-usage-visible";
 
-function clampSidebarWidth(width: number): number {
-  return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, Math.round(width)));
-}
-
-function loadSidebarWidth(): number {
-  if (typeof window === "undefined") return SIDEBAR_DEFAULT_WIDTH;
-  try {
-    const raw = window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
-    const width = raw ? Number(raw) : NaN;
-    return Number.isFinite(width) ? clampSidebarWidth(width) : SIDEBAR_DEFAULT_WIDTH;
-  } catch {
-    return SIDEBAR_DEFAULT_WIDTH;
-  }
-}
 const CommandPalette = dynamic(() => import("./CommandPalette").then((m) => m.CommandPalette), {
   ssr: false,
 });
-
-function PanelLoadingFallback() {
-  const { t } = useI18n();
-  return (
-    <div role="status" style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 12 }}>
-      {t("appShell.loading")}
-    </div>
-  );
-}
-
 
 type SessionCopyField = "file" | "id";
 type AutoNameStatus =
@@ -79,6 +89,7 @@ type AutoNameStatus =
   | { kind: "naming" }
   | { kind: "success" }
   | { kind: "error"; message: string };
+type TimerHandle = NodeJS.Timeout;
 
 export function AppShell() {
   const router = useRouter();
@@ -105,6 +116,7 @@ export function AppShell() {
   const [mobileSidebarReady, setMobileSidebarReady] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState<number>(SIDEBAR_DEFAULT_WIDTH);
   const [toolCallsDefaultCollapsed, setToolCallsDefaultCollapsed] = useState(true);
+  const [providerUsageVisible, setProviderUsageVisible] = useState(true);
   const [sidebarResizing, setSidebarResizing] = useState(false);
   // Active drag handlers so an unmount mid-drag can detach them.
   const sidebarResizeHandlersRef = useRef<{ onMove: (ev: MouseEvent) => void; onUp: () => void } | null>(null);
@@ -115,6 +127,7 @@ export function AppShell() {
     setSidebarWidth(loadSidebarWidth());
     try {
       setToolCallsDefaultCollapsed(window.localStorage.getItem(TOOL_CALLS_COLLAPSED_STORAGE_KEY) !== "false");
+      setProviderUsageVisible(window.localStorage.getItem(PROVIDER_USAGE_VISIBLE_STORAGE_KEY) !== "false");
     } catch {
       // Keep the compact default when storage is unavailable.
     }
@@ -123,6 +136,14 @@ export function AppShell() {
     setToolCallsDefaultCollapsed(collapsed);
     try {
       window.localStorage.setItem(TOOL_CALLS_COLLAPSED_STORAGE_KEY, String(collapsed));
+    } catch {
+      // The preference still applies for this page load.
+    }
+  }, []);
+  const handleProviderUsageVisibleChange = useCallback((visible: boolean) => {
+    setProviderUsageVisible(visible);
+    try {
+      window.localStorage.setItem(PROVIDER_USAGE_VISIBLE_STORAGE_KEY, String(visible));
     } catch {
       // The preference still applies for this page load.
     }
@@ -143,7 +164,63 @@ export function AppShell() {
       // ignore storage quota / privacy-mode errors
     }
   }, [sidebarWidth, sidebarResizing]);
+  const [appUpdate, setAppUpdate] = useState<AppUpdateInfo | null>(null);
+  const [appUpdateDialogOpen, setAppUpdateDialogOpen] = useState(false);
+  const [appUpdatePhase, setAppUpdatePhase] = useState<AppUpdatePhase>("idle");
+  const [appUpdateError, setAppUpdateError] = useState<string | null>(null);
+  const appUpdateAttemptRef = useRef<string | null>(null);
+  const appUpdateStartInFlightRef = useRef(false);
+  const appUpdateCompletingRef = useRef(false);
+  const [appUpdateVisibleStage, setAppUpdateVisibleStage] = useState<AppUpdateStage | undefined>();
+  const appUpdateVisibleStageRef = useRef<AppUpdateStage | undefined>(undefined);
+  const appUpdateVisibleStageStartedAtRef = useRef<number | null>(null);
+  const appUpdateCommittedAttemptRef = useRef<string | null>(null);
+  const appUpdateRecoveryCommitAttemptRef = useRef<string | null>(null);
+  const appUpdateStageFlowRef = useRef(0);
+  const appUpdateAcknowledgementsRef = useRef<Map<string, Promise<boolean>>>(new Map());
+  const advanceAppUpdateVisibleStage = useCallback((next: AppUpdateStage) => {
+    const visible = getMonotonicAppUpdateStage(appUpdateVisibleStageRef.current, next);
+    if (visible === appUpdateVisibleStageRef.current) return;
+    appUpdateVisibleStageRef.current = visible;
+    appUpdateVisibleStageStartedAtRef.current = Date.now();
+    setAppUpdateVisibleStage(visible);
+  }, []);
+  const resetAppUpdateVisibleStage = useCallback(() => {
+    appUpdateVisibleStageRef.current = undefined;
+    appUpdateStageFlowRef.current += 1;
+    appUpdateVisibleStageStartedAtRef.current = null;
+    appUpdateCommittedAttemptRef.current = null;
+    appUpdateRecoveryCommitAttemptRef.current = null;
+    setAppUpdateVisibleStage(undefined);
+    setAppUpdate((current) => current?.appUpdateDrain
+      ? { ...current, appUpdateDrain: undefined }
+      : current);
+  }, []);
+  const showAppUpdateStagesThrough = useCallback(async (target: AppUpdateStage) => {
+    const stageFlow = appUpdateStageFlowRef.current;
+    const targetIndex = getAppUpdateStageIndex(target);
+    if (appUpdateVisibleStageRef.current === undefined) {
+      advanceAppUpdateVisibleStage(target);
+      return;
+    }
+    while (true) {
+      const current = appUpdateVisibleStageRef.current;
+      if (current === undefined || getAppUpdateStageIndex(current) >= targetIndex) return;
+      await waitForAppUpdateDwell(
+        appUpdateVisibleStageStartedAtRef.current,
+        current === "preparing" ? APP_UPDATE_PREPARING_MIN_MS : APP_UPDATE_VISIBLE_STAGE_MIN_MS,
+      );
+      if (appUpdateStageFlowRef.current !== stageFlow) return;
+      const latest = appUpdateVisibleStageRef.current;
+      if (latest === undefined || getAppUpdateStageIndex(latest) >= targetIndex) return;
+      const next = getNextAppUpdateStage(latest);
+      if (next === undefined) return;
+      advanceAppUpdateVisibleStage(next);
+    }
+  }, [advanceAppUpdateVisibleStage]);
   const [ompUpdateAvailable, setOmpUpdateAvailable] = useState(false);
+  // Bumped on visibilitychange so the mount-time update checks re-run.
+  const [updateCheckKey, setUpdateCheckKey] = useState(0);
   // On mobile the sidebar is an overlay drawer; hide it by default so the chat
   // is visible on load. Runs once the breakpoint resolves after hydration.
   useEffect(() => {
@@ -165,6 +242,352 @@ export function AppShell() {
       active.blur();
     }
   }, [sidebarOpen, mobileSidebarReady]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch("/api/omp-update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "check" }),
+      signal: controller.signal,
+    })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data: { currentVersion?: string | null; availableVersion?: string | null; updateAvailable?: boolean; updateCommand?: string } | null) => {
+        setOmpUpdateAvailable(Boolean(data?.updateAvailable));
+        if (!data?.updateAvailable || !data.availableVersion) return;
+        const cmd = data.updateCommand || "omp update";
+        toast.info(
+          translate("appShell.ompUpdateAvailable"),
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
+            <div>{translate("appShell.updateVersion", { current: data.currentVersion ?? "?", available: data.availableVersion })}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+              <code style={{ background: "var(--bg-panel)", padding: "3px 7px", borderRadius: "var(--radius-control)", fontSize: 11, fontFamily: "var(--font-mono)" }}>
+                {cmd}
+              </code>
+              <button
+                type="button"
+                onClick={() => {
+                  void copyText(cmd)
+                    .then(() => toast.success(translate("appShell.commandCopied")))
+                    .catch(() => toast.error(translate("appShell.commandCopyFailed")));
+                }}
+                style={{ padding: "3px 7px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-panel)", color: "var(--text)", cursor: "pointer", fontSize: 11 }}
+              >
+                {translate("appShell.copyCommand")}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSettingsTab("system");
+                  toast.close("omp-update-available");
+                }}
+                style={{ padding: "3px 7px", border: "1px solid var(--accent-strong)", borderRadius: "var(--radius-control)", background: "var(--accent-strong)", color: "var(--on-accent)", cursor: "pointer", fontSize: 11, fontWeight: 600 }}
+              >
+                {translate("settingsConfig.ompUpdateAction")}
+              </button>
+            </div>
+          </div>,
+          { id: "omp-update-available", timeout: 0 }
+        );
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [updateCheckKey]);
+  useEffect(() => {
+    const recheck = () => {
+      if (document.visibilityState !== "visible") return;
+      // A transient failure on mount reads as "no update" forever otherwise;
+      // re-running the checks below on re-focus gives them another chance.
+      setUpdateCheckKey((key) => key + 1);
+    };
+    document.addEventListener("visibilitychange", recheck);
+    return () => document.removeEventListener("visibilitychange", recheck);
+  }, []);
+  const refreshAppUpdate = useCallback(async (force = false, autoOpen = false): Promise<AppUpdateInfo | null> => {
+    const data = await fetchAppUpdateJson<AppUpdateInfo>(
+      force ? "/api/app-update?force=1" : "/api/app-update",
+      { cache: "no-store" },
+    );
+    if (
+      autoOpen
+      && (appUpdateStartInFlightRef.current || appUpdateAttemptRef.current !== null || appUpdateCompletingRef.current)
+    ) return null;
+
+    setAppUpdate(data);
+
+    if (autoOpen && !data.selfUpdateStatus && data.updateAvailable && data.availableVersion) {
+      if (data.selfUpdateSupported === true) {
+        let dismissed: string | null = null;
+        try { dismissed = window.localStorage.getItem(DISMISSED_APP_UPDATE_KEY); } catch {}
+        if (dismissed !== data.availableVersion) {
+          setAppUpdatePhase("idle");
+          setAppUpdateError(null);
+          setAppUpdateDialogOpen(true);
+        }
+      } else {
+        const cmd = data.updateCommand || "npm install -g @kahme247/ompweb";
+        toast.info(
+          translate("appShell.appUpdateAvailable"),
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
+            <div>{translate("appShell.updateVersion", { current: data.currentVersion ?? "?", available: data.availableVersion })}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+              <code style={{ background: "var(--bg-panel)", padding: "3px 7px", borderRadius: "var(--radius-control)", fontSize: 11, fontFamily: "var(--font-mono)" }}>
+                {cmd}
+              </code>
+              <button
+                type="button"
+                onClick={() => {
+                  void copyText(cmd)
+                    .then(() => toast.success(translate("appShell.commandCopied")))
+                    .catch(() => toast.error(translate("appShell.commandCopyFailed")));
+                }}
+                style={{ padding: "3px 7px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-panel)", color: "var(--text)", cursor: "pointer", fontSize: 11 }}
+              >
+                {translate("appShell.copyCommand")}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSettingsTab("system");
+                  toast.close("app-update-available");
+                }}
+                style={{ padding: "3px 7px", border: "1px solid var(--accent-strong)", borderRadius: "var(--radius-control)", background: "var(--accent-strong)", color: "var(--on-accent)", cursor: "pointer", fontSize: 11, fontWeight: 600 }}
+              >
+                {translate("settingsConfig.appUpdateAction")}
+              </button>
+            </div>
+          </div>,
+          { id: "app-update-available", timeout: 0 }
+        );
+      }
+    }
+    return data;
+  }, []);
+
+  const acknowledgeAppUpdate = useCallback((attemptId: string): Promise<boolean> => {
+    const existing = appUpdateAcknowledgementsRef.current.get(attemptId);
+    if (existing) return existing;
+    const request = (async () => {
+      try {
+        const response = await fetch("/api/app-update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "acknowledge", attemptId }),
+        });
+        return response.ok;
+      } catch {
+        return false;
+      }
+    })();
+    appUpdateAcknowledgementsRef.current.set(attemptId, request);
+    void request.then((acknowledged) => {
+      if (!acknowledged && appUpdateAcknowledgementsRef.current.get(attemptId) === request) {
+        appUpdateAcknowledgementsRef.current.delete(attemptId);
+      }
+    });
+    return request;
+  }, []);
+
+  const showAppUpdateFailure = useCallback((error: unknown) => {
+    appUpdateAttemptRef.current = null;
+    appUpdateStartInFlightRef.current = false;
+    appUpdateCommittedAttemptRef.current = null;
+    setAppUpdateError(sanitizeAppUpdateError(error) || null);
+    setAppUpdatePhase("failed");
+    appUpdateStageFlowRef.current += 1;
+    setAppUpdateDialogOpen(true);
+  }, []);
+
+  const submitAppUpdateCommit = useCallback((attemptId: string) => {
+    void fetchAppUpdateJson<{ error?: string }>("/api/app-update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "commit", attemptId }),
+      keepalive: true,
+    }, 202).then(() => {
+      if (appUpdateAttemptRef.current === attemptId) {
+        appUpdateCommittedAttemptRef.current = attemptId;
+      }
+    }).catch((error) => {
+      if (error instanceof AppUpdateTransportError) {
+        if (appUpdateRecoveryCommitAttemptRef.current === attemptId) {
+          appUpdateRecoveryCommitAttemptRef.current = null;
+        }
+        return;
+      }
+      if (appUpdateAttemptRef.current !== attemptId) return;
+      showAppUpdateFailure(error);
+    });
+  }, [showAppUpdateFailure]);
+
+  const recoverPreparedAppUpdate = useCallback((data: AppUpdateInfo, attemptId: string) => {
+    const status = data.selfUpdateStatus;
+    if (
+      status?.attemptId !== attemptId
+      || status.state !== "prepared"
+      || (status.stage !== "preparing" && status.stage !== "stopping")
+    ) return;
+    if (appUpdateRecoveryCommitAttemptRef.current === attemptId) return;
+    appUpdateRecoveryCommitAttemptRef.current = attemptId;
+    submitAppUpdateCommit(attemptId);
+  }, [submitAppUpdateCommit]);
+
+  const completeAppUpdate = useCallback(async (targetVersion: string) => {
+    if (appUpdateCompletingRef.current) return;
+    appUpdateCompletingRef.current = true;
+    appUpdateAttemptRef.current = null;
+    appUpdateCommittedAttemptRef.current = null;
+    appUpdateStartInFlightRef.current = false;
+    await showAppUpdateStagesThrough("finalizing");
+    await waitForAppUpdateDwell(appUpdateVisibleStageStartedAtRef.current, APP_UPDATE_VISIBLE_STAGE_MIN_MS);
+    setAppUpdateError(null);
+    setAppUpdatePhase("completed");
+    setAppUpdateDialogOpen(true);
+    try {
+      window.sessionStorage.setItem(COMPLETED_APP_UPDATE_KEY, JSON.stringify({ version: targetVersion }));
+    } catch {}
+    await new Promise<void>((resolve) => window.setTimeout(resolve, APP_UPDATE_COMPLETED_RELOAD_MS));
+    appUpdateRecoveryCommitAttemptRef.current = null;
+    window.location.reload();
+  }, [showAppUpdateStagesThrough]);
+
+  const handleTerminalAppUpdate = useCallback(async (
+    data: AppUpdateInfo,
+    attemptId: string,
+    targetVersion: string,
+  ): Promise<boolean> => {
+    const status = data.selfUpdateStatus;
+    if (status?.attemptId !== attemptId || status.cleanupReady !== true) return false;
+    if (status.state === "failed") {
+      if (!await acknowledgeAppUpdate(attemptId)) return false;
+      showAppUpdateFailure(status.error);
+      return true;
+    }
+    if (status.state === "succeeded" && data.currentVersion === targetVersion) {
+      if (!await acknowledgeAppUpdate(attemptId)) return false;
+      await completeAppUpdate(targetVersion);
+      return true;
+    }
+    return false;
+  }, [acknowledgeAppUpdate, completeAppUpdate, showAppUpdateFailure]);
+
+  const monitorAppUpdate = useCallback(async (attemptId: string, targetVersion: string) => {
+    if (appUpdateAttemptRef.current === attemptId) return;
+    appUpdateAttemptRef.current = attemptId;
+    const deadline = Date.now() + APP_UPDATE_TIMEOUT_MS;
+    while (appUpdateAttemptRef.current === attemptId && Date.now() < deadline) {
+      await new Promise<void>((resolve) => window.setTimeout(
+        resolve,
+        appUpdateVisibleStageRef.current === "stopping" ? APP_UPDATE_STOPPING_POLL_MS : APP_UPDATE_POLL_MS,
+      ));
+      try {
+        const data = await refreshAppUpdate();
+        if (!data) continue;
+        const status = data.selfUpdateStatus;
+        if (status?.attemptId === attemptId && status.stage !== undefined) {
+          if (status.stage !== "preparing") appUpdateCommittedAttemptRef.current = attemptId;
+          await showAppUpdateStagesThrough(status.stage);
+        }
+        recoverPreparedAppUpdate(data, attemptId);
+        if (await handleTerminalAppUpdate(data, attemptId, targetVersion)) return;
+        if (isExactLegacyTargetCompletion(data, targetVersion)) {
+          // Legacy targets do not expose the status/acknowledge contract. Exact
+          // version equality is the completion proof; updater artifacts expire
+          // through the backend's terminal-status TTL instead of UI cleanup.
+          await completeAppUpdate(targetVersion);
+          return;
+        }
+      } catch (error) {
+        if (error instanceof AppUpdateTransportError) {
+          if (appUpdateCommittedAttemptRef.current === attemptId) {
+            advanceAppUpdateVisibleStage("installing");
+          }
+          // Connection failures are expected after commit while the server is offline.
+          continue;
+        }
+        showAppUpdateFailure(error);
+        return;
+      }
+    }
+    if (appUpdateAttemptRef.current === attemptId) {
+      showAppUpdateFailure(t("appUpdateDialog.timeout"));
+    }
+  }, [advanceAppUpdateVisibleStage, completeAppUpdate, handleTerminalAppUpdate, recoverPreparedAppUpdate, refreshAppUpdate, showAppUpdateFailure, showAppUpdateStagesThrough, t]);
+
+  useEffect(() => {
+    try {
+      const raw = window.sessionStorage.getItem(COMPLETED_APP_UPDATE_KEY);
+      if (raw) {
+        const completed = JSON.parse(raw) as { version?: unknown };
+        window.sessionStorage.removeItem(COMPLETED_APP_UPDATE_KEY);
+        if (typeof completed.version === "string") {
+          toast.success(t("appUpdateDialog.completed", { version: completed.version }));
+        }
+      }
+    } catch {}
+    void refreshAppUpdate(false, true)
+      .then(async (data) => {
+        const status = data?.selfUpdateStatus;
+        if (!data || !status) return;
+        const recoveredStage = status.stage ?? "stopping";
+        const initialStage = recoveredStage === "preparing" ? "preparing" : "stopping";
+        if (initialStage === "stopping") appUpdateCommittedAttemptRef.current = status.attemptId;
+        advanceAppUpdateVisibleStage(initialStage);
+        setAppUpdatePhase(initialStage === "preparing" ? "preparing" : "restarting");
+        setAppUpdateDialogOpen(true);
+        await showAppUpdateStagesThrough(recoveredStage);
+        if (await handleTerminalAppUpdate(data, status.attemptId, status.targetVersion)) return;
+        void monitorAppUpdate(status.attemptId, status.targetVersion);
+        recoverPreparedAppUpdate(data, status.attemptId);
+      })
+      .catch(() => {});
+  }, [advanceAppUpdateVisibleStage, handleTerminalAppUpdate, monitorAppUpdate, recoverPreparedAppUpdate, refreshAppUpdate, showAppUpdateStagesThrough, t]);
+
+  const proceedWithAppUpdate = useCallback(async () => {
+    if (appUpdateStartInFlightRef.current) return;
+    appUpdateStartInFlightRef.current = true;
+    appUpdateCompletingRef.current = false;
+    resetAppUpdateVisibleStage();
+    advanceAppUpdateVisibleStage("preparing");
+    setAppUpdatePhase("preparing");
+    setAppUpdateError(null);
+    try {
+      const prepared = await fetchAppUpdateJson<{ attemptId?: string; targetVersion?: string }>("/api/app-update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "prepare" }),
+      });
+      if (!prepared.attemptId || !prepared.targetVersion) {
+        throw new Error("Invalid update response");
+      }
+      submitAppUpdateCommit(prepared.attemptId);
+      void monitorAppUpdate(prepared.attemptId, prepared.targetVersion);
+      await showAppUpdateStagesThrough("stopping");
+      if (appUpdateAttemptRef.current !== prepared.attemptId) return;
+      setAppUpdatePhase("restarting");
+    } catch (error) {
+      showAppUpdateFailure(error);
+    }
+  }, [advanceAppUpdateVisibleStage, monitorAppUpdate, resetAppUpdateVisibleStage, showAppUpdateFailure, showAppUpdateStagesThrough, submitAppUpdateCommit]);
+
+  const dismissAppUpdate = useCallback(() => {
+    if (appUpdatePhase === "idle" && appUpdate?.availableVersion) {
+      try { window.localStorage.setItem(DISMISSED_APP_UPDATE_KEY, appUpdate.availableVersion); } catch {}
+      toast.info(t("appUpdateDialog.settingsLater"));
+    }
+    setAppUpdateDialogOpen(false);
+    setAppUpdatePhase("idle");
+    setAppUpdateError(null);
+    appUpdateAttemptRef.current = null;
+    resetAppUpdateVisibleStage();
+  }, [appUpdate?.availableVersion, appUpdatePhase, resetAppUpdateVisibleStage, t]);
+
+  const requestAppUpdateFromSettings = useCallback(() => {
+    setSettingsTab(null);
+    resetAppUpdateVisibleStage();
+    setAppUpdateError(null);
+    setAppUpdatePhase("idle");
+    window.requestAnimationFrame(() => setAppUpdateDialogOpen(true));
+  }, [resetAppUpdateVisibleStage]);
   const chatInputRef = useRef<ChatInputHandle | null>(null);
   const topBarRef = useRef<HTMLDivElement>(null);
 
@@ -188,6 +611,7 @@ export function AppShell() {
   const systemPromptLoaderRef = useRef<(() => Promise<void>) | null>(null);
   const systemPromptLoadIdRef = useRef(0);
   const systemBtnRef = useRef<HTMLButtonElement>(null);
+  const usageBtnRef = useRef<HTMLButtonElement>(null);
   const sessionStatsBtnRef = useRef<HTMLButtonElement>(null);
 
   const handleSystemPromptChange = useCallback((prompt: string | null) => {
@@ -204,26 +628,43 @@ export function AppShell() {
   // Session stats (tokens + cost) — populated by ChatWindow, displayed in top bar
   const [sessionStats, setSessionStats] = useState<SessionStatsInfo | null>(null);
   const [autoNameStatus, setAutoNameStatus] = useState<AutoNameStatus>({ kind: "idle" });
-  const autoNameTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoNameTimerRef = useRef<TimerHandle | undefined>(undefined);
   const activeSessionIdRef = useRef<string | null>(selectedSession?.id ?? null);
-  activeSessionIdRef.current = selectedSession?.id ?? null;
+  const archiveRetryTimerRef = useRef<TimerHandle | undefined>(undefined);
+  useEffect(() => () => clearTimeout(archiveRetryTimerRef.current), []);
+  useLayoutEffect(() => {
+    activeSessionIdRef.current = selectedSession?.id ?? null;
+  }, [selectedSession?.id]);
   const handleSessionStatsChange = useCallback((stats: SessionStatsInfo | null) => {
     setSessionStats(stats);
   }, []);
   const [copiedSessionField, setCopiedSessionField] = useState<SessionCopyField | null>(null);
-  const sessionCopyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sessionCopyTimerRef = useRef<TimerHandle | undefined>(undefined);
   const handleCopySessionField = useCallback((field: SessionCopyField, value: string) => {
     void copyText(value).then(() => {
-      if (sessionCopyTimerRef.current) clearTimeout(sessionCopyTimerRef.current);
+      clearTimeout(sessionCopyTimerRef.current);
       setCopiedSessionField(field);
       sessionCopyTimerRef.current = setTimeout(() => setCopiedSessionField(null), 1400);
     });
   }, []);
 
+  const [providerUsageContext, setProviderUsageContext] = useState<ProviderUsageContext | null>(null);
+  const handleProviderUsageContextChange = useCallback((context: ProviderUsageContext | null) => {
+    setProviderUsageContext(context);
+  }, []);
+  const activeProvider = providerUsageContext?.provider ?? null;
+  const activeModelId = providerUsageContext?.modelId ?? null;
+  const providerUsageQuery = providerUsageVisible && activeProvider
+    ? new URLSearchParams({ provider: activeProvider, ...(activeModelId ? { model: activeModelId } : {}) }).toString()
+    : null;
+  const { snapshot: providerUsage, loading: providerUsageLoading, error: providerUsageError } =
+    useProviderUsage(providerUsageQuery, 5 * 60_000);
+
+
   useEffect(() => {
     return () => {
-      if (sessionCopyTimerRef.current) clearTimeout(sessionCopyTimerRef.current);
-      if (autoNameTimerRef.current) clearTimeout(autoNameTimerRef.current);
+      clearTimeout(sessionCopyTimerRef.current);
+      clearTimeout(autoNameTimerRef.current);
     };
   }, []);
 
@@ -238,12 +679,17 @@ export function AppShell() {
   }, []);
 
   // Single active panel — only one dropdown open at a time
-  const [activeTopPanel, setActiveTopPanel] = useState<"branches" | "system" | "session" | null>(null);
-  const [topPanelPos, setTopPanelPos] = useState<{ top: number; left: number; width: number } | null>(null);
-  const toggleTopPanel = useCallback((panel: "branches" | "system" | "session") => {
+  const [activeTopPanel, setActiveTopPanel] = useState<"branches" | "system" | "usage" | "session" | null>(null);
+  const toggleTopPanel = useCallback((panel: "branches" | "system" | "usage" | "session") => {
     if (isMobile) setSidebarOpen(false);
     setActiveTopPanel((cur) => cur === panel ? null : panel);
   }, [isMobile]);
+  const { snapshot: allProviderUsage, loading: allProviderUsageLoading, error: allProviderUsageError } =
+    useProviderUsage(activeTopPanel === "usage" ? "" : null, 5 * 60_000);
+
+  useEffect(() => {
+    if (!providerUsageVisible && activeTopPanel === "usage") setActiveTopPanel(null);
+  }, [activeTopPanel, providerUsageVisible]);
 
   // Generation speed — current live t/s and the session average.
   const [generationSpeed, setGenerationSpeed] = useState<GenerationSpeedInfo | null>(null);
@@ -302,9 +748,21 @@ export function AppShell() {
     e.preventDefault();
     const startX = e.clientX;
     const startWidth = sidebarWidth;
+    // Interface Scale (html[data-ui-scale] zoom) leaves clientX in viewport
+    // pixels while the sidebar width is zoomed layout pixels: scale the drag
+    // delta so the edge tracks the pointer at any zoom (same --ui-scale
+    // ground truth as the zoom-aware menus in SessionSidebar-chrome).
+    let uiScale = 1;
+    try {
+      const raw = getComputedStyle(document.documentElement).getPropertyValue("--ui-scale");
+      const value = parseFloat(raw);
+      if (Number.isFinite(value) && value > 0) uiScale = value;
+    } catch {
+      // SSR/unavailable: fall back to unscaled math.
+    }
     setSidebarResizing(true);
     const onMove = (ev: MouseEvent) => {
-      const next = clampSidebarWidth(startWidth + (ev.clientX - startX));
+      const next = clampSidebarWidth(startWidth + (ev.clientX - startX) / uiScale);
       // Write the CSS variable straight to the DOM: the flex row follows the
       // pointer without re-rendering the whole AppShell on every mousemove.
       sidebarContainerRef.current?.style.setProperty("--sidebar-width", `${next}px`);
@@ -341,28 +799,17 @@ export function AppShell() {
     document.body.style.userSelect = "";
   }, []);
 
-  useEffect(() => {
-    if (!activeTopPanel || !topBarRef.current) return;
-    const update = () => {
-      const rect = topBarRef.current!.getBoundingClientRect();
-      setTopPanelPos({ top: rect.bottom, left: rect.left, width: rect.width });
-    };
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(topBarRef.current);
-    return () => ro.disconnect();
-  }, [activeTopPanel]);
 
-  // Dismiss the system/session dropdowns on outside click or Escape. The
-  // Escape handler stops propagation so the global Esc (abort agent) does not
-  // fire while a panel is open; clicks on the trigger buttons themselves are
-  // ignored here — their onClick toggles the panel.
+  // Dismiss the topbar dropdowns on outside click or Escape. The Escape
+  // handler stops propagation so the global Esc (abort agent) does not fire
+  // while a panel is open.
   useEffect(() => {
     // The branch panel manages its own outside-click and Escape dismissal.
     if (!activeTopPanel || activeTopPanel === "branches") return;
     const onPointerDown = (event: MouseEvent) => {
       if (event.target instanceof Element && event.target.closest("[data-top-panel]")) return;
       if (systemBtnRef.current?.contains(event.target as Node)) return;
+      if (usageBtnRef.current?.contains(event.target as Node)) return;
       if (sessionStatsBtnRef.current?.contains(event.target as Node)) return;
       setActiveTopPanel(null);
     };
@@ -398,8 +845,11 @@ export function AppShell() {
   const [activeCwd, setActiveCwd] = useState<string | null>(null);
   // True once the initial ?session= URL param has been resolved (or confirmed absent)
   const [initialSessionRestored, setInitialSessionRestored] = useState<boolean>(() => !initialSessionId);
-  // Suppresses sessionKey bump in handleCwdChange during the initial URL restore
-  const suppressCwdBumpRef = useRef(false);
+  // During the initial URL restore the sidebar adopts the restored cwd and
+  // notifies us; that first onCwdChange must not bump sessionKey. We store the
+  // expected cwd string and only skip when it matches, so a failure to fire
+  // can't leave the suppression armed for the user's next genuine switch.
+  const suppressCwdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const requestedCwd = initialNavigation.requestedCwd;
@@ -423,8 +873,7 @@ export function AppShell() {
 
         // The sidebar will notify us when it adopts this cwd. Avoid remounting
         // the just-created empty chat during that initial synchronization.
-        suppressCwdBumpRef.current = true;
-        setNewSessionCwd(data.cwd);
+        suppressCwdRef.current = data.cwd;
         setInitialCwdStatus("ready");
       })
       .catch((error: unknown) => {
@@ -440,8 +889,9 @@ export function AppShell() {
     setActiveCwd(cwd);
     // Skip if cwd is null (initial mount) or during the initial URL restore.
     if (!cwd) return;
-    if (suppressCwdBumpRef.current) {
-      suppressCwdBumpRef.current = false;
+    // Skip only when the notification matches the cwd we're suppressing for.
+    if (suppressCwdRef.current !== null && suppressCwdRef.current === cwd) {
+      suppressCwdRef.current = null;
       return;
     }
     // Worktrees of one repo share a project root. Moving the effective cwd
@@ -472,6 +922,10 @@ export function AppShell() {
   }, [router, selectedSession]);
 
   const handleSelectSession = useCallback((session: SessionInfo, isRestore = false) => {
+    // Re-picking the already-open session (sidebar double-click, palette
+    // re-select, notification click) must not bump sessionKey: that remounts
+    // ChatWindow, reconnects SSE, and drops the mid-run streaming view.
+    if (!isRestore && session.id === selectedSession?.id) return;
     setNewSessionCwd(null);
     setSelectedSession(session);
     setSessionKey((k) => k + 1);
@@ -482,15 +936,18 @@ export function AppShell() {
     if (isMobile && !isRestore) setSidebarOpen(false);
     if (isRestore) {
       // Suppress the redundant sessionKey bump that would come from the
-      // onCwdChange effect firing after setSelectedCwd in the sidebar
-      suppressCwdBumpRef.current = true;
+      // onCwdChange effect firing after setSelectedCwd in the sidebar. We
+      // arm the expected cwd (compared in handleCwdChange) rather than a
+      // sticky flag so a missed notification can't suppress the next
+      // genuine project switch.
+      suppressCwdRef.current = session.cwd;
     }
     // Skip router.replace when restoring from URL — the param is already correct
     // and calling replace in production Next.js triggers a Suspense remount loop
     if (!isRestore) {
       router.replace(`?session=${encodeURIComponent(session.id)}`, { scroll: false });
     }
-  }, [router, isMobile]);
+  }, [router, isMobile, selectedSession?.id]);
 
   const handleNewSession = useCallback((_sessionId: string, cwd: string) => {
     setSelectedSession(null);
@@ -554,13 +1011,17 @@ export function AppShell() {
     if (Notification.permission === "granted") notify();
     else if (Notification.permission === "default") {
       void Notification.requestPermission().then((permission) => { if (permission === "granted") notify(); });
+    } else {
+      // "denied": the OS blocks notifications, so surface the completion as an
+      // in-app toast instead of leaving background completions silent.
+      toast.info(targetSession?.name ?? translate("appShell.sessionComplete"), translate("appShell.taskFinished"));
     }
   }, [handleSelectSession, selectedSession]);
 
   const handleAutoName = useCallback(async () => {
     const sessionId = selectedSession?.id;
     if (!sessionId || autoNameStatus.kind === "naming") return;
-    if (autoNameTimerRef.current) clearTimeout(autoNameTimerRef.current);
+    clearTimeout(autoNameTimerRef.current);
     setActiveTopPanel(null);
     setAutoNameStatus({ kind: "naming" });
 
@@ -574,8 +1035,8 @@ export function AppShell() {
       }
 
       const title = body.title.trim();
-      setRefreshKey((key) => key + 1);
       if (activeSessionIdRef.current !== sessionId) return;
+      setRefreshKey((key) => key + 1);
       setSelectedSession((current) => current?.id === sessionId ? { ...current, name: title } : current);
       setSessionStats((current) => current?.sessionId === sessionId ? { ...current, sessionName: title } : current);
       setAutoNameStatus({ kind: "success" });
@@ -589,7 +1050,7 @@ export function AppShell() {
   }, [autoNameStatus.kind, selectedSession?.id]);
 
   useEffect(() => {
-    if (autoNameTimerRef.current) clearTimeout(autoNameTimerRef.current);
+    clearTimeout(autoNameTimerRef.current);
     setAutoNameStatus({ kind: "idle" });
   }, [selectedSession?.id]);
 
@@ -609,14 +1070,13 @@ export function AppShell() {
     setSelectedSession((prev) => ({
       ...(prev ?? { path: "", cwd: "", created: "", modified: "", messageCount: 0, firstMessage: "" }),
       id: newSessionId,
+      // path === "" is the sidebar's optimistic-row marker; keep it so the
+      // fork shows up immediately instead of waiting for a refresh.
+      path: "",
     }));
     hydrateSelectedSession(newSessionId);
     router.replace(`?session=${encodeURIComponent(newSessionId)}`, { scroll: false });
   }, [router, hydrateSelectedSession]);
-
-  const handleInitialRestoreDone = useCallback(() => {
-    setInitialSessionRestored(true);
-  }, []);
 
   const handleSessionDeleted = useCallback((sessionId: string) => {
     setRefreshKey((k) => k + 1);
@@ -632,18 +1092,29 @@ export function AppShell() {
       router.replace("/", { scroll: false });
     }
   }, [selectedSession, router]);
+  const handleInitialRestoreDone = useCallback(() => {
+    setInitialSessionRestored(true);
+  }, []);
+
   const handleArchiveRestored = useCallback(async (sessionId: string) => {
     setArchiveBrowserOpen(false);
     publishSessionsChanged([sessionId]);
     setRefreshKey((k) => k + 1);
 
+    // The poll must not yank the UI back to the restored session if the user
+    // picks another one while we wait, and an untracked setTimeout chain would
+    // keep retrying after unmount — so freeze the selection at start, bail out
+    // of every attempt + the fallback when it changed, and track the timer.
+    const sessionAtRestoreStart = activeSessionIdRef.current;
     const selectRestoredSession = async (attemptsLeft = 5): Promise<void> => {
+      if (activeSessionIdRef.current !== sessionAtRestoreStart) return;
       try {
         const res = await fetch("/api/sessions");
         if (res.ok) {
           const data = (await res.json()) as { sessions?: SessionInfo[] };
           const found = data.sessions?.find((s) => s.id === sessionId);
           if (found) {
+            if (activeSessionIdRef.current !== sessionAtRestoreStart) return;
             handleSelectSession(found, false);
             return;
           }
@@ -653,14 +1124,28 @@ export function AppShell() {
       }
 
       if (attemptsLeft > 0) {
-        setTimeout(() => void selectRestoredSession(attemptsLeft - 1), 300);
-      } else {
+        archiveRetryTimerRef.current = setTimeout(() => void selectRestoredSession(attemptsLeft - 1), 300);
+      } else if (activeSessionIdRef.current === sessionAtRestoreStart) {
         router.replace(`?session=${encodeURIComponent(sessionId)}`, { scroll: false });
       }
     };
 
     void selectRestoredSession();
   }, [handleSelectSession, router]);
+
+  const handleCloseFileTab = useCallback((tabId: string) => {
+    // Compute everything from the current list outside the updaters: no side
+    // effect inside a state updater, and no stale-closure read (the callback
+    // is recreated whenever fileTabs changes, but a batched double-close
+    // would still have read the pre-close list from the closure).
+    const next = fileTabs.filter((t) => t.id !== tabId);
+    setFileTabs(next);
+    if (next.length === 0) setRightPanelOpen(false);
+    setActiveFileTabId((cur) => {
+      if (cur !== tabId) return cur;
+      return next.length > 0 ? next[next.length - 1].id : null;
+    });
+  }, [fileTabs]);
 
   const handleOpenFile = useCallback((filePath: string, fileName: string, sourceSessionId?: string | null) => {
     const tabId = `file:${filePath}`;
@@ -679,20 +1164,6 @@ export function AppShell() {
   const handleOpenLinkedFile = useCallback((filePath: string) => {
     handleOpenFile(filePath, getFileName(filePath), selectedSession?.id ?? null);
   }, [handleOpenFile, selectedSession?.id]);
-
-  const handleCloseFileTab = useCallback((tabId: string) => {
-    // Compute everything from the current list outside the updaters: no side
-    // effect inside a state updater, and no stale-closure read (the callback
-    // is recreated whenever fileTabs changes, but a batched double-close
-    // would still have read the pre-close list from the closure).
-    const next = fileTabs.filter((t) => t.id !== tabId);
-    setFileTabs(next);
-    if (next.length === 0) setRightPanelOpen(false);
-    setActiveFileTabId((cur) => {
-      if (cur !== tabId) return cur;
-      return next.length > 0 ? next[next.length - 1].id : null;
-    });
-  }, [fileTabs]);
 
   const handleViewFullHistory = useCallback(() => {
     if (!selectedSession) return;
@@ -835,7 +1306,22 @@ export function AppShell() {
     <>
       <CommandPalette
         onSelectSession={handleSelectSession}
-        onNewSession={() => handleNewSession(`palette-${Date.now()}`, activeCwd ?? "")}
+        onNewSession={() => {
+          // An empty cwd is truthy, so showChat would render the shell while
+          // useAgentSession refuses to start — every send a silent no-op.
+          // Fall back to the server's default cwd (~/omp-cwd-<date>) instead.
+          if (activeCwd) {
+            handleNewSession(`palette-${Date.now()}`, activeCwd);
+            return;
+          }
+          void fetch("/api/default-cwd", { method: "POST" })
+            .then(async (response) => {
+              const data = (await response.json().catch(() => ({}))) as { cwd?: string };
+              if (!response.ok || !data.cwd) throw new Error(`HTTP ${response.status}`);
+              handleNewSession(`palette-${Date.now()}`, data.cwd);
+            })
+            .catch(() => toast.error(translate("errors.generic")));
+        }}
         currentModel={null}
       />
       <SessionSidebar
@@ -858,10 +1344,22 @@ export function AppShell() {
         onAtMention={handleAtMention}
         onOpenSettings={() => setSettingsTab("general")}
         onOpenArchive={() => setArchiveBrowserOpen(true)}
-        updateAvailable={ompUpdateAvailable}
+        updateAvailable={Boolean(appUpdate?.updateAvailable) || ompUpdateAvailable}
       />
     </>
   );
+  const currentProviderUsageReport = providerUsage?.reports[0] ?? null;
+  const currentProviderUsageText = currentProviderUsageReport && !currentProviderUsageReport.noLimits
+    ? formatProviderUsageReport(currentProviderUsageReport, "")
+    : null;
+  const currentProviderUsagePercents = currentProviderUsageReport ? [
+    currentProviderUsageReport.fiveHour?.percent,
+    currentProviderUsageReport.sevenDay?.percent,
+    currentProviderUsageReport.monthly?.percent,
+  ].filter((percent): percent is number => percent !== undefined) : [];
+  const currentProviderUsageColor = currentProviderUsagePercents.length > 0
+    ? usageTone(Math.max(...currentProviderUsagePercents))
+    : "var(--text-muted)";
 
   return (
     <>
@@ -1016,7 +1514,7 @@ export function AppShell() {
         }
       }
     `}</style>
-    <div style={{ display: "flex", height: "100dvh", overflow: "hidden", background: "var(--bg)" }}>
+    <div style={{ display: "flex", height: "100%", flex: 1, overflow: "hidden", background: "var(--bg)" }}>
       {/* Mobile overlay backdrop */}
       <div
         className={`sidebar-overlay-backdrop${mobileSidebarReady ? "" : " sidebar-mobile-pending"}`}
@@ -1082,263 +1580,402 @@ export function AppShell() {
 
       {/* Center: chat */}
       <main style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
-        {/* Top bar: compact icon-led control bar */}
-        <div ref={topBarRef} className="shell-topbar" style={{ display: "flex", alignItems: "center", flexShrink: 0, borderBottom: "1px solid var(--border)", height: isMobile ? 44 : 36, background: "var(--bg-panel)" }}>
-        {/* Utility group: sidebar, theme, language */}
-        <div style={{ display: "flex", alignItems: "center", gap: 4, height: "100%", paddingLeft: isMobile ? 4 : 8 }}>
-          <button
-            onClick={handleSidebarToggle}
-            title={sidebarOpen ? t("appShell.hideSidebar") : t("appShell.showSidebar")}
-            aria-label={sidebarOpen ? t("appShell.hideSidebar") : t("appShell.showSidebar")}
-            className="shell-toolbar-btn ui-focus-ring"
-          >
-            {sidebarOpen ? <PanelLeft size={16} strokeWidth={1.8} aria-hidden="true" /> : <Menu size={16} strokeWidth={1.8} aria-hidden="true" />}
-          </button>
-          <button
-            onClick={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              toggleTheme({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
-            }}
-            title={preference === "system" ? t("appShell.systemTheme") : (isDark ? t("appShell.switchToSystemTheme") : t("appShell.switchToDarkMode"))}
-            aria-label={preference === "system" ? t("appShell.systemTheme") : (isDark ? t("appShell.switchToSystemTheme") : t("appShell.switchToDarkMode"))}
-            aria-pressed={isDark}
-            className="shell-toolbar-btn ui-focus-ring"
-          >
-            {isDark ? <Sun size={16} strokeWidth={1.8} aria-hidden="true" /> : <Moon size={16} strokeWidth={1.8} aria-hidden="true" />}
-          </button>
-          <LanguageSwitcher />
-        </div>
-        {showChat && (
-          <>
-            <div className="shell-toolbar-divider" aria-hidden="true" />
-            {/* Session controls: history, generate title, branches, system */}
-            <div style={{ display: "flex", alignItems: "center", gap: 4, height: "100%" }}>
-              <button
-                onClick={handleViewFullHistory}
-                disabled={!selectedSession}
-                title={selectedSession ? t("appShell.fullHistory") : t("appShell.fullHistoryUnavailable")}
-                aria-label={t("appShell.fullHistory")}
-                className="shell-toolbar-btn ui-focus-ring"
-              >
-                <History size={16} strokeWidth={1.8} aria-hidden="true" />
-              </button>
-              {(() => {
-                const hasMessages = Boolean(
-                  selectedSession
-                  && (sessionStats?.userMessages ?? selectedSession.messageCount) > 0,
-                );
-                const disabled = !selectedSession || !hasMessages || autoNameStatus.kind === "naming";
-                const isSuccess = autoNameStatus.kind === "success";
-                const isError = autoNameStatus.kind === "error";
-                const label = autoNameStatus.kind === "naming"
-                  ? t("appShell.generating")
-                  : isSuccess
-                    ? t("appShell.titleUpdated")
-                    : isError
-                      ? t("appShell.generationFailed")
-                      : t("appShell.generateTitle");
-                const title = !selectedSession
-                  ? t("appShell.titleGenUnavailable")
-                  : !hasMessages
-                    ? t("appShell.titleGenNeedsMessage")
-                    : isError
-                      ? autoNameStatus.message
-                      : t("appShell.generateSessionTitle");
+        {/* Top bar: 3-zone segmented control bar */}
+        <div ref={topBarRef} className="shell-topbar" style={{
+          position: "relative",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexShrink: 0,
+          borderBottom: "1px solid var(--border)",
+          height: isMobile ? 44 : 36,
+          background: "var(--bg-panel)",
+          padding: isMobile ? "0 4px" : "0 8px",
+          gap: 8,
+          minWidth: 0,
+        }}>
+          {/* Left Zone: Utility group (sidebar, theme, language) & session controls (history, branches, system) */}
+          <div style={{ display: "flex", alignItems: "center", gap: 4, height: "100%", flexShrink: 0 }}>
+            <button
+              onClick={handleSidebarToggle}
+              title={sidebarOpen ? t("appShell.hideSidebar") : t("appShell.showSidebar")}
+              aria-label={sidebarOpen ? t("appShell.hideSidebar") : t("appShell.showSidebar")}
+              className="shell-toolbar-btn ui-focus-ring"
+            >
+              {sidebarOpen ? <PanelLeft size={16} strokeWidth={1.8} aria-hidden="true" /> : <Menu size={16} strokeWidth={1.8} aria-hidden="true" />}
+            </button>
+            <button
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                toggleTheme({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+              }}
+              title={preference === "system" ? t("appShell.systemTheme") : (isDark ? t("appShell.switchToSystemTheme") : t("appShell.switchToDarkMode"))}
+              aria-label={preference === "system" ? t("appShell.systemTheme") : (isDark ? t("appShell.switchToSystemTheme") : t("appShell.switchToDarkMode"))}
+              aria-pressed={isDark}
+              className="shell-toolbar-btn ui-focus-ring"
+            >
+              {isDark ? <Sun size={16} strokeWidth={1.8} aria-hidden="true" /> : <Moon size={16} strokeWidth={1.8} aria-hidden="true" />}
+            </button>
+            <LanguageSwitcher />
+            {showChat && (
+              <>
+                <div className="shell-toolbar-divider" aria-hidden="true" />
+                <button
+                  onClick={handleViewFullHistory}
+                  disabled={!selectedSession}
+                  title={selectedSession ? t("appShell.fullHistory") : t("appShell.fullHistoryUnavailable")}
+                  aria-label={t("appShell.fullHistory")}
+                  className="shell-toolbar-btn ui-focus-ring"
+                >
+                  <History size={16} strokeWidth={1.8} aria-hidden="true" />
+                </button>
+                <BranchNavigator
+                  tree={branchTree}
+                  activeLeafId={branchActiveLeafId}
+                  onLeafChange={handleBranchLeafChange}
+                  inline
+                  containerRef={topBarRef}
+                  open={activeTopPanel === "branches"}
+                  onToggle={() => toggleTopPanel("branches")}
+                  hasSession
+                />
+                <button
+                  ref={systemBtnRef}
+                  onClick={handleSystemPromptToggle}
+                  title={t("appShell.system")}
+                  aria-label={t("appShell.system")}
+                  aria-pressed={activeTopPanel === "system"}
+                  className="shell-toolbar-btn ui-focus-ring"
+                >
+                  <Terminal size={16} strokeWidth={1.8} aria-hidden="true" style={{ color: systemPrompt ? "var(--accent)" : undefined }} />
+                </button>
+              </>
+            )}
+          </div>
 
-                return (
-                  <button
-                    type="button"
-                    onClick={() => void handleAutoName()}
-                    disabled={disabled}
-                    title={title}
-                    aria-label={label}
-                    className="shell-toolbar-btn ui-focus-ring"
-                    style={{ opacity: autoNameStatus.kind === "naming" ? 1 : undefined }}
-                  >
-                    {autoNameStatus.kind === "naming" ? (
-                      <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" opacity="0.25" />
-                        <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                      </svg>
-                    ) : isSuccess ? (
-                      <Check size={16} strokeWidth={1.8} aria-hidden="true" style={{ color: "var(--accent)" }} />
-                    ) : isError ? (
-                      <Wand2 size={16} strokeWidth={1.8} aria-hidden="true" style={{ color: "var(--status-error)" }} />
-                    ) : (
-                      <Wand2 size={16} strokeWidth={1.8} aria-hidden="true" />
-                    )}
-                  </button>
-                );
-              })()}
-              <BranchNavigator
-                tree={branchTree}
-                activeLeafId={branchActiveLeafId}
-                onLeafChange={handleBranchLeafChange}
-                inline
-                containerRef={topBarRef}
-                open={activeTopPanel === "branches"}
-                onToggle={() => toggleTopPanel("branches")}
-                hasSession
-              />
-              <button
-                ref={systemBtnRef}
-                onClick={handleSystemPromptToggle}
-                title={t("appShell.system")}
-                aria-label={t("appShell.system")}
-                aria-pressed={activeTopPanel === "system"}
-                className="shell-toolbar-btn ui-focus-ring"
-              >
-                <Terminal size={16} strokeWidth={1.8} aria-hidden="true" style={{ color: systemPrompt ? "var(--accent)" : undefined }} />
-              </button>
-            </div>
-          </>
-        )}
-          {/* Session stats and generation speed — right-aligned in top bar */}
-          {showChat && (sessionStats || contextUsage || modelCapacity || generationSpeed) && (() => {
-            const tok = sessionStats?.tokens;
-            const c = sessionStats?.cost ?? 0;
-            const costStr = c > 0 ? (c >= 0.01 ? `$${c.toFixed(2)}` : `<$0.01`) : null;
-            const cacheHitRate = tok ? getCacheHitRate(tok.input, tok.cacheRead) : null;
-            const cacheRateStr = cacheHitRate !== null ? formatPercent(cacheHitRate) : null;
-            const cacheRateColor = cacheHitRate === null ? "var(--text-muted)" : cacheHitRate >= 75 ? "var(--status-success)" : cacheHitRate >= 50 ? "var(--status-warning)" : "var(--status-error)";
-            const currentSpeedStr = generationSpeed?.current !== null && generationSpeed?.current !== undefined
-              ? `${generationSpeed.current.toFixed(1)} t/s`
-              : null;
-            const averageSpeedStr = generationSpeed?.average !== null && generationSpeed?.average !== undefined
-              ? `AVG ${generationSpeed.average.toFixed(1)} t/s`
-              : null;
-
-            let ctxColor = "var(--text-muted)";
-            let ctxStr: string | null = null;
-            if (contextUsage?.contextWindow) {
-              const pct = contextUsage.percent;
-              if (pct !== null && pct > 90) ctxColor = "var(--status-error)";
-              else if (pct !== null && pct > 70) ctxColor = "var(--status-warning)";
-              else if (pct !== null && pct <= 35) ctxColor = "var(--status-success)";
-              ctxStr = pct !== null ? `${formatPercent(pct)} / ${formatCompactNumber(contextUsage.contextWindow)}` : `? / ${formatCompactNumber(contextUsage.contextWindow)}`;
-            }
-            const tooltipParts: string[] = [];
-            if (tok) {
-              tooltipParts.push(t("appShell.tooltipInput", { value: tok.input.toLocaleString(locale) }));
-              tooltipParts.push(t("appShell.tooltipOutput", { value: tok.output.toLocaleString(locale) }));
-              tooltipParts.push(t("appShell.tooltipCacheRead", { value: tok.cacheRead.toLocaleString(locale) }));
-              tooltipParts.push(t("appShell.tooltipCacheWrite", { value: tok.cacheWrite.toLocaleString(locale) }));
-              if (cacheRateStr) tooltipParts.push(t("appShell.tooltipCacheRate", { percent: cacheRateStr }));
-              if (c > 0) tooltipParts.push(t("appShell.tooltipCost", { value: c.toFixed(4) }));
-            }
-            if (modelCapacity?.maxTokens) tooltipParts.push(t("appShell.tooltipMaxOutput", { tokens: modelCapacity.maxTokens.toLocaleString(locale) }));
-            if (contextUsage?.contextWindow) {
-              const pct = contextUsage.percent;
-              tooltipParts.push(t("appShell.tooltipContext", {
-                percent: pct !== null ? pct.toFixed(1) + "%" : t("appShell.unknown"),
-                tokens: contextUsage.contextWindow.toLocaleString(locale),
-              }));
-            }
-            if (currentSpeedStr) tooltipParts.push(t("appShell.tooltipCurrentSpeed", { value: currentSpeedStr }));
-            if (averageSpeedStr) tooltipParts.push(t("appShell.tooltipAverageSpeed", { value: averageSpeedStr }));
-            const tooltip = tooltipParts.join("  |  ");
+          {/* Center Zone: Workspace & Session Breadcrumb + Auto-name action */}
+          {showChat && (() => {
+            const effectiveProject = selectedSession?.projectRoot ?? selectedSession?.cwd ?? activeCwd ?? "";
+            const sessionTitle = selectedSession?.name || selectedSession?.firstMessage || t("appShell.newSession");
+            const hasMessages = Boolean(
+              selectedSession
+              && (sessionStats?.userMessages ?? selectedSession.messageCount) > 0,
+            );
+            const wandDisabled = !selectedSession || !hasMessages || autoNameStatus.kind === "naming";
+            const wandIsSuccess = autoNameStatus.kind === "success";
+            const wandIsError = autoNameStatus.kind === "error";
+            const wandLabel = autoNameStatus.kind === "naming"
+              ? t("appShell.generating")
+              : wandIsSuccess
+                ? t("appShell.titleUpdated")
+                : wandIsError
+                  ? t("appShell.generationFailed")
+                  : t("appShell.generateTitle");
+            const wandTooltip = !selectedSession
+              ? t("appShell.titleGenUnavailable")
+              : !hasMessages
+                ? t("appShell.titleGenNeedsMessage")
+                : wandIsError
+                  ? autoNameStatus.message
+                  : t("appShell.generateSessionTitle");
 
             return (
-              <button
-                ref={sessionStatsBtnRef}
-                type="button"
-                onClick={() => toggleTopPanel("session")}
-                title={tooltip || t("appShell.sessionInfo")}
-                aria-label={t("appShell.sessionInfo")}
-                aria-pressed={activeTopPanel === "session"}
+              <div
+                className="shell-topbar-center"
                 style={{
-                  marginLeft: "auto",
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-                  paddingLeft: isMobile ? 0 : 12,
-                  // Reserve the corner for the always-visible file-panel
-                  // toggle: on mobile it is 44px wide and would otherwise
-                  // cover the session-stats button entirely.
-                  paddingRight: isMobile ? (rightPanelOpen ? 0 : 44) : rightPanelOpen ? 12 : 48,
-                  height: "100%",
-                  minWidth: isMobile ? 44 : 0,
-                  overflow: "hidden",
-                  background: activeTopPanel === "session" ? "var(--bg-selected)" : "none",
-                  border: "none",
-                  fontSize: 11, color: "var(--text-muted)",
-                  whiteSpace: "nowrap", cursor: "pointer",
-                  fontVariantNumeric: "tabular-nums",
-                  transition: "color var(--dur-fast) var(--ease-out-warm), background var(--dur-fast) var(--ease-out-warm)",
-                }}
-                onMouseEnter={(e) => {
-                  if (activeTopPanel !== "session") e.currentTarget.style.background = "var(--bg-hover)";
-                  e.currentTarget.style.color = "var(--text)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = activeTopPanel === "session" ? "var(--bg-selected)" : "none";
-                  e.currentTarget.style.color = activeTopPanel === "session" ? "var(--text)" : "var(--text-muted)";
+                  position: "absolute",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  maxWidth: "min(460px, calc(100% - 380px))",
+                  pointerEvents: "none",
+                  zIndex: 10,
                 }}
               >
-                {isMobile && (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
-                  </svg>
-                )}
-                {!isMobile && tok && tok.input > 0 && (
-                  <span title={t("appShell.tooltipInput", { value: tok.input.toLocaleString(locale) })} style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--status-renamed)" }}>
-                    <ArrowUp size={12} strokeWidth={2} aria-hidden="true" />
-                    {formatCompactNumber(tok.input)}
+                <div
+                  className="shell-topbar-breadcrumb"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    height: 26,
+                    padding: "0 8px",
+                    borderRadius: "var(--radius-control)",
+                    background: "var(--bg-subtle)",
+                    border: "1px solid var(--border)",
+                    fontSize: 11,
+                    color: "var(--text-muted)",
+                    whiteSpace: "nowrap",
+                    minWidth: 0,
+                    maxWidth: "min(400px, 30vw)",
+                    pointerEvents: "auto",
+                    flexShrink: 1,
+                  }}
+                >
+                  {effectiveProject ? (
+                    <>
+                      <Folder size={12} strokeWidth={1.8} style={{ opacity: 0.6, flexShrink: 0 }} aria-hidden="true" />
+                      <span
+                        style={{
+                          fontWeight: 600,
+                          color: "var(--text)",
+                          flexShrink: 0,
+                          maxWidth: 120,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                        title={effectiveProject}
+                      >
+                        {projectLabel(effectiveProject)}
+                      </span>
+                      <span style={{ color: "var(--text-dim)", flexShrink: 0, opacity: 0.5 }}>/</span>
+                    </>
+                  ) : null}
+                  <span
+                    style={{
+                      color: "var(--text)",
+                      fontWeight: 500,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      minWidth: 0,
+                    }}
+                    title={sessionTitle}
+                  >
+                    {sessionTitle}
                   </span>
-                )}
-                {!isMobile && tok && tok.output > 0 && (
-                  <span title={t("appShell.tooltipOutput", { value: tok.output.toLocaleString(locale) })} style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--accent)" }}>
-                    <ArrowDown size={12} strokeWidth={2} aria-hidden="true" />
-                    {formatCompactNumber(tok.output)}
-                  </span>
-                )}
-                {!isMobile && tok && tok.cacheRead > 0 && (
-                  <span title={t("appShell.tooltipCacheRead", { value: tok.cacheRead.toLocaleString(locale) })} style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--status-success)" }}>
-                    <Database size={12} strokeWidth={1.8} aria-hidden="true" />
-                    {formatCompactNumber(tok.cacheRead)}
-                  </span>
-                )}
-                {!isMobile && modelCapacity?.maxTokens && (
-                  <span title={t("appShell.tooltipMaxOutput", { tokens: modelCapacity.maxTokens.toLocaleString(locale) })} style={{ display: "flex", alignItems: "center", gap: 3, color: "var(--text-dim)", whiteSpace: "nowrap" }}>
-                    <ArrowUpRight size={12} strokeWidth={1.8} aria-hidden="true" />
-                    {formatCompactNumber(modelCapacity.maxTokens)}
-                  </span>
-                )}
-                {!isMobile && cacheRateStr && (
-                  <span title={t("appShell.tooltipCacheRate", { percent: cacheRateStr })} style={{ display: "flex", alignItems: "center", gap: 4, color: cacheRateColor }}>
-                    <Percent size={12} strokeWidth={1.8} aria-hidden="true" />
-                    {cacheRateStr}
-                  </span>
-                )}
-                {ctxStr && (
-                  <span title={contextUsage?.contextWindow ? t("appShell.tooltipContext", { percent: contextUsage.percent !== null ? contextUsage.percent.toFixed(1) + "%" : t("appShell.unknown"), tokens: contextUsage.contextWindow.toLocaleString(locale) }) : undefined} style={{ display: "flex", alignItems: "center", gap: 4, color: ctxColor, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    <Gauge size={12} strokeWidth={1.8} aria-hidden="true" />
-                    {ctxStr}
-                  </span>
-                )}
-                {!isMobile && costStr && (
-                  <span title={sessionStats?.cost ? t("appShell.tooltipCost", { value: sessionStats.cost.toFixed(4) }) : undefined} style={{ display: "flex", alignItems: "center", gap: 2, color: "var(--text)", fontWeight: 500 }}>
-                    <DollarSign size={12} strokeWidth={1.8} aria-hidden="true" />
-                    {costStr}
-                  </span>
-                )}
-                {!isMobile && currentSpeedStr && (
-                  <span title={t("appShell.tooltipCurrentSpeed", { value: currentSpeedStr })} style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--status-success)", fontWeight: 600 }}>
-                    <Zap size={12} strokeWidth={1.8} aria-hidden="true" />
-                    {currentSpeedStr}
-                  </span>
-                )}
-                {!isMobile && averageSpeedStr && (
-                  <span title={t("appShell.tooltipAverageSpeed", { value: averageSpeedStr })} style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text-muted)" }}>
-                    {averageSpeedStr}
-                  </span>
-                )}
-              </button>
+                  {selectedSession && (
+                    <button
+                      type="button"
+                      onClick={() => void handleAutoName()}
+                      disabled={wandDisabled}
+                      title={wandTooltip}
+                      aria-label={wandLabel}
+                      className="ui-focus-ring"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 18,
+                        height: 18,
+                        padding: 0,
+                        marginLeft: 2,
+                        border: "none",
+                        borderRadius: 4,
+                        background: "transparent",
+                        color: wandIsSuccess ? "var(--accent)" : wandIsError ? "var(--status-error)" : "var(--text-dim)",
+                        cursor: wandDisabled ? "default" : "pointer",
+                        flexShrink: 0,
+                        opacity: autoNameStatus.kind === "naming" ? 1 : wandDisabled ? 0.35 : 0.75,
+                        transition: "color var(--dur-fast), opacity var(--dur-fast)",
+                      }}
+                    >
+                      {autoNameStatus.kind === "naming" ? (
+                        <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" opacity="0.25" />
+                          <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                        </svg>
+                      ) : wandIsSuccess ? (
+                        <Check size={12} strokeWidth={2} aria-hidden="true" />
+                      ) : (
+                        <Wand2 size={12} strokeWidth={1.8} aria-hidden="true" />
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
             );
           })()}
-          {/* Top panel dropdown — shared, only one active at a time. The
-              branch panel renders inside BranchNavigator itself; never mount
-              an empty fixed layer for it (it would sit over the top-bar
-              region and swallow clicks). */}
-          {(activeTopPanel === "system" || activeTopPanel === "session") && topPanelPos && (
+
+          {/* Right Zone: Segmented metric pills (Provider limits, Session Stats/Usage, Speed) */}
+          <div
+            data-topbar-right-group
+            style={{
+              marginLeft: "auto",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              height: "100%",
+              paddingRight: isMobile ? (rightPanelOpen ? 0 : 44) : rightPanelOpen ? 8 : 44,
+              flexShrink: 0,
+            }}
+          >
+            {/* Provider limits pill */}
+            {showChat && providerUsageVisible && (providerUsage || providerUsageLoading || providerUsageError) && (
+              <button
+                ref={usageBtnRef}
+                type="button"
+                data-provider-usage-trigger
+                onClick={() => toggleTopPanel("usage")}
+                title={currentProviderUsageText
+                  ? t("appShell.tooltipProviderUsage", { value: currentProviderUsageText })
+                  : currentProviderUsageReport?.noLimits
+                    ? `${t("appShell.providerUsageNoData")}${activeProvider ? ` (${activeProvider})` : ""}`
+                    : providerUsageLoading
+                      ? t("appShell.providerUsageLoading")
+                      : providerUsageError
+                        ? t("appShell.providerUsageUnavailable")
+                        : t("appShell.providerUsageButton")}
+                aria-label={t("appShell.providerUsageButton")}
+                aria-pressed={activeTopPanel === "usage"}
+                className="shell-metric-pill ui-focus-ring"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 4,
+                  height: 26,
+                  padding: currentProviderUsageText ? "0 8px" : "0 6px",
+                  borderRadius: "var(--radius-control)",
+                  border: "1px solid var(--border)",
+                  background: activeTopPanel === "usage" ? "var(--bg-selected)" : "var(--bg-subtle)",
+                  color: currentProviderUsageText ? currentProviderUsageColor : "var(--text-dim)",
+                  fontSize: 11,
+                  fontFamily: "var(--font-mono)",
+                  fontVariantNumeric: "tabular-nums",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                  transition: "background var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast)",
+                }}
+              >
+                <Gauge size={13} strokeWidth={1.8} aria-hidden="true" />
+                {currentProviderUsageText && <span>{currentProviderUsageText}</span>}
+              </button>
+            )}
+
+            {/* Session Stats and context/cost pill */}
+            {showChat && (sessionStats || contextUsage || modelCapacity) && (() => {
+              const tok = sessionStats?.tokens;
+              const c = sessionStats?.cost ?? 0;
+              const costStr = c > 0 ? (c >= 0.01 ? `$${c.toFixed(2)}` : `<$0.01`) : null;
+              const cacheHitRate = tok ? getCacheHitRate(tok.input, tok.cacheRead) : null;
+              const cacheRateStr = cacheHitRate !== null ? formatPercent(cacheHitRate) : null;
+
+              let ctxColor = "var(--text-muted)";
+              let ctxStr: string | null = null;
+              if (contextUsage?.contextWindow) {
+                const pct = contextUsage.percent;
+                if (pct !== null && pct > 90) ctxColor = "var(--status-error)";
+                else if (pct !== null && pct > 70) ctxColor = "var(--status-warning)";
+                ctxStr = pct !== null ? `${formatPercent(pct)} / ${formatCompactNumber(contextUsage.contextWindow)}` : `? / ${formatCompactNumber(contextUsage.contextWindow)}`;
+              }
+
+              const tooltipParts: string[] = [];
+              if (tok) {
+                tooltipParts.push(t("appShell.tooltipInput", { value: tok.input.toLocaleString(locale) }));
+                tooltipParts.push(t("appShell.tooltipOutput", { value: tok.output.toLocaleString(locale) }));
+                tooltipParts.push(t("appShell.tooltipCacheRead", { value: tok.cacheRead.toLocaleString(locale) }));
+                tooltipParts.push(t("appShell.tooltipCacheWrite", { value: tok.cacheWrite.toLocaleString(locale) }));
+                if (cacheRateStr) tooltipParts.push(t("appShell.tooltipCacheRate", { percent: cacheRateStr }));
+                if (c > 0) tooltipParts.push(t("appShell.tooltipCost", { value: c.toFixed(4) }));
+              }
+              if (modelCapacity?.maxTokens) tooltipParts.push(t("appShell.tooltipMaxOutput", { tokens: modelCapacity.maxTokens.toLocaleString(locale) }));
+              if (contextUsage?.contextWindow) {
+                const pct = contextUsage.percent;
+                tooltipParts.push(t("appShell.tooltipContext", {
+                  percent: pct !== null ? pct.toFixed(1) + "%" : t("appShell.unknown"),
+                  tokens: contextUsage.contextWindow.toLocaleString(locale),
+                }));
+              }
+              const tooltip = tooltipParts.join("  |  ");
+
+              return (
+                <button
+                  ref={sessionStatsBtnRef}
+                  type="button"
+                  onClick={() => toggleTopPanel("session")}
+                  title={tooltip || t("appShell.sessionInfo")}
+                  aria-label={t("appShell.sessionInfo")}
+                  aria-pressed={activeTopPanel === "session"}
+                  className="shell-metric-pill ui-focus-ring"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    height: 26,
+                    padding: "0 8px",
+                    borderRadius: "var(--radius-control)",
+                    border: "1px solid var(--border)",
+                    background: activeTopPanel === "session" ? "var(--bg-selected)" : "var(--bg-subtle)",
+                    color: "var(--text)",
+                    fontSize: 11,
+                    fontFamily: "var(--font-mono)",
+                    fontVariantNumeric: "tabular-nums",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
+                    transition: "background var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast)",
+                  }}
+                >
+                  {ctxStr && (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: ctxColor }}>
+                      <span style={{ fontSize: 10, opacity: 0.7 }}>⌂</span>
+                      {ctxStr}
+                    </span>
+                  )}
+                  {!isMobile && cacheRateStr && (
+                    <span className="shell-pill-extra" style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--text-muted)" }}>
+                      <CircleCheck size={11} strokeWidth={1.8} aria-hidden="true" />
+                      {cacheRateStr}
+                    </span>
+                  )}
+                  {costStr && (
+                    <span style={{ fontWeight: 600, color: "var(--text)" }}>
+                      {costStr}
+                    </span>
+                  )}
+                </button>
+              );
+            })()}
+
+            {/* Generation speed pill */}
+            {showChat && (() => {
+              const currentSpeedStr = generationSpeed?.current !== null && generationSpeed?.current !== undefined
+                ? `${generationSpeed.current.toFixed(1)} t/s`
+                : null;
+              const averageSpeedStr = generationSpeed?.average !== null && generationSpeed?.average !== undefined
+                ? `AVG ${generationSpeed.average.toFixed(1)} t/s`
+                : null;
+              if (!currentSpeedStr && !averageSpeedStr) return null;
+              const speedTitle = currentSpeedStr
+                ? t("appShell.tooltipCurrentSpeed", { value: currentSpeedStr })
+                : t("appShell.tooltipAverageSpeed", { value: averageSpeedStr! });
+
+              return (
+                <div
+                  title={speedTitle}
+                  className="shell-metric-pill shell-pill-extra"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    height: 26,
+                    padding: "0 8px",
+                    borderRadius: "var(--radius-control)",
+                    border: "1px solid var(--border)",
+                    background: "var(--bg-subtle)",
+                    color: currentSpeedStr ? "var(--accent)" : "var(--text-muted)",
+                    fontSize: 11,
+                    fontFamily: "var(--font-mono)",
+                    fontVariantNumeric: "tabular-nums",
+                    whiteSpace: "nowrap",
+                    cursor: "default",
+                    flexShrink: 0,
+                  }}
+                >
+                  <Zap size={11} strokeWidth={2} aria-hidden="true" style={{ color: currentSpeedStr ? "var(--accent)" : "var(--text-dim)" }} />
+                  <span style={{ fontWeight: currentSpeedStr ? 600 : 400 }}>
+                    {currentSpeedStr ?? averageSpeedStr}
+                  </span>
+                </div>
+              );
+            })()}
+          </div>
+          {(activeTopPanel === "system" || activeTopPanel === "usage" || activeTopPanel === "session") && (
             <div data-top-panel className="dropdown-surface" style={{
               position: "fixed",
               top: topPanelPos.top,
@@ -1354,10 +1991,155 @@ export function AppShell() {
               boxSizing: "border-box",
               zIndex: 500,
             }}>
-              {activeTopPanel === "system" && (
-                <div style={{
+              {activeTopPanel === "usage" && (
+                <div className="session-info-popover" style={{
                   background: "var(--bg-panel)",
                   borderBottom: "1px solid var(--border)",
+                  boxShadow: "var(--shadow-pop)",
+                  padding: "14px 16px",
+                  minWidth: isMobile ? undefined : 500,
+                  maxWidth: "min(640px, calc(100vw - 24px))",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <Gauge size={14} strokeWidth={2} style={{ color: "var(--accent)" }} aria-hidden="true" />
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>{t("appShell.sectionProviderUsage")}</div>
+                    </div>
+                    {allProviderUsageLoading && allProviderUsage && (
+                      <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{t("appShell.providerUsageLoading")}</span>
+                    )}
+                  </div>
+                  {allProviderUsage?.reports.length ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 12, fontFamily: "var(--font-mono)" }}>
+                      {allProviderUsage.reports.map((report, index) => {
+                        const account = report.accountLabel ?? t("appShell.account", { number: report.accountIndex ?? index + 1 });
+                        const key = `${report.provider}:${account}:${report.modelId ?? "all"}:${index}`;
+                        return (
+                          <div
+                            key={key}
+                            style={{
+                              padding: "10px 12px",
+                              borderRadius: "var(--radius-card)",
+                              background: "var(--bg-subtle)",
+                              border: "1px solid var(--border)",
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 8,
+                            }}
+                          >
+                            {/* Card Header: Provider badge, account, plan, model */}
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                <span style={{
+                                  fontWeight: 700,
+                                  fontSize: 11,
+                                  color: "var(--text)",
+                                  background: "var(--bg-panel)",
+                                  border: "1px solid var(--border)",
+                                  padding: "2px 6px",
+                                  borderRadius: 4,
+                                }}>
+                                  {report.provider}
+                                </span>
+                                <span style={{ fontSize: 11, color: "var(--text)", fontWeight: 500 }}>
+                                  {account}
+                                </span>
+                                {report.tier && (
+                                  <span style={{ fontSize: 10, color: "var(--text-dim)", background: "var(--bg-panel)", border: "1px solid var(--border)", padding: "1px 5px", borderRadius: 3 }}>
+                                    {report.tier}
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-dim)" }}>
+                                {report.plan && <span style={{ color: "var(--text-muted)" }}>{report.plan}</span>}
+                                {report.modelId && <span>· {report.modelId}</span>}
+                              </div>
+                            </div>
+
+                            {/* Quota Limits or Unlimited status */}
+                            {report.noLimits ? (
+                              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-dim)", padding: "2px 0" }}>
+                                <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "var(--accent)" }} />
+                                <span>{t("appShell.providerUsageNoData")}</span>
+                              </div>
+                            ) : (
+                              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8 }}>
+                                {report.fiveHour && (() => {
+                                  const pct = Math.round(report.fiveHour.percent);
+                                  const reset = report.fiveHour.resetMinutes !== undefined ? formatUsageReset(report.fiveHour.resetMinutes, "minutes") : null;
+                                  const tone = usageTone(pct);
+                                  return (
+                                    <div style={{ background: "var(--bg-panel)", padding: "6px 8px", borderRadius: 6, border: "1px solid var(--border)" }}>
+                                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4, fontSize: 10 }}>
+                                        <span style={{ color: "var(--text-dim)", fontWeight: 600 }}>5h Window</span>
+                                        <span style={{ color: tone, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{pct}%</span>
+                                      </div>
+                                      <div style={{ height: 4, borderRadius: 2, background: "var(--border)", overflow: "hidden" }}>
+                                        <div style={{ height: "100%", width: `${Math.min(100, pct)}%`, background: tone, borderRadius: 2, transition: "width 0.3s" }} />
+                                      </div>
+                                      {reset && <div style={{ fontSize: 9, color: "var(--text-dim)", marginTop: 4, textAlign: "right" }}>resets {reset}</div>}
+                                    </div>
+                                  );
+                                })()}
+
+                                {report.sevenDay && (() => {
+                                  const pct = Math.round(report.sevenDay.percent);
+                                  const reset = report.sevenDay.resetHours !== undefined ? formatUsageReset(report.sevenDay.resetHours, "hours") : null;
+                                  const tone = usageTone(pct);
+                                  return (
+                                    <div style={{ background: "var(--bg-panel)", padding: "6px 8px", borderRadius: 6, border: "1px solid var(--border)" }}>
+                                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4, fontSize: 10 }}>
+                                        <span style={{ color: "var(--text-dim)", fontWeight: 600 }}>7d Window</span>
+                                        <span style={{ color: tone, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{pct}%</span>
+                                      </div>
+                                      <div style={{ height: 4, borderRadius: 2, background: "var(--border)", overflow: "hidden" }}>
+                                        <div style={{ height: "100%", width: `${Math.min(100, pct)}%`, background: tone, borderRadius: 2, transition: "width 0.3s" }} />
+                                      </div>
+                                      {reset && <div style={{ fontSize: 9, color: "var(--text-dim)", marginTop: 4, textAlign: "right" }}>resets {reset}</div>}
+                                    </div>
+                                  );
+                                })()}
+
+                                {report.monthly && (() => {
+                                  const pct = Math.floor(report.monthly.percent);
+                                  const reset = report.monthly.resetHours !== undefined ? formatUsageReset(report.monthly.resetHours, "hours") : null;
+                                  const tone = usageTone(pct);
+                                  return (
+                                    <div style={{ background: "var(--bg-panel)", padding: "6px 8px", borderRadius: 6, border: "1px solid var(--border)" }}>
+                                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4, fontSize: 10 }}>
+                                        <span style={{ color: "var(--text-dim)", fontWeight: 600 }}>Monthly</span>
+                                        <span style={{ color: tone, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{pct}%</span>
+                                      </div>
+                                      <div style={{ height: 4, borderRadius: 2, background: "var(--border)", overflow: "hidden" }}>
+                                        <div style={{ height: "100%", width: `${Math.min(100, pct)}%`, background: tone, borderRadius: 2, transition: "width 0.3s" }} />
+                                      </div>
+                                      {reset && <div style={{ fontSize: 9, color: "var(--text-dim)", marginTop: 4, textAlign: "right" }}>resets {reset}</div>}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : allProviderUsageLoading ? (
+                    <div style={{ fontSize: 12, color: "var(--text-muted)", fontStyle: "italic", padding: "8px 0" }}>{t("appShell.providerUsageLoading")}</div>
+                  ) : allProviderUsageError ? (
+                    <div style={{ fontSize: 12, color: "var(--status-error)", fontStyle: "italic", padding: "8px 0" }}>{t("appShell.providerUsageUnavailable")}</div>
+                  ) : allProviderUsage ? (
+                    <div style={{ fontSize: 12, color: "var(--text-muted)", fontStyle: "italic", padding: "8px 0" }}>{t("appShell.providerUsageNoData")}</div>
+                  ) : (
+                    <div style={{ fontSize: 12, color: "var(--text-muted)", fontStyle: "italic", padding: "8px 0" }}>{t("appShell.providerUsageLoading")}</div>
+                  )}
+                </div>
+              )}
+              {activeTopPanel === "system" && (
+                <div className="session-info-popover" style={{
+                  background: "var(--bg-panel)",
+                  borderBottom: "1px solid var(--border)",
+                  boxShadow: "var(--shadow-pop)",
+                  minWidth: isMobile ? undefined : 420,
                 }}>
                   {systemPrompt ? (
                     <div style={{
@@ -1485,6 +2267,7 @@ export function AppShell() {
                         </div>
                       </div>
                     );
+
                   })() : (
                     <div className="session-info-empty">
                       {t("appShell.sessionInfoLoadHint")}
@@ -1515,6 +2298,7 @@ export function AppShell() {
               onSystemPromptLoaderChange={handleSystemPromptLoaderChange}
               onSessionStatsChange={handleSessionStatsChange}
               onSessionStatsPanelOpen={openSessionStatsPanel}
+              onProviderUsageContextChange={handleProviderUsageContextChange}
               onContextUsageChange={handleContextUsageChange}
               onModelCapacityChange={handleModelCapacityChange}
               onGenerationSpeedChange={handleGenerationSpeedChange}
@@ -1646,7 +2430,8 @@ export function AppShell() {
         <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="15" y1="3" x2="15" y2="21" />
       </svg>
     </button>
-    {settingsTab && <SettingsConfig activeTab={settingsTab} toolCallsDefaultCollapsed={toolCallsDefaultCollapsed} onToolCallsDefaultCollapsedChange={handleToolCallsDefaultCollapsedChange} cwd={activeCwd ?? selectedSession?.cwd ?? newSessionCwd} sessionId={selectedSession?.id ?? null} onModelsSaved={() => setModelsRefreshKey((k) => k + 1)} onPluginsReloaded={() => setSessionKey((k) => k + 1)} onOmpUpdateAvailabilityChange={setOmpUpdateAvailable} onSelectTab={setSettingsTab} onClose={() => setSettingsTab(null)} />}
+    {settingsTab && <SettingsConfig activeTab={settingsTab} toolCallsDefaultCollapsed={toolCallsDefaultCollapsed} onToolCallsDefaultCollapsedChange={handleToolCallsDefaultCollapsedChange} providerUsageVisible={providerUsageVisible} onProviderUsageVisibleChange={handleProviderUsageVisibleChange} cwd={activeCwd ?? selectedSession?.cwd ?? newSessionCwd} sessionId={selectedSession?.id ?? null} onModelsSaved={() => setModelsRefreshKey((k) => k + 1)} onPluginsReloaded={() => setSessionKey((k) => k + 1)} appUpdate={appUpdate} onRefreshAppUpdate={refreshAppUpdate} onOmpUpdateAvailabilityChange={setOmpUpdateAvailable} onRequestAppUpdate={requestAppUpdateFromSettings} onSelectTab={setSettingsTab} onClose={() => setSettingsTab(null)} />}
+    <AppUpdateDialog open={appUpdateDialogOpen} update={appUpdate} phase={appUpdatePhase} visibleStage={appUpdateVisibleStage} error={appUpdateError} onProceed={() => void proceedWithAppUpdate()} onNotNow={dismissAppUpdate} />
     {archiveBrowserOpen && (
       <ArchiveBrowser
         open={archiveBrowserOpen}

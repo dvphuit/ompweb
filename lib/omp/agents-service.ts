@@ -79,10 +79,6 @@ export function buildAgentScanRoots(cwd?: string): AgentScanRoot[] {
   return roots;
 }
 
-export function getAgentScanRootDirs(cwd?: string): string[] {
-  return buildAgentScanRoots(cwd).map((root) => root.dir);
-}
-
 function asStringArray(value: unknown, field: string): string[] | undefined {
   if (value === undefined) return undefined;
   if (Array.isArray(value) && value.every((item) => typeof item === "string")) return value.map((item) => item.trim()).filter(Boolean);
@@ -239,6 +235,20 @@ function sameAgentPath(left: string, right: string): boolean {
   }
 }
 
+// On a case-insensitive filesystem (macOS APFS default) a case-only rename
+// resolves both names to the same directory entry even though the POSIX
+// string compare differs. realpathSync.native (realpath(3)) returns the
+// on-disk casing — the JS realpathSync preserves input casing — so case
+// aliases compare equal while distinct hardlink entries to the same inode
+// (a real name collision) stay distinct.
+function sameOnDiskEntry(left: string, right: string): boolean {
+  try {
+    return realpathSync.native(left) === realpathSync.native(right);
+  } catch {
+    return false;
+  }
+}
+
 export function validateAgentFileReference(scopeDir: string, name: string): void {
   if (!AGENT_NAME_RE.test(name)) throw new Error(`name must match ${AGENT_NAME_RE.source}`);
   const filePath = getAgentFilePath(scopeDir, name);
@@ -261,7 +271,7 @@ export function writeAgent(scopeDir: string, name: string, payload: AgentPayload
   const filePath = getAgentFilePath(dir, name);
   const previousPath = previousName ? getAgentFilePath(dir, previousName) : undefined;
   if (existsSync(filePath) && lstatSync(filePath).isSymbolicLink()) throw new Error("agent file may not be a symbolic link");
-  const replacesPreviousPath = Boolean(previousPath && sameAgentPath(filePath, previousPath));
+  const replacesPreviousPath = Boolean(previousPath && (sameAgentPath(filePath, previousPath) || sameOnDiskEntry(filePath, previousPath)));
   if (existsSync(filePath) && !replacesPreviousPath) throw new Error("agent file already exists");
   const preserved: Record<string, unknown> = isRecord(payload.existingFrontmatter) ? { ...payload.existingFrontmatter } : {};
   if (previousPath && existsSync(previousPath)) {
@@ -286,7 +296,13 @@ export function writeAgent(scopeDir: string, name: string, payload: AgentPayload
   writeFileSync(tmpPath, serialized, { encoding: "utf8", flag: "wx" });
   let displacedPath: string | undefined;
   try {
-    if (process.platform === "win32" && replacesPreviousPath && existsSync(filePath)) {
+// Windows cannot replace an existing file with renameSync, and on a
+// case-insensitive filesystem (macOS APFS default) renaming over a
+// case-variant keeps the OLD directory entry's casing. Move the old file
+// aside first so updates and case-only renames remain atomic from the
+// caller's view and the new name's casing lands on disk.
+    const caseOnlyReplace = Boolean(previousPath && !sameAgentPath(filePath, previousPath) && sameOnDiskEntry(filePath, previousPath));
+    if ((process.platform === "win32" || caseOnlyReplace) && replacesPreviousPath && existsSync(filePath)) {
       displacedPath = `${filePath}.${process.pid}.${Date.now()}.old`;
       renameSync(filePath, displacedPath);
     }

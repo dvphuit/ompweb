@@ -10,7 +10,7 @@ import {
   isFilePathAllowed,
   isWindowsAbsolutePath,
 } from "@/lib/file-access";
-import { buildEntriesFromFiles, filterFileEntries, type FileIndexEntry } from "@/lib/file-fuzzy";
+import { buildEntriesFromFiles, filterFileEntries, parseResultLimit, type FileIndexEntry } from "@/lib/file-fuzzy";
 
 const execFileAsync = promisify(execFile);
 
@@ -45,6 +45,8 @@ interface CacheEntry {
   listing: FileListing;
   /** Derived lazily on the first ?q= search against this listing */
   entries?: FileIndexEntry[];
+  /** Same, restricted to files, for callers that never show directories */
+  fileEntries?: FileIndexEntry[];
   expiresAt: number;
 }
 
@@ -53,6 +55,7 @@ interface CacheEntry {
 // not be recomputed within a short window.
 declare global {
   var __piFileIndexCache: Map<string, CacheEntry> | undefined;
+  var __piFileIndexPending: Map<string, Promise<FileListing>> | undefined;
 }
 
 function getIndexCache(): Map<string, CacheEntry> {
@@ -60,14 +63,40 @@ function getIndexCache(): Map<string, CacheEntry> {
   return globalThis.__piFileIndexCache;
 }
 
+/**
+ * Build the listing for one cwd, collapsing concurrent callers onto the same
+ * scan. Without this, several refreshes in flight would each run `git ls-files`
+ * and the slowest one could overwrite a newer cache entry.
+ */
+function loadListing(cwd: string): Promise<FileListing> {
+  if (!globalThis.__piFileIndexPending) globalThis.__piFileIndexPending = new Map();
+  const pending = globalThis.__piFileIndexPending;
+  const inFlight = pending.get(cwd);
+  if (inFlight) return inFlight;
+  const scan = (async () => (await listWithGit(cwd)) ?? listWithWalk(cwd))()
+    .finally(() => { pending.delete(cwd); });
+  pending.set(cwd, scan);
+  return scan;
+}
+
 async function listWithGit(cwd: string): Promise<FileListing | null> {
   try {
-    const { stdout } = await execFileAsync(
-      "git",
-      ["-C", cwd, "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
-      { timeout: 10_000, maxBuffer: 64 * 1024 * 1024, env: { ...process.env, LC_ALL: "C" } },
-    );
-    const all = stdout.split("\0").filter(Boolean);
+    const gitOptions = {
+      timeout: 10_000,
+      maxBuffer: 64 * 1024 * 1024,
+      env: { ...process.env, LC_ALL: "C" },
+    };
+    // --cached lists index entries, including files already removed from the
+    // working tree. Those would show up as results that 404 the moment anyone
+    // opens them, so subtract what git reports as deleted. That query is
+    // auxiliary: a stale-but-complete listing beats throwing away the git
+    // listing over it, which would fall back to the depth-capped readdir walk.
+    const [listed, deleted] = await Promise.all([
+      execFileAsync("git", ["-C", cwd, "ls-files", "--cached", "--others", "--exclude-standard", "-z"], gitOptions),
+      execFileAsync("git", ["-C", cwd, "ls-files", "--deleted", "-z"], gitOptions).catch(() => null),
+    ]);
+    const missing = new Set((deleted?.stdout ?? "").split("\0").filter(Boolean));
+    const all = listed.stdout.split("\0").filter((file) => file && !missing.has(file));
     if (all.length > GIT_HARD_CAP) {
       return { files: all.slice(0, GIT_HARD_CAP), hardTruncated: true };
     }
@@ -109,12 +138,15 @@ function listWithWalk(cwd: string): FileListing {
   return { files, hardTruncated: false };
 }
 
-// GET /api/file-index?cwd=/abs/path[&q=query]
+// GET /api/file-index?cwd=/abs/path[&q=query][&limit=n][&kind=file][&refresh=1]
 // Without q: { files: string[] (relative to cwd, capped at MAX_FILES),
 // truncated: boolean } — the client-side index for local filtering.
 // With q: { matches: { path, isDir }[] } — ranked against the FULL listing so
 // repos larger than MAX_FILES still find deep files (cap applied after
-// matching, like the TUI passing the query to fd).
+// matching, like the TUI passing the query to fd). limit defaults to the `@`
+// menu size and is clamped to MAX_RESULT_LIMIT; kind=file drops directories
+// before ranking and reports a `truncated` flag; refresh=1 rebuilds the listing
+// instead of using the TTL cache, for the explorer's refresh button.
 // Guarded by the same allow-list as /api/files.
 export async function GET(req: NextRequest) {
   try {
@@ -144,20 +176,47 @@ export async function GET(req: NextRequest) {
 
     const cache = getIndexCache();
     const now = Date.now();
+    // An explicit refresh in the UI must not be answered from the TTL window,
+    // or a file the agent just wrote stays invisible. loadListing collapses
+    // concurrent rebuilds onto one scan, which is the whole bound: an age gate
+    // on top of it can only suppress the refresh the user actually asked for.
+    const forceRefresh = req.nextUrl.searchParams.get("refresh") === "1";
     let cached = cache.get(cwd);
-    if (!cached || cached.expiresAt <= now) {
-      const listing = (await listWithGit(cwd)) ?? listWithWalk(cwd);
+    if (!cached || cached.expiresAt <= now || forceRefresh) {
+      const listing = await loadListing(cwd);
       for (const [key, entry] of cache) {
         if (entry.expiresAt <= now) cache.delete(key);
       }
-      if (cache.size >= CACHE_MAX_ENTRIES) cache.clear();
-      cached = { listing, expiresAt: now + CACHE_TTL_MS };
+      // Replacing an existing key does not grow the cache, so it must not wipe
+      // the listings of unrelated projects.
+      if (!cache.has(cwd) && cache.size >= CACHE_MAX_ENTRIES) cache.clear();
+      // Timed after the scan, not from `now`: a large repo can take longer to
+      // list than the whole TTL, which would store an already-expired entry.
+      cached = { listing, expiresAt: Date.now() + CACHE_TTL_MS };
       cache.set(cwd, cached);
     }
 
     if (query) {
+      const limit = parseResultLimit(req.nextUrl.searchParams.get("limit"));
       cached.entries ??= buildEntriesFromFiles(cached.listing.files);
-      return NextResponse.json({ matches: filterFileEntries(cached.entries, query) });
+      // Directories score a ranking bonus, so a caller that only renders files
+      // must drop them before the limit is applied: "api" in this repo matches
+      // 67 directories, which would otherwise consume half the budget and
+      // silently push matching files out of the response.
+      if (req.nextUrl.searchParams.get("kind") === "file") {
+        cached.fileEntries ??= cached.entries.filter((entry) => !entry.isDir);
+        // Ask for one past the limit: the extra row never ships, it only tells
+        // the panel that the list it shows is incomplete. A listing that hit the
+        // hard cap is incomplete the same way, and is worth reporting even
+        // though fewer than `limit` rows matched what survived.
+        const ranked = filterFileEntries(cached.fileEntries, query, limit + 1);
+        const truncated = ranked.length > limit || cached.listing.hardTruncated;
+        return NextResponse.json({
+          matches: truncated ? ranked.slice(0, limit) : ranked,
+          truncated,
+        });
+      }
+      return NextResponse.json({ matches: filterFileEntries(cached.entries, query, limit) });
     }
 
     const { files, hardTruncated } = cached.listing;

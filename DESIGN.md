@@ -39,8 +39,8 @@ do not assume that Pi-specific implementation changes can be merged unchanged.
 - Existing `OMP_WEB_*` environment variables remain the configuration prefix
   for compatibility: `OMP_WEB_HOSTNAME`, `OMP_WEB_NO_OPEN`,
   `OMP_WEB_PASSWORD`, and `OMP_WEB_OMP_BIN`.
-- `PI_CODING_AGENT_DIR`, profiles, and OMP's own directory conventions are
-  respected because they identify the user’s existing OMP state.
+- `PI_CODING_AGENT_DIR` and OMP's own directory conventions are
+  respected because they identify the user's existing OMP state.
 - The web UI displays its own package version separately from the detected
   installed OMP version; those versions may legitimately differ.
 
@@ -76,7 +76,7 @@ v1-capable installations.
 
 ### OMP-owned state
 
-- `~/.omp/agent` (or OMP's configured/profiled equivalent) is the source of
+- `~/.omp/agent` is the source of
   truth for sessions, configuration, models, skills, plugins, and blobs.
 - `agent.db` contains authentication data. ompweb never reads or writes it;
   authentication actions go through the OMP RPC process.

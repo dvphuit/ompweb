@@ -36,6 +36,17 @@ export class RpcCommandError extends Error {
     this.code = code;
   }
 }
+export class RpcCommandTimeoutError extends Error {
+  readonly command: string;
+  readonly timeoutMs: number;
+
+  constructor(command: string, timeoutMs: number, message?: string) {
+    super(message ?? `RPC command ${command} timed out after ${timeoutMs}ms`);
+    this.name = "RpcCommandTimeoutError";
+    this.command = command;
+    this.timeoutMs = timeoutMs;
+  }
+}
 
 interface PendingCommand {
   command: string;
@@ -94,9 +105,15 @@ export class RpcProcess {
     if (options.onFrame) this.frameListeners.add(options.onFrame);
 
     const args = ["--mode", "rpc-ui", "--cwd", options.cwd, ...(options.extraArgs ?? [])];
+    // omp-web ignores named profiles (OMP_PROFILE/PI_PROFILE): strip them so the
+    // child resolves the same default agent dir. An explicit options.env entry
+    // still wins (used to force the default profile for isolated test runs).
+    const childEnv = sanitizeProjectCommandEnvironment({ ...process.env, ...options.env });
+    if (options.env?.OMP_PROFILE === undefined) delete childEnv.OMP_PROFILE;
+    if (options.env?.PI_PROFILE === undefined) delete childEnv.PI_PROFILE;
     this.child = this.spawnProcess(bin, args, {
       cwd: options.cwd,
-      env: sanitizeProjectCommandEnvironment({ ...process.env, ...options.env }),
+      env: childEnv,
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
       // On POSIX, omp launches grandchildren (LSP servers, extension subprocesses). Run the
@@ -248,7 +265,7 @@ export class RpcProcess {
           // not spuriously reject a different command.
           if (this.pending.get(id) === entry) {
             this.pending.delete(id);
-            reject(new Error(`RPC command ${command.type} timed out after ${timeoutMs}ms`));
+            reject(new RpcCommandTimeoutError(command.type, timeoutMs));
           }
         }, timeoutMs);
         // A pending command timer must never keep the event loop alive on its own

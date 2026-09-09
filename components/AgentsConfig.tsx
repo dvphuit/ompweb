@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, Bot, Check, Copy, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import { Alert } from "@/components/ui/field";
 import { toast } from "@/components/ui/toast";
 import { useI18n } from "@/lib/i18n";
 
@@ -121,7 +122,6 @@ export function AgentsConfig({ cwd }: { cwd: string | null }) {
       const msg = e instanceof Error ? e.message : String(e);
       setWorkspaceCheckPending(false);
       setMessage(msg);
-      toast.error(t("agentsConfig.loadError"), msg);
     } finally { if (isCurrent()) { setLoading(false); setWorkspaceCheckPending(false); } }
   }, [cwd, creating, t]);
   useEffect(() => { void load(); }, [load]);
@@ -185,10 +185,8 @@ export function AgentsConfig({ cwd }: { cwd: string | null }) {
       if (!isCurrent()) return;
       const count = data.written ?? data.total ?? 0;
       toast.success(t("agentsConfig.unpackedToast", { count }));
-      setMessage(t("agentsConfig.unpackedMsg", { count, scope: scope === "project" ? t("agentsConfig.scopeProject") : t("agentsConfig.scopeUser") }));
       await load();
-    } catch (e) { if (!isCurrent()) return; const msg = e instanceof Error ? e.message : String(e); setMessage(msg); toast.error(t("agentsConfig.unpackFailed"), msg); }
-    finally { if (cwdRef.current === requestCwd) setSaving(false); }
+    } catch (e) { if (!isCurrent()) return; const msg = e instanceof Error ? e.message : String(e); setMessage(msg); }
   };
   const save = async () => {
     const trimmedName = name.trim();
@@ -222,10 +220,8 @@ export function AgentsConfig({ cwd }: { cwd: string | null }) {
       }
       if (!isCurrent()) return;
       toast.success(creating ? t("agentsConfig.agentCreatedToast", { name: trimmedName }) : t("agentsConfig.agentSavedToast", { name: trimmedName }));
-      setMessage(creating ? t("agentsConfig.agentCreatedMsg") : t("agentsConfig.agentSavedMsg"));
       selectedRef.current = trimmedName; setCreating(false); setSelected(trimmedName); await load(true);
-    } catch (e) { if (!isCurrent()) return; const msg = e instanceof Error ? e.message : String(e); setMessage(msg); toast.error(t("agentsConfig.saveError"), msg); }
-    finally { if (cwdRef.current === requestCwd) setSaving(false); }
+    } catch (e) { if (!isCurrent()) return; const msg = e instanceof Error ? e.message : String(e); setMessage(msg); }
   };
   const remove = async () => {
     if (!active || active.scope === "bundled" || activeProjectUnavailable) return;
@@ -242,9 +238,8 @@ export function AgentsConfig({ cwd }: { cwd: string | null }) {
       }
       if (!isCurrent()) return;
       toast.success(t("agentsConfig.agentRemovedToast", { name: active.name }));
-      setMessage(t("agentsConfig.agentRemovedMsg")); selectedRef.current = null; setSelected(null); clearForm(); await load();
-    } catch (e) { if (!isCurrent()) return; const msg = e instanceof Error ? e.message : String(e); setMessage(msg); toast.error(t("agentsConfig.removeError"), msg); }
-    finally { if (cwdRef.current === requestCwd) setSaving(false); }
+      selectedRef.current = null; setSelected(null); clearForm(); await load();
+    } catch (e) { if (!isCurrent()) return; const msg = e instanceof Error ? e.message : String(e); setMessage(msg); }
   };
   const copyPath = async (p: string) => {
     try { await navigator.clipboard.writeText(p); toast.success(t("agentsConfig.pathCopied")); }
@@ -408,7 +403,7 @@ export function AgentsConfig({ cwd }: { cwd: string | null }) {
                       <Trash2 size={13} aria-hidden="true" /> {t("agentsConfig.remove")}
                     </button>
                   )}
-                  {message ? <span style={{ fontSize: 11, color: message.toLowerCase().includes("fail") || message.toLowerCase().includes("error") ? "var(--status-error, #e5484d)" : "var(--text-muted)", fontFamily: "var(--font-mono)" }}>{message}</span> : null}
+                  {message ? <Alert variant={message.toLowerCase().includes("fail") || message.toLowerCase().includes("error") ? "error" : "info"} description={message} onDismiss={() => setMessage(null)} /> : null}
                 </div>
                 <p style={{ margin: 0, fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>{t("agentsConfig.atomicNotice")}</p>
               </div>

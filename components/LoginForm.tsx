@@ -2,10 +2,8 @@
 
 import { LockKeyhole } from "lucide-react";
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
 
 export function LoginForm() {
-  const router = useRouter();
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -24,8 +22,9 @@ export function LoginForm() {
         setError("Incorrect password. Please try again.");
         return;
       }
-      router.push("/");
-      router.refresh();
+      // Full reload so the new auth cookie is picked up by middleware
+      // and server components — SPA navigation alone may keep stale state.
+      window.location.replace("/");
     } catch {
       setError("Could not sign in. Please check your connection and try again.");
     } finally {

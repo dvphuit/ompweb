@@ -41,35 +41,7 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            VERSION="${TAG#v}"
-            PREVIOUS_TAG="$(git describe --tags --abbrev=0 "$TAG^" --match 'v*' 2>/dev/null || true)"
-
-            if [ -n "$PREVIOUS_TAG" ]; then
-              RANGE="$PREVIOUS_TAG..$TAG"
-              CHANGELOG_URL="https://github.com/$GITHUB_REPOSITORY/compare/$PREVIOUS_TAG...$TAG"
-            else
-              RANGE="$TAG"
-              CHANGELOG_URL="https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
-            fi
-
-            CHANGES="$(
-              git log --no-merges --format='• %s' "$RANGE" |
-                grep -Eiv '^• ((chore: )?release( ompweb)? v?[0-9]|v?[0-9]+\.[0-9]+\.[0-9]+$)' || true
-            )"
-            if [ -z "$CHANGES" ]; then
-              CHANGES='• Internal release maintenance.'
-            fi
-
-            {
-              printf '%s\n\n' '## Changes'
-              printf '%s\n\n' "$CHANGES"
-              printf '%s\n\n' '## Upgrade'
-              printf '%s\n' '```bash'
-              printf 'npm install -g @kahme247/ompweb@%s\n' "$VERSION"
-              printf '%s\n\n' '```'
-              printf '**Full changelog:** %s\n' "$CHANGELOG_URL"
-            } > release-notes.md
-
+            node bin/generate-release-notes.js --tag "$TAG" --output release-notes.md
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$TAG" --notes-file release-notes.md --draft
           fi
 

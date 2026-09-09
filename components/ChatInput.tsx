@@ -1,26 +1,51 @@
 "use client";
 
 import React, { useRef, useState, useCallback, useEffect, useImperativeHandle, forwardRef, memo, KeyboardEvent } from "react";
-import { CheckCircle2, ChevronDown, ListChecks, Search, Shrink, Sparkles, Target, X, Zap } from "lucide-react";
+import { CheckCircle2, ChevronDown, ListChecks, Search, Shrink, Sparkles, Target, Wrench, X, Zap } from "lucide-react";
 import { getSubmitDuringRunBehavior } from "@/lib/composer-prefs";
 import type { BuiltinSlashCommandResult, CompactResultInfo, QueuedMessages, SlashCommandInfo } from "@/hooks/useAgentSession";
 import type { ActiveGoal, ActivePlan } from "@/lib/web-mode-state";
-import { formatGoalElapsed } from "@/lib/web-mode-state";
 import { toast } from "@/components/ui/toast";
-import { formatCompactNumber } from "@/lib/format";
-import { clearDraft, getDraft, setDraft, type ChatDraftFile, type ChatDraftImage } from "@/lib/draft-store";
-import { WEB_SLASH_COMMANDS, expandWebSlashCommand } from "@/lib/web-slash-commands";
+import { clearDraft, getDraft, setDraft } from "@/lib/draft-store";
+import { expandWebSlashCommand } from "@/lib/web-slash-commands";
+import type { AttachedImage, AttachedTextFile } from "./ChatInput-draft-attachments";
+import {
+  draftFilesToAttachedFiles,
+  draftImagesToAttachedImages,
+  imageToDraftImage,
+  revokeImagePreview,
+  textFileToDraftFile,
+} from "./ChatInput-draft-attachments";
+import {
+  BUILTIN_SLASH_COMMAND_DEFS,
+  CLIENT_BUILTIN_COMMAND_NAMES,
+  SLASH_SOURCE_GROUP_LABEL_KEYS,
+  SLASH_SOURCE_ORDER,
+  SLASH_SOURCES,
+  isDormantSkillCommand,
+  slashMatchRank,
+  type SlashCommandPaletteItem,
+  type SlashCommandSource,
+} from "./ChatInput-slash-commands";
+import {
+  COMPOSER_MODELS_STORAGE_KEY,
+  compareModelOptions,
+  filterModelOptions,
+  formatTokenCount,
+  readVisibleModelKeys,
+  type ModelOption,
+} from "./ChatInput-model-options";
+import { ComposerModeStatus, ModelErrorBanner, QueuedActionButton } from "./ChatInput-banners";
 import { CHAT_COLUMN_MAX_WIDTH } from "@/lib/chat-layout";
 import {
   composeMessageWithTextAttachments,
   MAX_ATTACHED_TEXT_BYTES,
   MAX_ATTACHED_TEXT_FILES,
-  type AttachedTextFileData,
 } from "@/lib/chat-attachments";
 import {
   MAX_ATTACHED_IMAGE_BYTES,
   MAX_ATTACHED_IMAGES,
-  isBase64ImageWithinLimits,
+  validateOutgoingPrompt,
 } from "@/lib/image-attachments";
 import {
   buildEntriesFromFiles, buildAtInsertText, extractAtQuery, filterFileEntries,
@@ -30,20 +55,17 @@ import { FolderIcon, getFileIcon } from "./FileIcons";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useI18n } from "@/lib/i18n";
 import { selectableThinkingLevels } from "@/lib/thinking-levels";
+import type { ToolPreset } from "@/lib/tool-presets";
 
-export interface AttachedImage {
-  data: string;   // base64, no prefix
-  mimeType: string;
-  previewUrl: string; // object URL for display
-}
+export type { AttachedImage, AttachedTextFile } from "./ChatInput-draft-attachments";
+export { filterModelOptions } from "./ChatInput-model-options";
+export { ModelErrorBanner } from "./ChatInput-banners";
 
-export type AttachedTextFile = AttachedTextFileData;
-
-interface ModelOption {
-  provider: string;
-  modelId: string;
-  name: string;
-}
+const TOOL_PRESET_OPTIONS: Array<{ value: ToolPreset; descriptionKey: string }> = [
+  { value: "none", descriptionKey: "chatInput.toolPresetNone" },
+  { value: "default", descriptionKey: "chatInput.toolPresetDefault" },
+  { value: "full", descriptionKey: "chatInput.toolPresetFull" },
+];
 
 interface Props {
   onSend: (message: string, images?: AttachedImage[]) => void;
@@ -70,6 +92,9 @@ interface Props {
   onThinkingLevelChange?: (level: string) => void;
   availableThinkingLevels?: string[] | null;
   thinkingLevelMap?: Record<string, string | null> | null;
+  /** Browser-side tool preset, applied when spawning NEW sessions. */
+  toolPreset?: ToolPreset;
+  onToolPresetChange?: (preset: ToolPreset) => void;
   /** Display name for the current model when the catalog does not know it. */
   modelNameOverride?: string | null;
   retryInfo?: { attempt: number; maxAttempts: number; errorMessage?: string } | null;
@@ -100,9 +125,14 @@ interface Props {
   advisorEnabled?: boolean;
   /** Toggle the per-chat advisor (composer icon + /advisor command). */
   onAdvisorChange?: (enabled: boolean) => void;
+  /** Collapse the entire composer into a minimized bar. */
+  onMinimize?: () => void;
+  /** Active status label attached to the composer's top edge (e.g. "Waiting for model..."). */
+  statusText?: string | null;
 }
 
 export interface ChatInputHandle {
+  focus: () => void;
   insertText: (text: string) => void;
   insertIfEmpty: (text: string) => void;
   prependText: (text: string) => void;
@@ -110,432 +140,13 @@ export interface ChatInputHandle {
 }
 
 const COMPOSITION_END_ENTER_GRACE_MS = 100;
-const COMPOSER_MODELS_STORAGE_KEY = "omp-composer-models";
 
-function readVisibleModelKeys(): Set<string> | null {
-  try {
-    const value = JSON.parse(localStorage.getItem(COMPOSER_MODELS_STORAGE_KEY) ?? "null");
-    return Array.isArray(value) ? new Set(value.filter((item): item is string => typeof item === "string")) : null;
-  } catch {
-    return null;
-  }
-}
-
-function compareModelOptions(collator: Intl.Collator, a: ModelOption, b: ModelOption): number {
-  return collator.compare(a.name || a.modelId, b.name || b.modelId)
-    || collator.compare(a.provider, b.provider)
-    || collator.compare(a.modelId, b.modelId);
-}
-
-export function filterModelOptions(options: ModelOption[], query: string, locale: string): ModelOption[] {
-  const normalizedQuery = query.trim().toLocaleLowerCase(locale);
-  if (!normalizedQuery) return options;
-  return options.filter((option) => (
-    option.name.toLocaleLowerCase(locale).includes(normalizedQuery)
-    || option.modelId.toLocaleLowerCase(locale).includes(normalizedQuery)
-    || option.provider.toLocaleLowerCase(locale).includes(normalizedQuery)
-  ));
-}
-
-
-function formatTokenCount(tokens: number, locale: string): string {
-  return formatCompactNumber(tokens, locale);
-}
-
-type SlashCommandSource = "builtin" | "extension" | "prompt" | "skill" | "ompBuiltin";
-
-type SlashCommandPaletteItem = {
-  name: string;
-  description?: string;
-  /** Bracketed argument hint rendered after the command name, e.g. "[goal]". */
-  argumentHint?: string;
-  source: SlashCommandSource;
-};
-
-function isDormantSkillCommand(command: SlashCommandPaletteItem, dormantNames: Set<string>): boolean {
-  return command.source === "skill" && dormantNames.has(command.name);
-}
-
-const BUILTIN_SLASH_COMMAND_DEFS: { name: string; descriptionKey: string; argumentHintKey?: string }[] = [
-  // Web-native prompt-composing commands (goal/plan/... are TUI-only in omp and
-  // never execute over the RPC prompt path — see lib/web-slash-commands.ts).
-  ...WEB_SLASH_COMMANDS.map((command) => ({
-    name: command.name,
-    descriptionKey: command.descriptionKey,
-    argumentHintKey: command.argumentHintKey,
-  })),
-  { name: "compact", descriptionKey: "chatInput.cmdCompact" },
-  { name: "reload", descriptionKey: "chatInput.cmdReload" },
-  { name: "name", descriptionKey: "chatInput.cmdName" },
-  { name: "session", descriptionKey: "chatInput.cmdSession" },
-  { name: "copy", descriptionKey: "chatInput.cmdCopy" },
-];
-
-const CLIENT_BUILTIN_COMMAND_NAMES = new Set(BUILTIN_SLASH_COMMAND_DEFS.map((def) => def.name));
-
-const SLASH_SOURCES: SlashCommandSource[] = ["builtin", "extension", "prompt", "skill", "ompBuiltin"];
-
-const SLASH_SOURCE_GROUP_LABEL_KEYS: Record<SlashCommandSource, string> = {
-  builtin: "chatInput.groupBuiltin",
-  extension: "chatInput.groupExtensions",
-  prompt: "chatInput.groupPrompts",
-  skill: "chatInput.groupSkills",
-  ompBuiltin: "chatInput.groupOmpBuiltin",
-};
-
-const SLASH_SOURCE_ORDER: Record<SlashCommandSource, number> = {
-  builtin: 0,
-  extension: 1,
-  prompt: 2,
-  skill: 3,
-  ompBuiltin: 4,
-};
-
-function slashMatchRank(command: SlashCommandPaletteItem, query: string): number {
-  const name = command.name.toLowerCase();
-  const description = command.description?.toLowerCase() ?? "";
-  if (name === query) return 0;
-  if (name.startsWith(query)) return 1;
-  if (name.includes(query)) return 2;
-  if (description.includes(query)) return 3;
-  return 4;
-}
-
-function imageToDraftImage(image: AttachedImage): ChatDraftImage {
-  return { data: image.data, mimeType: image.mimeType };
-}
-
-function draftImageToAttachedImage(image: ChatDraftImage): AttachedImage {
-  return {
-    ...image,
-    previewUrl: `data:${image.mimeType};base64,${image.data}`,
-  };
-}
-
-function draftImagesToAttachedImages(images: ChatDraftImage[] | undefined): AttachedImage[] {
-  return (images ?? [])
-    .filter(isBase64ImageWithinLimits)
-    .slice(0, MAX_ATTACHED_IMAGES)
-    .map(draftImageToAttachedImage);
-}
-function textFileToDraftFile(file: AttachedTextFile): ChatDraftFile {
-  return { name: file.name, mimeType: file.mimeType, content: file.content, size: file.size };
-}
-
-function draftFilesToAttachedFiles(files: ChatDraftFile[] | undefined): AttachedTextFile[] {
-  return (files ?? [])
-    .filter((file) => typeof file.name === "string"
-      && typeof file.mimeType === "string"
-      && typeof file.content === "string"
-      && Number.isFinite(file.size)
-      && file.size <= MAX_ATTACHED_TEXT_BYTES)
-    .slice(0, MAX_ATTACHED_TEXT_FILES);
-}
-
-function revokeImagePreview(image: AttachedImage): void {
-  if (image.previewUrl.startsWith("blob:")) {
-    URL.revokeObjectURL(image.previewUrl);
-  }
-}
-
-/** Compact action button for the queued follow-up bar. */
-function QueuedActionButton({
-  onClick,
-  title,
-  accent = false,
-  children,
-}: {
-  onClick: () => void;
-  title: string;
-  accent?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      style={{
-        flexShrink: 0,
-        padding: "4px 8px", minHeight: 24,
-        border: "none",
-        borderRadius: 6,
-        background: "transparent",
-        color: accent ? "var(--accent)" : "var(--text-dim)",
-        cursor: "pointer",
-        fontSize: 11,
-        fontWeight: accent ? 600 : 400,
-        transition: "background var(--dur-fast) var(--ease-out-warm), color var(--dur-fast) var(--ease-out-warm)",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = "var(--bg-hover)";
-        if (!accent) e.currentTarget.style.color = "var(--text-muted)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = "transparent";
-        if (!accent) e.currentTarget.style.color = "var(--text-dim)";
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-export function ModelErrorBanner({ error }: { error?: string | null }) {
-  const { t } = useI18n();
-  if (!error) return null;
-  return (
-    <div
-      role="alert"
-      style={{
-        display: "flex",
-        alignItems: "flex-start",
-        gap: 8,
-        maxHeight: 120,
-        marginBottom: 8,
-        padding: "7px 10px",
-        overflowY: "auto",
-        border: "1px solid color-mix(in srgb, var(--status-error) 35%, transparent)",
-        borderRadius: "var(--radius-control)",
-        background: "color-mix(in srgb, var(--status-error) 8%, transparent)",
-        color: "var(--status-error)",
-        fontSize: 11,
-        lineHeight: 1.45,
-      }}
-    >
-      <svg
-        width="13"
-        height="13"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        style={{ flexShrink: 0, marginTop: 1 }}
-        aria-hidden="true"
-      >
-        <path d="M10.3 2.9 1.8 17a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 2.9a2 2 0 0 0-3.4 0Z" />
-        <line x1="12" y1="9" x2="12" y2="13" />
-        <line x1="12" y1="17" x2="12.01" y2="17" />
-      </svg>
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontWeight: 600 }}>{t("chatInput.modelError")}</div>
-        <div style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{error}</div>
-      </div>
-    </div>
-  );
-}
-
-function ComposerModeStatus({
-  goal,
-  plan,
-  onClearGoal,
-}: {
-  goal?: ActiveGoal | null;
-  plan?: ActivePlan | null;
-  onClearGoal?: () => void;
-}) {
-  const { t } = useI18n();
-  const [expanded, setExpanded] = useState(false);
-  const [now, setNow] = useState(() => Date.now());
-  const prevGoalKeyRef = useRef<string | null>(null);
-
-  const goalKey = goal ? `${goal.startedAt}:${goal.objective}` : null;
-  useEffect(() => {
-    if (!goalKey) {
-      setExpanded(false);
-      prevGoalKeyRef.current = null;
-      return;
-    }
-    if (prevGoalKeyRef.current !== goalKey) {
-      prevGoalKeyRef.current = goalKey;
-      setExpanded(false);
-    }
-  }, [goalKey]);
-
-  useEffect(() => {
-    if (!goal || goal.completedAt) return;
-    setNow(Date.now());
-    const timer = window.setInterval(() => setNow(Date.now()), 10_000);
-    return () => window.clearInterval(timer);
-  }, [goal]);
-
-  if (!goal && !plan) return null;
-
-  const isCompleted = Boolean(goal?.completedAt);
-  const elapsed = goal ? formatGoalElapsed((goal.completedAt ?? now) - goal.startedAt) : "0m";
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
-      {goal && (
-        <div
-          className="border border-border bg-bg-subtle"
-          style={{
-            borderRadius: "var(--radius-card)",
-            overflow: "hidden",
-            borderColor: isCompleted
-              ? "color-mix(in srgb, var(--status-success) 35%, var(--border))"
-              : "color-mix(in srgb, var(--accent) 35%, var(--border))",
-            background: isCompleted
-              ? "color-mix(in srgb, var(--status-success) 5%, var(--bg-panel))"
-              : "color-mix(in srgb, var(--accent) 6%, var(--bg-panel))",
-            transition: "border-color var(--dur-fast) var(--ease-out-warm), background var(--dur-fast) var(--ease-out-warm)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 8px" }}>
-            <button
-              type="button"
-              aria-expanded={expanded}
-              onClick={() => setExpanded((v) => !v)}
-              title={expanded ? t("chatInput.collapseGoal") : t("chatInput.expandGoal")}
-              className="ui-focus-ring"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 7,
-                flex: 1,
-                minWidth: 0,
-                padding: "2px 4px",
-                border: "none",
-                background: "transparent",
-                color: "var(--text)",
-                cursor: "pointer",
-                textAlign: "left",
-              }}
-            >
-              {isCompleted ? (
-                <CheckCircle2
-                  size={14}
-                  strokeWidth={2.2}
-                  style={{ flexShrink: 0, color: "var(--status-success)" }}
-                  aria-hidden="true"
-                />
-              ) : (
-                <Target
-                  size={14}
-                  strokeWidth={2}
-                  style={{ flexShrink: 0, color: "var(--accent)" }}
-                  aria-hidden="true"
-                />
-              )}
-              <span
-                style={{
-                  flexShrink: 0,
-                  color: isCompleted ? "var(--status-success)" : "var(--accent)",
-                  fontSize: 10,
-                  fontFamily: "var(--font-mono)",
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.04em",
-                }}
-              >
-                {isCompleted ? t("chatInput.goalCompleted") : t("chatInput.goalActive")} · {elapsed}
-              </span>
-              {!expanded && (
-                <span
-                  style={{
-                    minWidth: 0,
-                    flex: 1,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    fontSize: 12,
-                    color: "var(--text-muted)",
-                  }}
-                >
-                  {goal.objective}
-                </span>
-              )}
-              <ChevronDown
-                size={14}
-                strokeWidth={1.8}
-                aria-hidden="true"
-                style={{
-                  color: "var(--text-dim)",
-                  marginLeft: "auto",
-                  flexShrink: 0,
-                  transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
-                  transition: "transform var(--dur-med) var(--ease-out-warm)",
-                }}
-              />
-            </button>
-            {onClearGoal && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onClearGoal();
-                }}
-                title={t("chatInput.clearGoal")}
-                aria-label={t("chatInput.clearGoal")}
-                className="ui-focus-ring"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: 24,
-                  height: 24,
-                  flexShrink: 0,
-                  border: "1px solid var(--border)",
-                  borderRadius: "var(--radius-control)",
-                  background: "var(--bg)",
-                  color: "var(--text-muted)",
-                  cursor: "pointer",
-                  transition: "background var(--dur-fast) var(--ease-out-warm), color var(--dur-fast) var(--ease-out-warm)",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "var(--bg-hover)";
-                  e.currentTarget.style.color = "var(--text)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "var(--bg)";
-                  e.currentTarget.style.color = "var(--text-muted)";
-                }}
-              >
-                <X size={12} strokeWidth={2} aria-hidden="true" />
-              </button>
-            )}
-          </div>
-
-          {/* Expandable body */}
-          <div
-            className={"accordion-flow " + (expanded ? "is-open" : "")}
-            inert={!expanded ? true : undefined}
-          >
-            <div className="accordion-flow-inner">
-              <div
-                style={{
-                  padding: "8px 12px 10px",
-                  borderTop: "1px solid var(--border)",
-                  fontSize: 12.5,
-                  lineHeight: 1.5,
-                  color: "var(--text)",
-                  whiteSpace: "pre-wrap",
-                  overflowWrap: "anywhere",
-                }}
-              >
-                {goal.objective}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      {plan && (
-        <div role="status" aria-live="polite" style={{ display: "flex", alignItems: "center", gap: 7, padding: "5px 9px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-panel)", color: "var(--text-muted)", fontSize: 12 }}>
-          <ListChecks size={14} strokeWidth={2} style={{ flexShrink: 0, color: "var(--accent)" }} aria-hidden="true" />
-          <span style={{ fontWeight: 600 }}>{t("chatInput.planningInProgress")}</span>
-          <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-dim)" }}>{plan.objective}</span>
-        </div>
-      )}
-    </div>
-  );
-}
 
 export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatInput({
   onSend, onAbort, onSteer, onFollowUp, isStreaming, model, isAutoModelSelection, modelNames, modelList, modelError, modelsLoading, onModelChange, fastModeEnabled, fastModeActive, fastModeSupported, onFastModeChange,
   onAbortCompaction, isCompacting, compactResult,
   thinkingLevel, onThinkingLevelChange, availableThinkingLevels, thinkingLevelMap, modelNameOverride,
+  toolPreset, onToolPresetChange,
   retryInfo, queuedMessages, inputHistory = [], onAbortRetry,
   slashCommands, slashCommandsLoading, onLoadSlashCommands,
   onBuiltinCommand,
@@ -553,6 +164,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   activePlan,
   advisorEnabled,
   onAdvisorChange,
+  onMinimize,
+  statusText,
 }: Props, ref) {
   const isMobile = useIsMobile();
   const { t, tn, locale } = useI18n();
@@ -562,8 +175,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   );
   const [value, setValue] = useState(() => (draftKey ? getDraft(draftKey)?.value ?? "" : ""));
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
-  const [modelDropdownRect, setModelDropdownRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const [thinkingDropdownOpen, setThinkingDropdownOpen] = useState(false);
+  const [toolPresetDropdownOpen, setToolPresetDropdownOpen] = useState(false);
   const [modelSearchQuery, setModelSearchQuery] = useState("");
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>(() => (
     draftKey ? draftImagesToAttachedImages(getDraft(draftKey)?.images) : []
@@ -591,6 +204,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   const modelDropdownPanelRef = useRef<HTMLDivElement>(null);
   const modelSearchInputRef = useRef<HTMLInputElement>(null);
   const thinkingDropdownRef = useRef<HTMLDivElement>(null);
+  const toolPresetDropdownRef = useRef<HTMLDivElement>(null);
   const historyMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isComposingRef = useRef(false);
@@ -615,6 +229,9 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   attachedTextFilesRef.current = attachedTextFiles;
 
   useImperativeHandle(ref, () => ({
+    focus() {
+      textareaRef.current?.focus();
+    },
     insertIfEmpty(text: string) {
       const ta = textareaRef.current;
       const current = ta ? ta.value : value;
@@ -854,6 +471,12 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     const previousDraftKey = draftKeyRef.current;
     if (previousDraftKey === draftKey) return;
 
+    // Invalidate any attachment reads still in flight for the old session so
+    // they cannot append onto the new session's composer, and drop any stale
+    // validation banner along with the old draft.
+    attachmentRevisionRef.current += 1;
+    setAttachError(null);
+
     if (previousDraftKey) {
       setDraft(previousDraftKey, {
         value: valueRef.current,
@@ -880,11 +503,31 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     ta.style.height = "auto";
     if (value) ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
   }, [value]);
+  useEffect(() => {
+    return () => {
+      // Drop any reads still in flight when the composer goes away entirely
+      // (they would otherwise touch state/URLs of a dead component).
+      attachmentRevisionRef.current += 1;
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
       attachedImagesRef.current.forEach(revokeImagePreview);
     };
+  }, []);
+
+  /** The routes reject an oversized prompt with 413, but the session hook has
+   * already shown the optimistic user bubble and Waiting for model by then, and
+   * the composer has been cleared. Refuse here instead, keeping text and
+   * images so the user can trim the message.
+   *
+   * The check owns the banner it raises: a dispatch that now fits clears it,
+   * because a text-only prompt has no attachment chip whose removal would. */
+  const rejectsOversizedPrompt = useCallback((message: string, images: AttachedImage[]): boolean => {
+    const error = validateOutgoingPrompt(message, images);
+    setAttachError(error);
+    return error !== null;
   }, []);
 
   const handleSend = useCallback(async () => {
@@ -894,15 +537,21 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     onAudioUnlock?.();
     const composedMessage = composeMessageWithTextAttachments(msg, attachedTextFiles);
     if (!attachedImages.length && !attachedTextFiles.length && msg.startsWith("/") && onBuiltinCommand) {
+      const expansion = expandWebSlashCommand(msg);
+      if (expansion.kind === "expand" && rejectsOversizedPrompt(expansion.prompt, attachedImages)) return;
+      const sentValue = value;
       const result = await onBuiltinCommand(msg);
       if (result.handled) {
-        if (!result.error && !result.retainInput) clearInput();
+        // The user may have started typing while the command ran; only clear
+        // if the composer still holds what was sent.
+        if (!result.error && !result.retainInput && valueRef.current === sentValue) clearInput();
         return;
       }
     }
+    if (rejectsOversizedPrompt(composedMessage, attachedImages)) return;
     onSend(composedMessage, attachedImages.length ? attachedImages : undefined);
     clearInput();
-  }, [value, attachedImages, attachedTextFiles, isStreaming, onBuiltinCommand, onSend, clearInput, onAudioUnlock]);
+  }, [value, attachedImages, attachedTextFiles, isStreaming, onBuiltinCommand, onSend, clearInput, onAudioUnlock, rejectsOversizedPrompt]);
 
   const slashQuery = value.startsWith("/") && !/\s/.test(value.slice(1))
     ? value.slice(1).toLowerCase()
@@ -1061,8 +710,12 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     if (fileIndexFetchingRef.current === cwd) return;
     fileIndexFetchingRef.current = cwd;
     const fetchCwd = cwd;
+    // Abort the previous fetch when the cwd changes or the menu closes, so a
+    // slow response for an old directory cannot flip the loading state after
+    // a newer one has taken over.
+    const controller = new AbortController();
     setFileIndexLoading(true);
-    fetch(`/api/file-index?cwd=${encodeURIComponent(fetchCwd)}`)
+    fetch(`/api/file-index?cwd=${encodeURIComponent(fetchCwd)}`, { signal: controller.signal })
       .then((res) => {
         if (!res.ok) throw new Error(`file index failed: ${res.status}`);
         return res.json() as Promise<{ files?: string[]; truncated?: boolean }>;
@@ -1072,13 +725,17 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         fileIndexMetaRef.current = { cwd: fetchCwd, fetchedAt: Date.now() };
       })
       .catch(() => {
-        // Leave any previous index in place; next open retries.
+        // Leave any previous index in place; next open retries. Aborts land
+        // here too, which is exactly the desired no-op.
         fileIndexMetaRef.current = null;
       })
       .finally(() => {
-        fileIndexFetchingRef.current = null;
-        setFileIndexLoading(false);
+        if (fileIndexFetchingRef.current === fetchCwd) {
+          fileIndexFetchingRef.current = null;
+          setFileIndexLoading(false);
+        }
       });
+    return () => controller.abort();
   }, [atTokenActive, cwd]);
 
   const applyAtCompletion = useCallback((entry: FileIndexEntry) => {
@@ -1191,6 +848,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
       // own ACP handlers can run them.
       const expansion = expandWebSlashCommand(msg);
       if (expansion.kind === "expand") {
+        if (rejectsOversizedPrompt(expansion.prompt, attachedImages)) return;
         onPromptWithStreamingBehavior(expansion.prompt, streamingBehavior, attachedImages.length ? attachedImages : undefined);
         clearInput();
         return;
@@ -1202,17 +860,19 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         }));
         return;
       }
+      if (rejectsOversizedPrompt(msg, attachedImages)) return;
       onPromptWithStreamingBehavior(msg, streamingBehavior, attachedImages.length ? attachedImages : undefined);
       clearInput();
       return;
     }
+    if (rejectsOversizedPrompt(msg, attachedImages)) return;
     if (mode === "steer" && onSteer) {
       onSteer(msg, attachedImages.length ? attachedImages : undefined);
     } else if (mode === "followup" && onFollowUp) {
       onFollowUp(msg, attachedImages.length ? attachedImages : undefined);
     }
     clearInput();
-  }, [value, attachedImages, attachedTextFiles, onPromptWithStreamingBehavior, onSteer, onFollowUp, clearInput, onAudioUnlock, t, advisorEnabled]);
+  }, [value, attachedImages, attachedTextFiles, onPromptWithStreamingBehavior, onSteer, onFollowUp, clearInput, onAudioUnlock, t, advisorEnabled, rejectsOversizedPrompt]);
   // A typed, text-only message during a run is a queued follow-up. Keep Stop
   // as the action while the composer is empty or contains attachments.
   const primaryActionQueuesMessage =
@@ -1429,6 +1089,13 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         return;
       }
 
+      // Esc minimizes the composer when idle, empty, and no menus open.
+      if (e.key === "Escape" && !isComposing && !isStreaming && onMinimize && value.trim().length === 0) {
+        e.preventDefault();
+        onMinimize();
+        return;
+      }
+
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         if (isStreaming && (onSteer || onFollowUp)) {
@@ -1442,7 +1109,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         }
       }
     },
-    [isStreaming, onSteer, onFollowUp, onAbort, slashMenuOpen, slashQuery, filteredSlashCommands, slashActiveIndex, applySlashCommand, sendQueued, handleSend, getNextSlashIndex, atMenuOpen, atQuery, atMatches, atActiveIndex, applyAtCompletion, historyMenuOpen, inputHistory, historyActiveIndex, applyHistoryInput, value]
+    [isStreaming, onSteer, onFollowUp, onAbort, onMinimize, slashMenuOpen, slashQuery, filteredSlashCommands, slashActiveIndex, applySlashCommand, sendQueued, handleSend, getNextSlashIndex, atMenuOpen, atQuery, atMatches, atActiveIndex, applyAtCompletion, historyMenuOpen, inputHistory, historyActiveIndex, applyHistoryInput, value]
   );
 
   const handleInput = useCallback(() => {
@@ -1601,6 +1268,9 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
       }
       if (thinkingDropdownRef.current && !thinkingDropdownRef.current.contains(e.target as Node)) {
         setThinkingDropdownOpen(false);
+      }
+      if (toolPresetDropdownRef.current && !toolPresetDropdownRef.current.contains(e.target as Node)) {
+        setToolPresetDropdownOpen(false);
       }
       if (historyMenuRef.current && !historyMenuRef.current.contains(e.target as Node) && !textareaRef.current?.contains(e.target as Node)) {
         setHistoryMenuOpen(false);
@@ -2302,6 +1972,31 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             )}
           </div>
         )}
+        {/* Live agent status bar — attached to composer's top edge */}
+        {statusText && (
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              border: `1px solid ${bashMode ? "var(--tool-bg)" : "color-mix(in srgb, var(--border) 70%, transparent)"}`,
+              borderBottom: "none",
+              borderRadius: queuedCount > 0 ? 0 : "var(--radius-card) var(--radius-card) 0 0",
+              background: "var(--bg-panel)",
+              padding: "6px 14px",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              fontSize: 12,
+              color: "var(--text-muted)",
+            }}
+          >
+            <span
+              aria-hidden
+              className="live-status-dot live-pulse inline-block h-2 w-2 shrink-0 rounded-full bg-accent"
+            />
+            <span>{statusText}</span>
+          </div>
+        )}
           <div
             className="chat-input-shell"
             style={{
@@ -2309,7 +2004,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               flexDirection: "column",
               background: "var(--bg)",
               border: `1px solid ${bashMode ? "var(--tool-bg)" : "color-mix(in srgb, var(--border) 70%, transparent)"}`,
-              borderRadius: "var(--radius-card)",
+              borderRadius: (queuedCount > 0 || Boolean(statusText)) ? "0 0 var(--radius-card) var(--radius-card)" : "var(--radius-card)",
               padding: "12px 12px 10px 14px",
               boxShadow: "var(--shadow-card)",
               transition: "border-color var(--dur-fast) var(--ease-out-warm), background var(--dur-fast) var(--ease-out-warm), box-shadow var(--dur-fast) var(--ease-out-warm)",
@@ -2348,8 +2043,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               outline: "none",
               resize: "none",
               color: "var(--text)",
-              fontSize: 14,
-              lineHeight: 1.6,
+              fontSize: "var(--chat-user-font-size)",
+              lineHeight: "var(--chat-line-height)",
               fontFamily: "inherit",
               minHeight: 24,
               maxHeight: 200,
@@ -2434,11 +2129,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             {(modelOptions.length > 0 || currentName || modelError || showModelsLoading) && onModelChange && (
               <div ref={dropdownRef} style={{ position: "relative", minWidth: 0 }}>
                 <button
-                  onClick={(e) => {
-                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                    setModelDropdownRect({ top: rect.top, left: rect.left, width: rect.width });
-                    setModelDropdownOpen((v) => !v);
-                  }}
+                  onClick={() => setModelDropdownOpen((v) => !v)}
                   disabled={modelSelectorDisabled}
                   style={{
                     display: "flex", alignItems: "center", gap: 5,
@@ -2483,24 +2174,24 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                       ? t("chatInput.selectModel")
                       : showModelsLoading ? t("chatInput.loadingModels") : t("chatInput.noModels"))}
                   </span>
-                  <ChevronDown size={12} strokeWidth={1.8} style={{ flexShrink: 0, opacity: 0.7 }} aria-hidden="true" />
+                  <ChevronDown size={12} strokeWidth={1.8} style={{ flexShrink: 0, opacity: 0.7, transform: modelDropdownOpen ? "rotate(180deg)" : "none", transition: "transform var(--dur-fast) var(--ease-out-warm)" }} aria-hidden="true" />
                 </button>
-                {modelDropdownOpen && modelDropdownRect && (() => {
-                  const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-                  const bottom = viewportHeight - modelDropdownRect.top + 6;
-                  const maxH = Math.max(120, Math.min(modelDropdownRect.top - 8, viewportHeight * 0.6));
-                  const panelPos: React.CSSProperties = isMobile
-                    ? { left: 8, right: 8, maxWidth: "calc(100vw - 16px)" }
-                    : { left: modelDropdownRect.left, width: "max-content", minWidth: modelDropdownRect.width, maxWidth: "calc(100vw - 16px)" };
-                  return (
-                    <div ref={modelDropdownPanelRef} className="picker-panel" style={{
-                      position: "fixed",
-                      bottom,
-                      ...panelPos,
+                {modelDropdownOpen && (
+                  <div
+                    ref={modelDropdownPanelRef}
+                    className="picker-panel"
+                    style={{
+                      position: isMobile ? "fixed" : "absolute",
+                      bottom: isMobile ? 8 : "calc(100% + 6px)",
+                      ...(isMobile
+                        ? { left: 8, right: 8, maxWidth: "calc(100vw - 16px)" }
+                        : { left: 0, width: "max-content", minWidth: 200, maxWidth: "min(320px, calc(100vw - 32px))" }),
                       zIndex: 500,
-                      display: "flex", flexDirection: "column",
-                      maxHeight: maxH,
-                    }}>
+                      display: "flex",
+                      flexDirection: "column",
+                      maxHeight: isMobile ? "calc(100dvh - 32px)" : "min(380px, 60vh)",
+                    }}
+                  >
                       <div className="picker-panel-header">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: "var(--text-muted)" }}>
                           <rect x="4" y="4" width="16" height="16" rx="2" />
@@ -2556,8 +2247,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                         ))}
                       </div>
                     </div>
-                  );
-                })()}
+                )}
               </div>
             )}
 
@@ -2630,6 +2320,75 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     <div className="picker-panel-footer">
                       <span>{t("chatInput.appliesNextPrompt")}</span>
                       <span style={{ fontWeight: 600, color: "var(--text-muted)", textTransform: "capitalize" }}>{thinkingDisplayLabel}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tool preset selector — a browser-side preference applied when
+                spawning NEW sessions (omp's RPC cannot retool a live session,
+                which the change notice below communicates). */}
+            {onToolPresetChange && (
+              <div ref={toolPresetDropdownRef} style={{ position: "relative" }}>
+                <button
+                  onClick={() => setToolPresetDropdownOpen((v) => !v)}
+                  title={t("chatInput.changeToolPresetTitle", { preset: toolPreset ?? "full" })}
+                  aria-label={`${t("chatInput.changeToolPreset")}: ${toolPreset ?? "full"}`}
+                  aria-expanded={toolPresetDropdownOpen}
+                  aria-haspopup="menu"
+                  style={{
+                    display: "flex", alignItems: "center", gap: 5,
+                    height: 28, padding: "0 8px", background: toolPresetDropdownOpen ? "var(--bg-hover)" : "none",
+                    border: "none", borderRadius: 7, color: "var(--text-muted)", cursor: "pointer",
+                    fontSize: 12,
+                    transition: "background var(--dur-fast) var(--ease-out-warm), color var(--dur-fast) var(--ease-out-warm)",
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.color = "var(--text)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = toolPresetDropdownOpen ? "var(--bg-hover)" : "none"; e.currentTarget.style.color = "var(--text-muted)"; }}
+                >
+                  <Wrench size={11} strokeWidth={1.8} style={{ flexShrink: 0 }} aria-hidden="true" />
+                  <span style={{ whiteSpace: "nowrap", textTransform: "capitalize" }}>{toolPreset ?? "full"}</span>
+                  <ChevronDown size={12} strokeWidth={1.8} style={{ flexShrink: 0, opacity: 0.7, transform: toolPresetDropdownOpen ? "rotate(180deg)" : "none", transition: "transform var(--dur-fast) var(--ease-out-warm)" }} aria-hidden="true" />
+                </button>
+                {toolPresetDropdownOpen && (
+                  <div
+                    className="picker-panel"
+                    role="menu"
+                    style={{
+                      position: "absolute", bottom: "calc(100% + 6px)", left: 0,
+                      zIndex: 100, width: 260, maxWidth: "calc(100vw - 32px)",
+                    }}
+                  >
+                    <div className="picker-panel-header">
+                      <Wrench size={12} strokeWidth={1.8} style={{ color: "var(--text-muted)", flexShrink: 0 }} aria-hidden="true" />
+                      <span className="picker-panel-title">{t("chatInput.toolPresetLabel")}</span>
+                      <span className="picker-panel-count">{TOOL_PRESET_OPTIONS.length}</span>
+                    </div>
+                    <div className="picker-thinking-cards">
+                      {TOOL_PRESET_OPTIONS.map((opt) => {
+                        const isActive = (toolPreset ?? "full") === opt.value;
+                        return (
+                          <button
+                            className="picker-thinking-card"
+                            data-active={isActive}
+                            role="menuitemradio"
+                            aria-checked={isActive}
+                            key={opt.value}
+                            title={t(opt.descriptionKey)}
+                            onClick={() => { setToolPresetDropdownOpen(false); if (!isActive) onToolPresetChange(opt.value); }}
+                          >
+                            <span className="picker-check">
+                              {isActive && <svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1.5 5 4 7.5 8.5 2.5" /></svg>}
+                            </span>
+                            <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textTransform: "capitalize" }}>{opt.value}</span>
+                            <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11, color: "var(--text-dim)" }}>{t(opt.descriptionKey)}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="picker-panel-footer">
+                      <span>{t("chatInput.toolPresetFooter")}</span>
                     </div>
                   </div>
                 )}

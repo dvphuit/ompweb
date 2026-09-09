@@ -62,7 +62,7 @@ export async function listDirectories(directory: string): Promise<BrowsableDirec
   // as a static glob would walk the entire Windows profile during `next build`.
   const readDirectory = Reflect.get(fsPromises, "readdir") as typeof fsPromises.readdir;
   const entries = await readDirectory(directory, { withFileTypes: true });
-  // 忽略损坏、不可访问或不指向目录的符号链接。
+  // Skip broken, inaccessible, or non-directory symlinks.
   const candidates = await Promise.all(entries.map(async (entry) => {
     if (entry.isDirectory()) {
       return { name: entry.name, path: path.join(directory, entry.name) };

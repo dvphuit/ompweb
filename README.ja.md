@@ -1,10 +1,17 @@
 # ompweb
 
-[English](./README.md) | [简体中文](./README.zh-CN.md)
+[![npm version](https://img.shields.io/npm/v/@kahme247/ompweb.svg?logo=npm&color=e05d44)](https://www.npmjs.com/package/@kahme247/ompweb)
+[![node version](https://img.shields.io/node/v/@kahme247/ompweb.svg?logo=node.js&color=44cc11)](https://nodejs.org)
+[![license](https://img.shields.io/github/license/kahme247/ompweb.svg?color=44cc11)](./LICENSE)
+[![npm downloads](https://img.shields.io/npm/dm/@kahme247/ompweb.svg?color=44cc11)](https://www.npmjs.com/package/@kahme247/ompweb)
+[![GitHub stars](https://img.shields.io/github/stars/kahme247/ompweb.svg?logo=github)](https://github.com/kahme247/ompweb/stargazers)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/kahme247/ompweb/pulls)
+
+[English](./README.md) | [简体中文](./README.zh-CN.md) | [日本語](./README.ja.md)
 
 コミュニティ：[OMPWEB Discord に参加](https://discord.gg/evqgGzRfM5)
 
-[oh-my-pi (omp) コーディングエージェント](https://github.com/can1357/oh-my-pi)のローカル Web UI です。ompweb はローカルの omp セッションファイルを読み込み、セッションの閲覧、リアルタイムチャット、モデル設定、スキル管理、プロジェクトファイルのプレビューを行えるブラウザワークスペースを提供します。
+[oh-my-pi (omp)](https://github.com/can1357/oh-my-pi) コーディングエージェント向けのモダンな Web UI です。ローカルの omp セッションを読み込み、ブラウザから対話、プロジェクト閲覧、設定管理、ファイルプレビューを行えるワークスペースを提供します。
 
 ![ompweb — デモ](docs/demo.gif)
 
@@ -19,12 +26,12 @@
 
 ## 必要条件
 
-- [omp](https://github.com/can1357/oh-my-pi) がインストールされ、`PATH` に含まれていること（または `OMP_WEB_OMP_BIN` でバイナリの場所を指定）
-- Node.js 22.19.0 以降（`node --version`）
+- [omp](https://github.com/can1357/oh-my-pi) がインストールされ、`PATH` に含まれていること（または `OMP_WEB_OMP_BIN` で指定）
+- Node.js `>= 22.19.0`
 
 ## クイックスタート
 
-**インストールせずに実行:**
+**インストールせずに直接実行:**
 
 ```bash
 npx @kahme247/ompweb@latest
@@ -37,103 +44,61 @@ npm install -g @kahme247/ompweb
 ompweb
 ```
 
-続いて [http://127.0.0.1:30177](http://127.0.0.1:30177) を開きます。サーバーの準備が整うと、CLI はブラウザを自動的に開こうとします。ompweb はデフォルトで `127.0.0.1` で待ち受けます。
+ブラウザで [http://127.0.0.1:30177](http://127.0.0.1:30177) を開きます。
 
-**オプション:**
+### CLI オプション
 
 ```bash
-ompweb --port 8080              # カスタムポート
-ompweb --hostname 0.0.0.0       # 信頼できるネットワークに公開
-ompweb -p 8080 -H 0.0.0.0       # オプションを組み合わせる
-ompweb --no-open                # ブラウザを自動的に開かない
-
-ompweb --password "a-long-random-password" # パスワードのみのサインインを有効化（Windows でも同様）
-
-PORT=8080 ompweb                # 環境変数にも対応
-OMP_WEB_HOSTNAME=0.0.0.0 ompweb # ネットワーク公開を明示的に有効化
-OMP_WEB_PASSWORD='a-long-random-password' ompweb # 環境変数でも同様（POSIX）
-# Windows: $env:OMP_WEB_PASSWORD="secret"; ompweb
-OMP_WEB_NO_OPEN=1 ompweb        # バックグラウンドサービスとして実行する場合に便利
+ompweb --port 8080                         # ポート番号指定
+ompweb --hostname 0.0.0.0                  # ネットワーク公開
+ompweb --password "your-password"          # パスワード認証を有効化
+ompweb --no-open                           # ブラウザ自動起動を無効化
 ```
 
-`OMP_WEB_PASSWORD` を設定すると、テーマに統合されたパスワードのみのサインイン画面で UI とすべての API エンドポイントを保護できます。サインイン後は HTTP-only の署名付きセッションクッキーが 30 日間有効です。未設定なら認証は無効です。リモート利用では、パスワードとセッションクッキーを守るため、信頼できるリバースプロキシまたは VPN 経由の HTTPS が必要です。ompweb をインターネットへ直接公開しないでください。
+## 主な機能
 
-## 機能
+- **リアルタイムチャット**: ローカルの `omp` エージェントとストリーミング対話。
+- **セッション管理**: プロジェクトごとに履歴を一覧表示、分岐やフォークにも対応。
+- **ライブタスク＆サブエージェント**: Todo リストと稼働中サブエージェントの進捗を折りたたみパネルでリアルタイム表示。
+- **ファイル閲覧・プレビュー**: チャットと並べてファイルを閲覧、コード・Markdown・画像・音声・PDF をプレビュー。
+- **Git Worktree サポート**: サイドバーから直接 Git ワークツリーを切り替え・管理。
+- **GUI 設定管理**: 設定ファイルを直接編集することなく、モデル、API キー、MCP サーバー、スキル、プラグイン、OMP 設定を変更可能。
+- **スラッシュコマンド・ショートカット**: `/plan`、`/review`、`/fix`、`/test` などの定型プロンプトと `⌘K` / `Ctrl+K` コマンドパレット。
+- **テーマと多言語対応**: ペーパー調のライト/ダークテーマ、英語・簡体字中国語・日本語に完全対応。
 
-- **作業をすぐに再開**: ターミナル履歴やセッションパスを探し回らずに、プロジェクトごとに過去の omp の会話を閲覧できます。
-- **別の方向性を安全に試す**: 以前のメッセージから続行するか、セッションをフォークして別ルートに分岐できます。
-- **サイドバーを整理**: 非アクティブなセッションはネイティブな記録を残してアーカイブし、不要になったものは明示的に削除できます。
-- **ブランチをまたいで作業**: サイドバーから Git ワークツリーを切り替えると、新しいセッションとエクスプローラーが選択したチェックアウトに追従します。
-- **プロジェクトを見ながらチャット**: エージェントの作業中に、左側でファイルを閲覧し、右側でソース、ドキュメント、画像、音声、PDF をプレビューできます。
-- **セッション状態をひと目で把握**: コンテキスト使用量、コスト、コンパクション状態、システムプロンプトの詳細をトップバーで確認できます。
-- **ターミナルに頼らない設定**: モデル、ログイン/APIキー、モデルテスト、ネイティブ OMP 制御（アドバイザー、承認、Bash ポリシー、思考、コンパクション、メモリ、自動学習、リトライ/フォールバック）、スキル、プラグイン、プロジェクト MCP サーバーを Web UI から管理できます。
-- **Settings で MCP を管理**: 専用の MCP タブでプロジェクトサーバーの状態（有効 / 無効 / 無効な設定）を表示し、追加、編集、名前変更、検証、削除を行えます。設定エラーはトーストで通知されます。
-- **OMP を最新に保つ**: Settings からインストール済みランタイムを確認・更新し、必要に応じてアクティブなセッションを再起動できます。
-- **完了を見逃さない**: エージェント完了時のブラウザー通知を有効にし、インストール済みスキルの更新を確認できます。
-- **⌘K でどこへでもジャンプ**: セッションの切り替え、新規作成、テーマ切替ができるコマンドパレット（⌘K / Ctrl+K）。
-- **温かみのある紙のようなデザイン**: ライト/ダークの2テーマ、セリフ体のディスプレイ書体、WCAG AA 検証済みのコントラスト。トークン駆動の UI キット（Base UI プリミティブ、cmdk、lucide アイコン）で構築。
+## 環境変数
 
-## 設定
-
-| 変数 | 意味 |
-| --- | --- |
-| `PORT` | サーバーポート（デフォルト `30177`。`-p/--port` が優先） |
-| `OMP_WEB_HOSTNAME` | バインドするホスト名（デフォルト `127.0.0.1`。`-H/--hostname` が優先） |
-| `OMP_WEB_PASSWORD` | サインイン画面用の任意のパスワード |
-| `OMP_WEB_NO_OPEN` | `1`/`true` を設定するとブラウザの自動起動をスキップ |
-| `OMP_WEB_OMP_BIN` | `omp` バイナリが `PATH` にない場合の絶対パス |
-| `PI_CODING_AGENT_DIR` | 別の omp エージェントディレクトリを指定（デフォルト `~/.omp/agent`） |
-| `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` | サーバーサイドリクエスト用の標準プロキシ変数 |
-
-## アーキテクチャ
-
-ompweb は Node 上でホストされる Next.js アプリで、インストール済みの `omp` バイナリを操作します。エージェント自体は同梱していません:
-
-- **ライブセッション**: `omp --mode rpc-ui`（stdio 上の NDJSON）を、アクティブなセッションごとに 1 つの子プロセスとして起動します。そのため、エージェントのバージョンは常にインストールされているものと完全に一致します。
-- **セッション閲覧**: omp のセッションファイル（`~/.omp/agent/sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl`）を直接読み込みます。タイトル変更、アーカイブ、削除は、OMP のライブ書き込みと競合しないよう保護されたネイティブファイルのメンテナンス操作です。
-- **モデルと認証**: omp 子プロセスに対する RPC コマンドを使用します。モデルパネルは omp エージェントディレクトリ内の `models.yml` を編集します。
-- **スキルとプラグイン**: omp のスキルディレクトリ（`~/.omp/agent/skills`、プロジェクトの `.omp/skills`、互換ディレクトリ）をスキャンし、プラグイン管理には `omp plugin` を呼び出します。
-- **ファイルアクセス**: ファイルの閲覧とプレビューは、選択したプロジェクトディレクトリとセッションに現れる作業ディレクトリに限定されます。
-- **フォークとセッション内ブランチの違い**: フォークは新しい `.jsonl` ファイルを作成します。「ここから編集」は同じセッションファイル内に別のブランチを作成します。
+| 変数名 | 説明 | デフォルト値 |
+| --- | --- | --- |
+| `PORT` | サーバーポート | `30177` |
+| `OMP_WEB_HOSTNAME` | バインドホスト | `127.0.0.1` |
+| `OMP_WEB_PASSWORD` | Web ログイン用パスワード | _なし（認証無効）_ |
+| `OMP_WEB_NO_OPEN` | `1` でブラウザ自動起動を無効化 | `0` |
+| `OMP_WEB_OMP_BIN` | `omp` の絶対パス（PATH 未登録時） | _自動検出_ |
+| `PI_CODING_AGENT_DIR` | カスタム omp エージェントディレクトリ | `~/.omp/agent` |
 
 ## 開発
 
 ```bash
+git clone https://github.com/kahme247/ompweb.git
+cd ompweb
 npm install
 npm run dev
 ```
 
-ローカル開発サーバーは [http://127.0.0.1:30177](http://127.0.0.1:30177) で動作します。
+ローカル開発サーバーは [http://127.0.0.1:30178](http://127.0.0.1:30178) で起動します。
 
-よく使うチェック:
+### チェックコマンド
 
 ```bash
-npx tsc --noEmit       # 型チェック
-npm run lint           # ESLint（警告ゼロを強制）
-node --test lib/*.test.mjs components/*.test.mjs   # テスト実行
+npm run typecheck   # 型チェック (TypeScript)
+npm run lint        # ESLint
+npm test            # テスト実行
 ```
 
-ローカル開発中は `next build` / `npm run build` の実行を避けてください。`.next/` への書き込みが行われ、開発サーバーに干渉することがあります。ビルドはリリース作業のときだけにしてください。
+> **注意**: ローカル開発中に `npm run build` を実行しないでください（`.next/` が生成され `npm run dev` に影響を与える恐れがあります）。
 
-## 国際化
+## クレジットとライセンス
 
-ompweb は英語、簡体字中国語（简体中文）、日本語をサポートし、3 言語で UI 全体の翻訳文字列を提供しています。言語は `navigator.language` から自動検出され、トップバーの言語メニューから実行時に切り替えできます。選択はセッション間で永続化されます。
-
-- 辞書ファイル: `lib/i18n/locales/{en,zh-CN,ja}.json`
-- フレームワーク: `lib/i18n/index.tsx` — `useSyncExternalStore` ベースの軽量ストア、`{var}` 補間と複数形サポート（`.one`/`.other`）
-- API エラーメッセージは安定したエラーコード（`errors.<code>`）でクライアント側で翻訳
-
-## 品質
-
-- **アクセシビリティ**: WCAG AA 準拠 — Lighthouse アクセシビリティスコア 100/100、キーボードナビゲーション全面対応、フォーカス可視リング、ARIA ロール
-- **パフォーマンス**: リストコンポーネントのメモ化、RAF によるスクロール/マウスハンドラのスロットリング、デバウンス検索、ストリーミング JSONL リーダー、ETag キャッシュによるセッションリスト
-- **堅牢性**: omp 子プロセスのグレースフルシャットダウン（プロセスグループキル）、エラーバウンダリ、アトミックなセッションファイル書き換え
-- **テスト**: セッション解析、ターミナル入力、Markdown レンダリング、メッセージ表示、ネイティブ設定、MCP 設定をカバーする焦点を絞ったテストスイート
-
-## クレジット
-
-ompweb は [agegr/pi-web](https://github.com/agegr/pi-web)（MIT）のフォークです。pi-web は [badlogic/pi-mono](https://github.com/badlogic/pi-mono) の pi コーディングエージェント向け Web UI で、これを [can1357/oh-my-pi](https://github.com/can1357/oh-my-pi) 向けに適合させたものです。
-
-## ライセンス
-
-MIT
+- [agegr/pi-web](https://github.com/agegr/pi-web) (MIT) をベースに [can1357/oh-my-pi](https://github.com/can1357/oh-my-pi) 向けに適合・拡張したフォークです。
+- [MIT ライセンス](./LICENSE) のもとで公開されています。

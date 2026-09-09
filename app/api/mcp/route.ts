@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getAllowedFileRoots, isExistingFilePathAllowed } from "@/lib/file-access";
 import { deleteMcpServer, parseMcpListOutput, readDiscoveredMcpServers, readMcpConfig, readUserMcpConfig, type McpLiveServer, validateMcpServer, writeMcpServer } from "@/lib/omp/mcp-config";
 import { readSessionHeader, resolveSessionPath } from "@/lib/session-reader";
-import { getRpcSession, resolveSpawnCwdResult, startRpcSession } from "@/lib/rpc-manager";
+import { WebRpcError, getRpcSession, resolveSpawnCwdResult, startRpcSession } from "@/lib/rpc-manager";
+import { RpcCommandError } from "@/lib/omp/rpc-process";
 import { parseJsonWithinLimit, RequestBodyTooLargeError } from "@/lib/bounded-form-data";
 import { redactMcpServer } from "@/lib/omp/mcp-config";
 
@@ -12,6 +13,16 @@ const MAX_MCP_REQUEST_BYTES = 1024 * 1024;
 function mcpErrorResponse(error: unknown) {
   const status = error instanceof RequestBodyTooLargeError ? 413 : 400;
   return NextResponse.json({ error: error instanceof RequestBodyTooLargeError ? "MCP request is too large" : error instanceof Error ? error.message : String(error) }, { status });
+}
+
+/** Stable client-safe message for the GET liveError field: raw child-process
+ *  errors (spawn failures, stderr tails) must not reach the browser. */
+function sanitizeMcpLiveError(error: unknown): string {
+  if (error instanceof WebRpcError || error instanceof RpcCommandError) {
+    return error.message;
+  }
+  console.error("[api/mcp] live server list failed:", error);
+  return "Could not load live MCP server states";
 }
 
 function mergeMcpServers(primary: McpLiveServer[], secondary: McpLiveServer[]): McpLiveServer[] {
@@ -69,6 +80,10 @@ export async function GET(request: Request) {
       }),
     };
     const sessionId = params.get("sessionId");
+    // Advisor opinion for a fresh spawn only (same ?advisor=1 convention as
+    // /api/agent/[id]): an alive child is reused as-is below, never replaced —
+    // listing servers must stay side-effect-free.
+    const advisor = params.get("advisor") === "1";
     let liveServers: ReturnType<typeof parseMcpListOutput> | undefined;
     let liveError: string | undefined;
     if (sessionId) {
@@ -79,13 +94,14 @@ export async function GET(request: Request) {
           if (!sessionFile) throw new Error("Session not found");
           const header = readSessionHeader(sessionFile);
           const { cwd } = resolveSpawnCwdResult(header?.cwd);
-          // No advisor opinion: this spawn is a side effect of listing MCP
-          // servers and must not replace a child spawned with --advisor.
-          ({ session } = await startRpcSession(sessionId, sessionFile, cwd, undefined, undefined, header?.cwd));
+          // Fresh spawn only (an alive child is reused above): apply the
+          // caller's advisor opinion so a racing prompt doesn't inherit a
+          // wrong-flag child for its whole turn.
+          ({ session } = await startRpcSession(sessionId, sessionFile, cwd, undefined, advisor, header?.cwd));
         }
         liveServers = mergeMcpServers(parseMcpListOutput(await session.getMcpList()), inventory);
       } catch (error) {
-        liveError = error instanceof Error ? error.message : String(error);
+        liveError = sanitizeMcpLiveError(error);
       }
     }
     return NextResponse.json({ root: file?.root ?? null, path: file?.path ?? null, exists: file?.exists ?? false, servers: Object.entries(file?.config.mcpServers ?? {}).sort(([a], [b]) => a.localeCompare(b)).map(([name, config]) => ({ name, config: redactMcpServer(config) })), user: safeUser, inventory, liveServers, liveError });

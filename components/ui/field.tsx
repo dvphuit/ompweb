@@ -22,7 +22,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
-import { AlertCircle, Eye, EyeOff } from "lucide-react";
+import { AlertCircle, Check as CheckIcon, Eye, EyeOff, Info, TriangleAlert, X } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/primitives";
 
 /* ────────────────────────── Field wrapper ────────────────────────── */
@@ -92,7 +92,7 @@ function FieldError({ children, id }: { children: ReactNode; id?: string }) {
         alignItems: "center",
         gap: 4,
         fontSize: 12,
-        color: "var(--accent)",
+        color: "var(--status-error)",
         lineHeight: 1.3,
         marginTop: 1,
       }}
@@ -100,6 +100,81 @@ function FieldError({ children, id }: { children: ReactNode; id?: string }) {
       <AlertCircle size={12} aria-hidden="true" />
       {children}
     </span>
+  );
+}
+
+export type AlertVariant = "success" | "error" | "warning" | "info";
+
+export function Alert({
+  variant = "info",
+  title,
+  description,
+  onDismiss,
+  style,
+}: {
+  variant?: AlertVariant;
+  title?: ReactNode;
+  description: ReactNode;
+  onDismiss?: () => void;
+  style?: CSSProperties;
+}) {
+  const isError = variant === "error";
+  const isWarning = variant === "warning";
+  const Icon = isError ? AlertCircle : variant === "success" ? CheckIcon : isWarning ? TriangleAlert : Info;
+  const color = isError ? "var(--status-error)" : variant === "success" ? "var(--status-success)" : isWarning ? "var(--status-warning)" : "var(--text-muted)";
+  const borderColor = isError ? "var(--status-error)" : variant === "success" ? "var(--status-success)" : isWarning ? "var(--status-warning)" : "var(--border)";
+  const bg = isError
+    ? "color-mix(in srgb, var(--status-error) 7%, var(--bg-panel))"
+    : variant === "success"
+      ? "color-mix(in srgb, var(--status-success) 7%, var(--bg-panel))"
+      : isWarning
+        ? "color-mix(in srgb, var(--status-warning) 7%, var(--bg-panel))"
+        : "var(--bg-subtle)";
+  return (
+    <div
+      role={isError ? "alert" : "status"}
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 8,
+        padding: "10px 12px",
+        border: `1px solid ${borderColor}`,
+        borderRadius: "var(--radius-control)",
+        background: bg,
+        color: "var(--text)",
+        fontSize: 12,
+        lineHeight: 1.5,
+        ...style,
+      }}
+    >
+      <Icon size={13} aria-hidden="true" style={{ flexShrink: 0, marginTop: 1, color }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {title && <div style={{ fontWeight: 600, color }}>{title}</div>}
+        <div style={{ color: isError ? "var(--status-error)" : isWarning ? "var(--status-warning)" : "var(--text-muted)", overflowWrap: "anywhere" }}>{description}</div>
+      </div>
+      {onDismiss && (
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="Dismiss"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 20,
+            height: 20,
+            border: 0,
+            borderRadius: "var(--radius-control)",
+            background: "transparent",
+            color: "var(--text-dim)",
+            cursor: "pointer",
+            flexShrink: 0,
+          }}
+        >
+          <X size={12} aria-hidden="true" />
+        </button>
+      )}
+    </div>
   );
 }
 

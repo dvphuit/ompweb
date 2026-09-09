@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import { parseJsonWithinLimit, RequestBodyTooLargeError } from "@/lib/bounded-form-data";
 import { existsSync } from "fs";
 import { apiErrorResponse } from "@/lib/api-utils";
-import { allowFileRoot, getAllowedFileRoots, isExistingFilePathAllowed, isFilePathAllowed } from "@/lib/file-access";
+import { join } from "path";
 import { addWorktree, findCurrentWorktreePath, listWorktrees, removeWorktree, resolveProject } from "@/lib/worktree";
+import { allowFileRoot, getAllowedFileRoots, isExistingFilePathAllowed, isFilePathAllowed } from "@/lib/file-access";
 import { projectIdentityKey } from "@/lib/paths";
+import { invalidateSessionListCache } from "@/lib/session-reader";
 
 const MAX_WORKTREE_REQUEST_BYTES = 16 * 1024;
 async function checkCwdAllowed(cwd: string): Promise<NextResponse | null> {
@@ -43,7 +45,9 @@ export async function GET(req: Request) {
     try {
       // For a removed-worktree cwd (session of a deleted worktree), fall back
       // to the inferred project root so the switcher still shows the project.
-      worktrees = await listWorktrees(existsSync(cwd) ? cwd : project.projectRoot);
+      const hasGit = existsSync(join(cwd, ".git"));
+      const queryRoot = hasGit ? cwd : project.projectRoot;
+      worktrees = await listWorktrees(queryRoot);
       currentWorktreePath = findCurrentWorktreePath(worktrees, cwd);
     } catch {
       isGit = false;
@@ -75,6 +79,7 @@ export async function POST(req: Request) {
     if (denied) return denied;
     if (!existsSync(body.cwd)) return NextResponse.json({ error: `Directory does not exist: ${body.cwd}`, code: "directory_not_found" }, { status: 400 });
     const result = await addWorktree(body.cwd, body.branch);
+    invalidateSessionListCache();
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof RequestBodyTooLargeError) return NextResponse.json({ error: "Worktree request is too large", code: "request_too_large" }, { status: 413 });
@@ -93,6 +98,7 @@ export async function DELETE(req: Request) {
     const denied = await checkCwdAllowed(body.cwd);
     if (denied) return denied;
     await removeWorktree(body.cwd, body.path, body.force === true);
+    invalidateSessionListCache();
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof RequestBodyTooLargeError) return NextResponse.json({ error: "Worktree request is too large", code: "request_too_large" }, { status: 413 });
