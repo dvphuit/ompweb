@@ -712,7 +712,7 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
         if (el) el.scrollTop = el.scrollHeight;
       });
     }
-  }, [sessionKeyForPaging]);
+  }, [sessionKeyForPaging, scrollContainerRef]);
   const [composerMinimized, setComposerMinimized] = useState(false);
   const minimizedExpandRef = useRef<HTMLButtonElement | null>(null);
   // True while the viewport is at/near the conversation bottom. Drives the

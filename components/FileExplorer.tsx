@@ -52,7 +52,6 @@ interface Props {
   onOpenFile: (filePath: string, fileName: string) => void;
   refreshKey?: number;
   onAtMention?: (relativePath: string, isDir: boolean) => void;
-  onAtMentions?: (relativePaths: string[]) => void;
   onRefreshDone?: () => void;
   fileSearchOpen?: boolean;
   onFileSearchOpenChange?: (open: boolean) => void;
@@ -519,7 +518,7 @@ export function FileExplorer({
   onOpenFile,
   refreshKey,
   onAtMention,
-  onAtMentions,
+
   onRefreshDone,
   fileSearchOpen = false,
   onFileSearchOpenChange,

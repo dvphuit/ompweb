@@ -62,7 +62,6 @@ interface Props {
   explorerRefreshing?: boolean;
   onExplorerRefreshDone?: () => void;
   onAtMention?: (relativePath: string, isDir: boolean) => void;
-  onAtMentions?: (relativePaths: string[]) => void;
   /** Opens the app settings (pinned sidebar footer row). */
   onOpenSettings?: () => void;
   /** True when an omp/ompweb update is available — shows a badge on the gear. */
@@ -74,7 +73,7 @@ interface Props {
 
 
 
-export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, optimisticSession, onSelectSession, onNewSession, initialSessionId, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, explorerRefreshKey, onExplorerRefresh, explorerRefreshing, onExplorerRefreshDone, onAtMention, onAtMentions, onOpenSettings, onOpenArchive, updateAvailable }: Props) {
+export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, optimisticSession, onSelectSession, onNewSession, initialSessionId, skipInitialProjectSelection, onInitialRestoreDone, refreshKey, onSessionDeleted, selectedCwd: selectedCwdProp, onCwdChange, onOpenFile, explorerRefreshKey, onExplorerRefresh, explorerRefreshing, onExplorerRefreshDone, onAtMention, onOpenSettings, onOpenArchive, updateAvailable }: Props) {
   const { t } = useI18n();
   const [allSessions, setAllSessions] = useState<SessionInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -573,7 +572,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
       }
     }
     return placeholders.length ? [...base, ...placeholders] : base;
-  }, [allSessions, optimisticSession, optimisticProjectRoot, runningSessionIds, runningSessionCwds, projectRootFor, selectedCwd]);
+  }, [allSessions, allSessionIndex.byId, optimisticSession, optimisticProjectRoot, runningSessionIds, runningSessionCwds, projectRootFor, selectedCwd]);
   const visibleSessionIndex = useMemo(() => buildSidebarSessionIndex(visibleSessions), [visibleSessions]);
   const hasUnmaterializedRunning = useMemo(
     () => [...runningSessionIds].some((id) => !allSessionIndex.byId.has(id)),
@@ -744,7 +743,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
     setSelectedCwd(top.path);
     expandProject(top.path);
     provisionalSelectionRef.current = allSessions.length === 0;
-  }, [allSessionIndex.byId, allSessions.length, selectedCwd, initialSessionId, skipInitialProjectSelection, onSelectSession, onInitialRestoreDone, sortedProjects, expandProject, loadSessions]);
+  }, [allSessionIndex.byId, allSessions, selectedCwd, initialSessionId, skipInitialProjectSelection, onSelectSession, onInitialRestoreDone, sortedProjects, expandProject, loadSessions]);
 
   // Default expansion: when the user has never stored an expansion choice,
   // expand only the active project.
@@ -1535,7 +1534,6 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
                 onOpenFile={onOpenFile ?? NOOP_OPEN_FILE}
                 refreshKey={explorerKey}
                 onAtMention={onAtMention}
-                onAtMentions={onAtMentions}
                 onRefreshDone={onExplorerRefreshDone}
                 fileSearchOpen={fileSearchOpen}
                 onFileSearchOpenChange={setFileSearchOpen}
