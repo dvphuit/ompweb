@@ -219,8 +219,6 @@ export function AppShell() {
     }
   }, [advanceAppUpdateVisibleStage]);
   const [ompUpdateAvailable, setOmpUpdateAvailable] = useState(false);
-  // Bumped on visibilitychange so the mount-time update checks re-run.
-  const [updateCheckKey, setUpdateCheckKey] = useState(0);
   // On mobile the sidebar is an overlay drawer; hide it by default so the chat
   // is visible on load. Runs once the breakpoint resolves after hydration.
   useEffect(() => {
@@ -242,66 +240,6 @@ export function AppShell() {
       active.blur();
     }
   }, [sidebarOpen, mobileSidebarReady]);
-  useEffect(() => {
-    const controller = new AbortController();
-    void fetch("/api/omp-update", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "check" }),
-      signal: controller.signal,
-    })
-      .then((response) => response.ok ? response.json() : null)
-      .then((data: { currentVersion?: string | null; availableVersion?: string | null; updateAvailable?: boolean; updateCommand?: string } | null) => {
-        setOmpUpdateAvailable(Boolean(data?.updateAvailable));
-        if (!data?.updateAvailable || !data.availableVersion) return;
-        const cmd = data.updateCommand || "omp update";
-        toast.info(
-          translate("appShell.ompUpdateAvailable"),
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
-            <div>{translate("appShell.updateVersion", { current: data.currentVersion ?? "?", available: data.availableVersion })}</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-              <code style={{ background: "var(--bg-panel)", padding: "3px 7px", borderRadius: "var(--radius-control)", fontSize: 11, fontFamily: "var(--font-mono)" }}>
-                {cmd}
-              </code>
-              <button
-                type="button"
-                onClick={() => {
-                  void copyText(cmd)
-                    .then(() => toast.success(translate("appShell.commandCopied")))
-                    .catch(() => toast.error(translate("appShell.commandCopyFailed")));
-                }}
-                style={{ padding: "3px 7px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-panel)", color: "var(--text)", cursor: "pointer", fontSize: 11 }}
-              >
-                {translate("appShell.copyCommand")}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSettingsTab("system");
-                  toast.close("omp-update-available");
-                }}
-                style={{ padding: "3px 7px", border: "1px solid var(--accent-strong)", borderRadius: "var(--radius-control)", background: "var(--accent-strong)", color: "var(--on-accent)", cursor: "pointer", fontSize: 11, fontWeight: 600 }}
-              >
-                {translate("settingsConfig.ompUpdateAction")}
-              </button>
-            </div>
-          </div>,
-          { id: "omp-update-available", timeout: 0 }
-        );
-      })
-      .catch(() => {});
-    return () => controller.abort();
-  }, [updateCheckKey]);
-  useEffect(() => {
-    const recheck = () => {
-      if (document.visibilityState !== "visible") return;
-      // A transient failure on mount reads as "no update" forever otherwise;
-      // re-running the checks below on re-focus gives them another chance.
-      setUpdateCheckKey((key) => key + 1);
-    };
-    document.addEventListener("visibilitychange", recheck);
-    return () => document.removeEventListener("visibilitychange", recheck);
-  }, []);
   const refreshAppUpdate = useCallback(async (force = false, autoOpen = false): Promise<AppUpdateInfo | null> => {
     const data = await fetchAppUpdateJson<AppUpdateInfo>(
       force ? "/api/app-update?force=1" : "/api/app-update",
@@ -524,23 +462,7 @@ export function AppShell() {
         }
       }
     } catch {}
-    void refreshAppUpdate(false, true)
-      .then(async (data) => {
-        const status = data?.selfUpdateStatus;
-        if (!data || !status) return;
-        const recoveredStage = status.stage ?? "stopping";
-        const initialStage = recoveredStage === "preparing" ? "preparing" : "stopping";
-        if (initialStage === "stopping") appUpdateCommittedAttemptRef.current = status.attemptId;
-        advanceAppUpdateVisibleStage(initialStage);
-        setAppUpdatePhase(initialStage === "preparing" ? "preparing" : "restarting");
-        setAppUpdateDialogOpen(true);
-        await showAppUpdateStagesThrough(recoveredStage);
-        if (await handleTerminalAppUpdate(data, status.attemptId, status.targetVersion)) return;
-        void monitorAppUpdate(status.attemptId, status.targetVersion);
-        recoverPreparedAppUpdate(data, status.attemptId);
-      })
-      .catch(() => {});
-  }, [advanceAppUpdateVisibleStage, handleTerminalAppUpdate, monitorAppUpdate, recoverPreparedAppUpdate, refreshAppUpdate, showAppUpdateStagesThrough, t]);
+  }, [t]);
 
   const proceedWithAppUpdate = useCallback(async () => {
     if (appUpdateStartInFlightRef.current) return;
@@ -680,6 +602,7 @@ export function AppShell() {
 
   // Single active panel — only one dropdown open at a time
   const [activeTopPanel, setActiveTopPanel] = useState<"branches" | "system" | "usage" | "session" | null>(null);
+  const [topPanelPos, setTopPanelPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const toggleTopPanel = useCallback((panel: "branches" | "system" | "usage" | "session") => {
     if (isMobile) setSidebarOpen(false);
     setActiveTopPanel((cur) => cur === panel ? null : panel);
@@ -690,6 +613,17 @@ export function AppShell() {
   useEffect(() => {
     if (!providerUsageVisible && activeTopPanel === "usage") setActiveTopPanel(null);
   }, [activeTopPanel, providerUsageVisible]);
+  useEffect(() => {
+    if (!activeTopPanel || !topBarRef.current) return;
+    const update = () => {
+      const rect = topBarRef.current!.getBoundingClientRect();
+      setTopPanelPos({ top: rect.bottom, left: rect.left, width: rect.width });
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(topBarRef.current);
+    return () => ro.disconnect();
+  }, [activeTopPanel]);
 
   // Generation speed — current live t/s and the session average.
   const [generationSpeed, setGenerationSpeed] = useState<GenerationSpeedInfo | null>(null);
@@ -1975,7 +1909,7 @@ export function AppShell() {
               );
             })()}
           </div>
-          {(activeTopPanel === "system" || activeTopPanel === "usage" || activeTopPanel === "session") && (
+          {(activeTopPanel === "system" || activeTopPanel === "usage" || activeTopPanel === "session") && topPanelPos && (
             <div data-top-panel className="dropdown-surface" style={{
               position: "fixed",
               top: topPanelPos.top,

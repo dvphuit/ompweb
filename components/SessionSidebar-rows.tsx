@@ -34,7 +34,7 @@ interface ProjectRowProps {
   runningSessionIds: Set<string>;
   unreadSessionIds: Set<string>;
   relativeTimeNow: number;
-  onActivate: (path: string) => void;
+  onNewSession: (path: string) => void;
   onToggleExpand: (path: string) => void;
   onRemoveProject: (path: string) => void;
   onEditLaunchConfig: (project: ManagedProject) => void;
@@ -71,7 +71,7 @@ function ProjectRow({
   runningSessionIds,
   unreadSessionIds,
   relativeTimeNow,
-  onActivate,
+  onNewSession,
   onToggleExpand,
   onRemoveProject,
   onEditLaunchConfig,
@@ -215,7 +215,7 @@ function ProjectRow({
           >
           <button
             className="sidebar-project-identity"
-            onClick={() => onActivate(project.path)}
+            onClick={() => onNewSession(project.path)}
             aria-current={isActive ? "true" : undefined}
             title={project.path}
             style={{
@@ -313,6 +313,9 @@ function ProjectRow({
         )}
         <div
           style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 2,
             flexShrink: 0,
             visibility: showActions ? "visible" : "hidden",
           }}

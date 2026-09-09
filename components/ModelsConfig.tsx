@@ -20,8 +20,9 @@ import {
   ConfirmDialog,
   useFieldValidation,
 } from "@/components/ui/field";
-import { Plus, Trash2, RefreshCw, AlertCircle, Cpu, Settings, Sparkles, Check as CheckIcon, Layers, RotateCcw, SlidersHorizontal, BookOpen, Search } from "lucide-react";
+import { Plus, Trash2, RefreshCw, AlertCircle, Cpu, Settings, Sparkles, Check as CheckIcon, Layers, RotateCcw, SlidersHorizontal, BookOpen, Search, Copy } from "lucide-react";
 import { toast } from "@/components/ui/toast";
+import { copyText } from "@/lib/clipboard";
 import { SettingsTabs, type SettingsTab } from "./SettingsTabs";
 import { ModelCatalogPicker } from "./ModelCatalogPicker";
 import {
@@ -782,9 +783,39 @@ function ModelDetail({
 
 // ── OAuth detail ──────────────────────────────────────────────────────────────
 
+/** Login URL with a copy button, shown while browser authorization is pending.
+ *  The "progress" phase overwrites the auth state, so OAuthDetail keeps the
+ *  URL aside and passes it back in. */
+function AuthUrlRow({ url }: { url: string }) {
+  const { t } = useI18n();
+  return (
+    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={url}
+        style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--accent)" }}
+      >
+        {url}
+      </a>
+      <button
+        type="button"
+        onClick={() => { void copyText(url).then(() => toast.success(t("appShell.copied"))).catch(() => toast.error(t("appShell.commandCopyFailed"))); }}
+        title={t("appShell.copyCommand")}
+        aria-label={t("appShell.copyCommand")}
+        style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 10px", border: "1px solid var(--border)", borderRadius: 5, background: "var(--bg)", color: "var(--text-muted)", cursor: "pointer", fontSize: 11, flexShrink: 0 }}
+      >
+        <Copy size={12} aria-hidden="true" /> {t("appShell.copyCommand")}
+      </button>
+    </div>
+  );
+}
+
 function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefresh: () => void }) {
   const { t, tn } = useI18n();
   const [loginState, setLoginState] = useState<OAuthLoginState>({ phase: "idle" });
+  const [pendingAuthUrl, setPendingAuthUrl] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState("");
   const eventSourceRef = useRef<EventSource | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -797,6 +828,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
 
   // Reset state when provider changes
   useEffect(() => {
+    setPendingAuthUrl(null);
     setLoginState({ phase: "idle" });
     setInputValue("");
     eventSourceRef.current?.close();
@@ -829,8 +861,8 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         return;
       }
       if (data.type === "auth") {
+        setPendingAuthUrl(data.url!);
         setLoginState({ phase: "auth", url: data.url!, instructions: data.instructions ?? null, token: data.token! });
-        if (isSafeExternalUrl(data.url)) window.open(data.url, "_blank", "noopener,noreferrer");
       } else if (data.type === "device_code") {
         setLoginState({
           phase: "device_code",
@@ -839,7 +871,6 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
           intervalSeconds: data.intervalSeconds ?? null,
           expiresInSeconds: data.expiresInSeconds ?? null,
         });
-        if (isSafeExternalUrl(data.verificationUri)) window.open(data.verificationUri, "_blank", "noopener,noreferrer");
       } else if (data.type === "prompt_request") {
         setLoginState({ phase: "prompt", message: data.message!, placeholder: data.placeholder ?? null, token: data.token! });
       } else if (data.type === "select_request") {
@@ -848,13 +879,16 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         setLoginState({ phase: "progress", message: data.message! });
       } else if (data.type === "success") {
         es.close();
+        setPendingAuthUrl(null);
         setLoginState({ phase: "success" });
         onRefresh();
       } else if (data.type === "error") {
         es.close();
+        setPendingAuthUrl(null);
         setLoginState({ phase: "error", message: data.message! });
       } else if (data.type === "cancelled") {
         es.close();
+        setPendingAuthUrl(null);
         setLoginState({ phase: "idle" });
       }
     };
@@ -969,13 +1003,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
                 ? t("modelsConfig.completeSignIn")
                 : loginState.message}
             </p>
-            {loginState.phase === "auth" && (
-              <p style={{ margin: 0, fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>
-                <a href={loginState.url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", wordBreak: "break-all" }}>
-                  {t("modelsConfig.browserNotOpened")}
-                </a>
-              </p>
-            )}
+            {loginState.phase === "auth" && <AuthUrlRow url={loginState.url} />}
             <div style={{ display: "flex", gap: 6 }}>
               <input
                 ref={inputRef}
@@ -1012,7 +1040,10 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
           </div>
         )}
         {loginState.phase === "progress" && (
-          <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>{loginState.message}</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>{loginState.message}</p>
+            {pendingAuthUrl && <AuthUrlRow url={pendingAuthUrl} />}
+          </div>
         )}
         {loginState.phase === "success" && (
           <p style={{ margin: 0, fontSize: 12, color: "var(--status-success)" }}>{t("modelsConfig.connectedSuccessfully")}</p>
@@ -1026,7 +1057,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       <div style={{ display: "flex", gap: 8 }}>
         {isWorking ? (
           <button
-            onClick={() => { eventSourceRef.current?.close(); setLoginState({ phase: "idle" }); }}
+            onClick={() => { eventSourceRef.current?.close(); setPendingAuthUrl(null); setLoginState({ phase: "idle" }); }}
             style={{ padding: "5px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text-muted)", cursor: "pointer", fontSize: 12 }}
           >
             {t("modelsConfig.cancel")}

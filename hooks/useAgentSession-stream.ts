@@ -10,7 +10,7 @@ import type {
   SessionTreeNode,
 } from "@/lib/types";
 import type { ThinkingModelMeta } from "@/lib/thinking-levels";
-import type { RpcAvailableSlashCommand, TodoPhase } from "@/lib/pi-types";
+import type { LiveRpcSessionState, RpcAvailableSlashCommand, TodoPhase } from "@/lib/pi-types";
 import type {
   SubagentHistoryEntry,
   SubagentInfo,
@@ -23,6 +23,7 @@ export interface SessionData {
   filePath: string;
   tree: SessionTreeNode[];
   leafId: string | null;
+  agent?: LiveRpcSessionState;
   context: {
     messages: AgentMessage[];
     entryIds: string[];

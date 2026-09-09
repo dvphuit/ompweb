@@ -9,6 +9,7 @@ import {
   FolderTree,
   List,
   Loader2,
+  X,
 } from "lucide-react";
 import { getFileIcon } from "./FileIcons";
 import { Tooltip } from "./ui/primitives";
@@ -51,6 +52,7 @@ interface Props {
   onOpenFile: (filePath: string, fileName: string) => void;
   refreshKey?: number;
   onAtMention?: (relativePath: string, isDir: boolean) => void;
+  onAtMentions?: (relativePaths: string[]) => void;
   onRefreshDone?: () => void;
   fileSearchOpen?: boolean;
   onFileSearchOpenChange?: (open: boolean) => void;
@@ -517,7 +519,10 @@ export function FileExplorer({
   onOpenFile,
   refreshKey,
   onAtMention,
+  onAtMentions,
   onRefreshDone,
+  fileSearchOpen = false,
+  onFileSearchOpenChange,
 }: Props) {
   const { t } = useI18n();
   const [roots, setRoots] = useState<FileNode[]>([]);
@@ -755,6 +760,84 @@ export function FileExplorer({
 
   return (
     <div style={{ minHeight: "100%" }}>
+      {/* Pinned: the result list scrolls, so an un-sticky box leaves you
+          unable to edit the query that produced it. */}
+      {fileSearchOpen && (
+        <div style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 1,
+          background: "var(--bg-panel)",
+          padding: "6px 8px 4px",
+        }}>
+          <input
+            ref={searchInputRef}
+            value={searchQuery}
+            onChange={(e) => {
+              // Arm the loading state in the same batch as the query: the
+              // debounce effect only runs after paint, so the first keystroke
+              // would otherwise show "No matching files" for a frame.
+              setSearchQuery(e.target.value);
+              setSearchLoading(true);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                onFileSearchOpenChange?.(false);
+              }
+            }}
+            placeholder={t("fileExplorer.searchPlaceholder")}
+            aria-label={t("fileExplorer.searchFiles")}
+            style={{
+              width: "100%",
+              height: 27,
+              boxSizing: "border-box",
+              padding: searchQuery ? "0 26px 0 9px" : "0 9px",
+              background: "var(--bg)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-control)",
+              outline: "none",
+              color: "var(--text)",
+              fontSize: 12,
+            }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = "var(--accent)"; }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = "var(--border)"; }}
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery("");
+                searchInputRef.current?.focus();
+              }}
+              title={t("fileExplorer.clearSearch")}
+              aria-label={t("fileExplorer.clearSearch")}
+              style={{
+                position: "absolute",
+                right: 12,
+                top: "50%",
+                transform: "translateY(calc(-50% + 1px))",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 18,
+                height: 18,
+                padding: 0,
+                border: "none",
+                borderRadius: "var(--radius-control)",
+                background: "none",
+                color: "var(--text-dim)",
+                cursor: "pointer",
+                transition: `color var(--dur-fast) var(--ease-out-warm), background var(--dur-fast) var(--ease-out-warm)`,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.color = "var(--text)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "var(--text-dim)"; }}
+            >
+              <X size={11} strokeWidth={2.4} aria-hidden="true" />
+            </button>
+          )}
+        </div>
+      )}
 
       <div style={{ display: "flex", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
         <button

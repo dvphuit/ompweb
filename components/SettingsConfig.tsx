@@ -544,7 +544,6 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
   const [checking, setChecking] = useState(false);
   const [checkingAppUpdate, setCheckingAppUpdate] = useState(false);
   const [appUpdateMessage, setAppUpdateMessage] = useState<string | null>(null);
-  const [hasCheckedUpdates, setHasCheckedUpdates] = useState(false);
   const [ompUpdating, setOmpUpdating] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -738,12 +737,6 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
       void fetchWindowsServiceStatus();
     }
   }, [currentTab, fetchWindowsServiceStatus]);
-
-  useEffect(() => {
-    if (currentTab !== "system" || hasCheckedUpdates) return;
-    setHasCheckedUpdates(true);
-    void checkForUpdate();
-  }, [currentTab, hasCheckedUpdates, checkForUpdate]);
 
   const trimmedQuery = searchQuery.trim().toLowerCase();
   const searchActive = trimmedQuery.length > 0;

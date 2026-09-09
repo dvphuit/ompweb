@@ -91,7 +91,6 @@ import {
 import type {
   AgentEvent,
   AgentPhase,
-  AgentStateResponse,
   AttachedImage,
   BuiltinSlashCommandResult,
   ChatInputHandle,
@@ -2311,7 +2310,7 @@ addNotice({ type: "error", message: e instanceof Error ? e.message : String(e) }
   // sibling in `/tree` (in-place branching) — the web UI surfaces that sibling
   // via BranchNavigator, and a subsequent prompt continues from the displayed
   // leaf once the run finishes and the client re-loads.
-  const handleNavigate = useCallback(async (entryId: string): Promise<boolean> =>
+  const handleNavigate = useCallback(async (entryId: string): Promise<boolean> => {
     // While a run is active its streaming frames append to the displayed
     // message list — swapping in another branch's context mid-run would mix
     // the running turn into the wrong branch (same gating as MessageView's

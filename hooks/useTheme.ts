@@ -140,10 +140,17 @@ export function useTheme() {
   const prefersDark = hydrated && osDark;
   const theme = resolveTheme(preference, prefersDark);
 
-  // Keep the DOM class in sync on an OS flip while the user is on "system"
-  // (setTheme/applyTheme own the class for explicit choices).
+  // Own the DOM class after hydration. An explicit choice enforces the stored
+  // preference (this also repairs a transient hydration mismatch: the first
+  // client render uses the server "system" snapshot, so the branch below may
+  // briefly apply the OS theme before the real preference arrives). "system"
+  // follows the OS live.
   useEffect(() => {
-    if (preference !== "system" || typeof window === "undefined") return;
+    if (typeof window === "undefined") return;
+    if (preference !== "system") {
+      document.documentElement.classList.toggle("dark", preference === "dark");
+      return;
+    }
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => {
       document.documentElement.classList.toggle("dark", media.matches);

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ListChecks, Target } from "lucide-react";
+import { CheckCircle2, ListChecks, Target, X } from "lucide-react";
 import type { ActiveGoal, ActivePlan } from "@/lib/web-mode-state";
 import { formatGoalElapsed } from "@/lib/web-mode-state";
 import { useI18n } from "@/lib/i18n";
@@ -95,7 +95,7 @@ export function ModelErrorBanner({ error }: { error?: string | null }) {
   );
 }
 
-export function ComposerModeStatus({ goal, plan }: { goal?: ActiveGoal | null; plan?: ActivePlan | null }) {
+export function ComposerModeStatus({ goal, plan, onClearGoal }: { goal?: ActiveGoal | null; plan?: ActivePlan | null; onClearGoal?: () => void }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -109,9 +109,12 @@ export function ComposerModeStatus({ goal, plan }: { goal?: ActiveGoal | null; p
   }, [goal]);
 
   if (!goal && !plan) return null;
+  const isCompleted = Boolean(goal?.completedAt);
+  const elapsed = goal ? formatGoalElapsed((goal.completedAt ?? now) - goal.startedAt) : "";
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
       {goal && (
+        <div style={{ display: "flex", alignItems: "stretch", gap: 6 }}>
         <button
           type="button"
           aria-expanded={expanded}
@@ -119,22 +122,58 @@ export function ComposerModeStatus({ goal, plan }: { goal?: ActiveGoal | null; p
           title={expanded ? t("chatInput.collapseGoal") : t("chatInput.expandGoal")}
           style={{
             display: "flex", alignItems: expanded ? "flex-start" : "center", gap: 8,
-            width: "100%", padding: "6px 9px",
-            border: "1px solid color-mix(in srgb, var(--accent) 32%, var(--border))",
+            minWidth: 0, flex: 1, padding: "6px 9px",
+            border: isCompleted
+              ? "1px solid color-mix(in srgb, var(--status-success) 35%, var(--border))"
+              : "1px solid color-mix(in srgb, var(--accent) 32%, var(--border))",
             borderRadius: "var(--radius-control)",
-            background: "color-mix(in srgb, var(--accent) 7%, var(--bg-panel))",
+            background: isCompleted
+              ? "color-mix(in srgb, var(--status-success) 5%, var(--bg-panel))"
+              : "color-mix(in srgb, var(--accent) 7%, var(--bg-panel))",
             color: "var(--text)", cursor: "pointer", textAlign: "left",
             transition: "background var(--dur-fast) var(--ease-out-warm), border-color var(--dur-fast) var(--ease-out-warm)",
           }}
         >
-          <Target size={14} strokeWidth={2} style={{ flexShrink: 0, marginTop: expanded ? 1 : 0, color: "var(--accent)" }} aria-hidden="true" />
-          <span style={{ flexShrink: 0, color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-            {t("chatInput.goalActive")} · {formatGoalElapsed(now - goal.startedAt)}
+          {isCompleted ? (
+            <CheckCircle2 size={14} strokeWidth={2.2} style={{ flexShrink: 0, marginTop: expanded ? 1 : 0, color: "var(--status-success)" }} aria-hidden="true" />
+          ) : (
+            <Target size={14} strokeWidth={2} style={{ flexShrink: 0, marginTop: expanded ? 1 : 0, color: "var(--accent)" }} aria-hidden="true" />
+          )}
+          <span style={{ flexShrink: 0, color: isCompleted ? "var(--status-success)" : "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+            {isCompleted ? t("chatInput.goalCompleted") : t("chatInput.goalActive")} · {elapsed}
           </span>
           <span style={{ minWidth: 0, flex: 1, overflow: expanded ? "visible" : "hidden", textOverflow: expanded ? undefined : "ellipsis", whiteSpace: expanded ? "pre-wrap" : "nowrap", fontSize: 12, lineHeight: 1.4 }}>
             {goal.objective}
           </span>
         </button>
+        {onClearGoal && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClearGoal();
+            }}
+            title={t("chatInput.clearGoal")}
+            aria-label={t("chatInput.clearGoal")}
+            className="ui-focus-ring"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 24,
+              height: 24,
+              flexShrink: 0,
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-control)",
+              background: "transparent",
+              color: "var(--text-dim)",
+              cursor: "pointer",
+            }}
+          >
+            <X size={12} strokeWidth={2} aria-hidden="true" />
+          </button>
+        )}
+        </div>
       )}
       {plan && (
         <div role="status" aria-live="polite" style={{ display: "flex", alignItems: "center", gap: 7, padding: "5px 9px", border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg-panel)", color: "var(--text-muted)", fontSize: 12 }}>

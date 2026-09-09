@@ -6,13 +6,13 @@ import { useI18n } from "@/lib/i18n";
 import { formatApiError } from "@/lib/i18n/api-error";
 import { DirectoryPicker } from "./DirectoryPicker";
 import { ProjectLaunchConfigDialog } from "./ProjectLaunchConfigDialog";
-import { FileExplorer, type FileExplorerHandle } from "./FileExplorer";
+import { FileExplorer } from "./FileExplorer";
 import { Tooltip } from "./ui/primitives";
 import { toast } from "./ui/toast";
 import { clearLastOpenSession, setLastOpenSession, workspaceKeyOf } from "@/lib/workspace-memory";
 import { buildSidebarSessionIndex, groupSessionsByProject, projectActivityCounts, sortManagedProjects } from "@/lib/project-ordering";
 import { comparableProjectPath } from "@/lib/comparable-path";
-import { Archive, Check, ChevronDown, ChevronRight, FileUp, Folder, GitBranch, MoreHorizontal, Plus, RefreshCw, Search, Settings2, SlidersHorizontal, Trash2, Upload } from "lucide-react";
+import { Archive, Check, ChevronRight, FileUp, Plus, RefreshCw, Search, Settings2, SlidersHorizontal } from "lucide-react";
 import { publishSessionsChanged } from "@/lib/session-change-bus";
 import {
   EMPTY_PROJECT_SET,
@@ -110,7 +110,6 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
   const wtNewInputRef = useRef<HTMLInputElement>(null);
   const [explorerOpen, setExplorerOpen] = useState(true);
   const [explorerKey, setExplorerKey] = useState(0);
-  const [explorerUploadBusy, setExplorerUploadBusy] = useState(false);
   const [fileSearchOpen, setFileSearchOpen] = useState(false);
   const [sessionRefreshDone, setSessionRefreshDone] = useState(false);
   const [runningSessionIds, setRunningSessionIds] = useState<Set<string>>(() => new Set());
@@ -131,7 +130,6 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
   // running state; late /api/sessions responses must not overwrite it.
   const sseAuthoritativeRef = useRef(false);
   const sessionRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const fileExplorerRef = useRef<FileExplorerHandle>(null);
 
   const sessionsEtagRef = useRef<string | null>(null);
   const sessionsAbortRef = useRef<AbortController | null>(null);
@@ -386,24 +384,6 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
     if (registered) return registered.path;
     return allSessionIndex.projectRootByComparableCwd.get(comparableProjectPath(cwd)) ?? cwd;
   }, [allSessionIndex, registeredProjectByComparablePath, worktreeRootByNormalizedPath]);
-    for (const state of Object.values(worktreeStateByProject)) {
-      for (const worktree of state.worktrees) {
-        const key = normalizeProjectKey(worktree.path);
-        if (!map.has(key)) map.set(key, state.projectRoot);
-      }
-    }
-    return map;
-  }, [worktreeStateByProject]);
-
-  /** Resolve the project root for a cwd from indexed and cached data. */
-  const projectRootFor = useCallback((cwd: string | null): string | null => {
-    if (!cwd) return null;
-    const worktreeRoot = worktreeRootByNormalizedPath.get(normalizeProjectKey(cwd));
-    if (worktreeRoot) return worktreeRoot;
-    const registered = registeredProjectByComparablePath.get(comparableProjectPath(cwd));
-    if (registered) return registered.path;
-    return allSessionIndex.projectRootByComparableCwd.get(comparableProjectPath(cwd)) ?? cwd;
-  }, [allSessionIndex, registeredProjectByComparablePath, worktreeRootByNormalizedPath]);
 
   // ---- Expansion (used by the sync/notify effects below, so declared first) --
   // Keys are stored in comparableProjectPath form so case-variant spellings of
@@ -594,6 +574,11 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
     }
     return placeholders.length ? [...base, ...placeholders] : base;
   }, [allSessions, optimisticSession, optimisticProjectRoot, runningSessionIds, runningSessionCwds, projectRootFor, selectedCwd]);
+  const visibleSessionIndex = useMemo(() => buildSidebarSessionIndex(visibleSessions), [visibleSessions]);
+  const hasUnmaterializedRunning = useMemo(
+    () => [...runningSessionIds].some((id) => !allSessionIndex.byId.has(id)),
+    [allSessionIndex, runningSessionIds],
+  );
   const visibleProjects = useMemo(() => {
     let base = projects;
     const hasOpt = optimisticProjectRoot ? base.some((p) => comparableProjectPath(p.path) === comparableProjectPath(optimisticProjectRoot)) : false;
@@ -1028,7 +1013,6 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
     onNewSession?.(tempId, targetCwd);
   }, [activateProject, selectedProject, selectedCwd, onNewSession]);
 
-
   const [importing, setImporting] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
 
@@ -1404,9 +1388,8 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
                 runningSessionIds={runningSessionIds}
                 unreadSessionIds={unreadSessionIds}
                 relativeTimeNow={relativeTimeNow}
-                onActivate={activateProject}
-                onToggleExpand={toggleProjectExpanded}
                 onNewSession={handleNewSessionForProject}
+                onToggleExpand={toggleProjectExpanded}
                 onRemoveProject={handleRemoveProject}
                 onEditLaunchConfig={setLaunchConfigProject}
                 onUpdatePresentation={handleUpdateProjectPresentation}
@@ -1507,30 +1490,6 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
                   <Search size={13} strokeWidth={2} aria-hidden="true" />
                 </button>
               </Tooltip>
-              <Tooltip content={t("sessionSidebar.uploadFilesTitle")} side="top">
-                <button
-                  onClick={() => fileExplorerRef.current?.openUploadPicker()}
-                  disabled={explorerUploadBusy}
-                  title={t("sessionSidebar.uploadFilesTitle")}
-                  aria-label={t("sessionSidebar.uploadFiles")}
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    width: 26, height: 26, padding: 0,
-                    background: "none",
-                    border: "none",
-                    color: "var(--text-dim)",
-                    cursor: explorerUploadBusy ? "default" : "pointer",
-                    borderRadius: "var(--radius-control)",
-                    flexShrink: 0,
-                    opacity: explorerUploadBusy ? 0.6 : 1,
-                    transition: "color var(--dur-fast) var(--ease-out-warm), background var(--dur-fast) var(--ease-out-warm)",
-                  }}
-                  onMouseEnter={(e) => { if (explorerUploadBusy) return; e.currentTarget.style.color = "var(--text-muted)"; e.currentTarget.style.background = "var(--bg-hover)"; }}
-                  onMouseLeave={(e) => { if (explorerUploadBusy) return; e.currentTarget.style.color = "var(--text-dim)"; e.currentTarget.style.background = "none"; }}
-                >
-                  <Upload size={13} strokeWidth={2} aria-hidden="true" />
-                </button>
-              </Tooltip>
             </div>
             <Tooltip content={t("sessionSidebar.refreshExplorer")} side="top">
               <button
@@ -1572,13 +1531,11 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
           >
             <div className="accordion-flow-inner" style={{ height: "100%", overflowY: "auto", overflowX: "hidden" }}>
               <FileExplorer
-                ref={fileExplorerRef}
                 cwd={selectedCwd ?? selectedCwdProp!}
                 onOpenFile={onOpenFile ?? NOOP_OPEN_FILE}
                 refreshKey={explorerKey}
                 onAtMention={onAtMention}
                 onAtMentions={onAtMentions}
-                onUploadBusyChange={setExplorerUploadBusy}
                 onRefreshDone={onExplorerRefreshDone}
                 fileSearchOpen={fileSearchOpen}
                 onFileSearchOpenChange={setFileSearchOpen}
