@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { accessDenied } from "@/lib/api-utils";
 import { runNpx } from "@/lib/npx";
 import type { SkillInstallScope } from "@/lib/api-types";
 import { buildSkillUpdateArgs } from "@/lib/skill-updates";
@@ -24,7 +25,7 @@ export async function POST(req: Request) {
     }
     const allowedRoots = await getAllowedFileRoots();
     if (!isExistingFilePathAllowed(cwd, allowedRoots)) {
-      return NextResponse.json({ error: "Access denied", code: "access_denied" }, { status: 403 });
+      return accessDenied();
     }
 
     const { skills } = await loadSkillsWithInstallInfo(cwd);

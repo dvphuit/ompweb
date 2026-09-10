@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorMessage } from "@/lib/errors";
 import { getAllowedFileRoots, isExistingFilePathAllowed } from "@/lib/file-access";
 import { deleteMcpServer, parseMcpListOutput, readDiscoveredMcpServers, readMcpConfig, readUserMcpConfig, type McpLiveServer, validateMcpServer, writeMcpServer } from "@/lib/omp/mcp-config";
 import { readSessionHeader, resolveSessionPath } from "@/lib/session-reader";
@@ -12,7 +13,7 @@ const MAX_MCP_REQUEST_BYTES = 1024 * 1024;
 
 function mcpErrorResponse(error: unknown) {
   const status = error instanceof RequestBodyTooLargeError ? 413 : 400;
-  return NextResponse.json({ error: error instanceof RequestBodyTooLargeError ? "MCP request is too large" : error instanceof Error ? error.message : String(error) }, { status });
+  return NextResponse.json({ error: error instanceof RequestBodyTooLargeError ? "MCP request is too large" : errorMessage(error) }, { status });
 }
 
 /** Stable client-safe message for the GET liveError field: raw child-process

@@ -1,4 +1,5 @@
 import { homedir } from "os";
+import { errorMessage } from "@/lib/errors";
 import { parseJsonWithinLimit, RequestBodyTooLargeError } from "@/lib/bounded-form-data";
 import { invalidateModelsCache } from "@/lib/models-cache";
 import { enableProvider } from "@/lib/omp/model-roles";
@@ -142,7 +143,7 @@ export async function GET(
       try {
         proc = new RpcProcess({ cwd: homedir(), extraArgs: LOGIN_EXTRA_ARGS, onFrame: handleFrame });
       } catch (error) {
-        send({ type: "error", message: error instanceof Error ? error.message : String(error) });
+        send({ type: "error", message: errorMessage(error) });
         clearInterval(heartbeat);
         closed = true;
         try { controller.close(); } catch {}
@@ -182,7 +183,7 @@ export async function GET(
         if (req.signal.aborted) {
           send({ type: "cancelled" });
         } else {
-          send({ type: "error", message: error instanceof Error ? error.message : String(error) });
+          send({ type: "error", message: errorMessage(error) });
         }
       } finally {
         cleanup();

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorMessage } from "@/lib/errors";
 import { resolveSessionPathOr404 } from "@/lib/api-utils";
 import { readCompletionArtifact, readSubagentTranscriptPage, resolveSubagentArtifact, subagentTranscriptPath } from "@/lib/subagent-history";
 
@@ -60,7 +61,7 @@ export async function GET(
     return NextResponse.json(page);
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : String(error) },
+      { error: errorMessage(error) },
       { status: 500 },
     );
   }

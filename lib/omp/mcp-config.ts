@@ -1,4 +1,5 @@
 import { execFileSync } from "child_process";
+import { errorMessage } from "../errors";
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync, writeSync } from "fs";
 import { homedir } from "os";
 import { basename, dirname, join, relative, resolve, sep } from "path";
@@ -52,7 +53,7 @@ function readMcpUserConfig(path: string): McpUserConfig {
         : [],
     };
   } catch (error) {
-    return { path, servers: [], disabledServers: [], error: error instanceof Error ? error.message : String(error) };
+    return { path, servers: [], disabledServers: [], error: errorMessage(error) };
   }
 }
 

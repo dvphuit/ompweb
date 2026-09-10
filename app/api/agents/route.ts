@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorMessage } from "@/lib/errors";
 import { existsSync, statSync } from "fs";
 import { dirname, resolve } from "path";
 import { getAllowedFileRoots, isExistingFilePathAllowed } from "@/lib/file-access";
@@ -72,7 +73,7 @@ export async function GET(request: Request) {
       bundledPath: result.bundledPath,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorMessage(error);
     return NextResponse.json({ error: message }, { status: /not allowed/i.test(message) ? 403 : 400 });
   }
 }
@@ -100,7 +101,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, ...written, agent });
   } catch (error) {
     if (error instanceof RequestBodyTooLargeError) return NextResponse.json({ error: "Agent request is too large" }, { status: 413 });
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorMessage(error);
     return NextResponse.json({ error: message }, { status: /not allowed/i.test(message) ? 403 : 400 });
   }
 }
@@ -120,7 +121,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ success: true, ...written, agent: readAgentFile(written.path) });
   } catch (error) {
     if (error instanceof RequestBodyTooLargeError) return NextResponse.json({ error: "Agent request is too large" }, { status: 413 });
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorMessage(error);
     return NextResponse.json({ error: message }, { status: /not allowed/i.test(message) ? 403 : 400 });
   }
 }
@@ -137,7 +138,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ success: true, ...deleteAgent(scopeDir, body.name.trim()) });
   } catch (error) {
     if (error instanceof RequestBodyTooLargeError) return NextResponse.json({ error: "Agent request is too large" }, { status: 413 });
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorMessage(error);
     const status = /not found/i.test(message) ? 404 : /not allowed/i.test(message) ? 403 : 400;
     return NextResponse.json({ error: message }, { status });
   }

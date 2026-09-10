@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { accessDenied } from "@/lib/api-utils";
+import { errorMessage } from "@/lib/errors";
 import type { SkillInstallScope } from "@/lib/api-types";
 import { checkSkillUpdates } from "@/lib/skill-updates";
 import { loadSkillsWithInstallInfo } from "@/lib/skills-service";
@@ -17,7 +19,7 @@ export async function POST(req: Request) {
     if (!cwd) return NextResponse.json({ error: "cwd required", code: "cwd_required" }, { status: 400 });
     const allowedRoots = await getAllowedFileRoots();
     if (!isExistingFilePathAllowed(cwd, allowedRoots)) {
-      return NextResponse.json({ error: "Access denied", code: "access_denied" }, { status: 403 });
+      return accessDenied();
     }
 
     const pkg = typeof body.package === "string" ? body.package : undefined;
@@ -44,7 +46,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ updates });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : String(error) },
+      { error: errorMessage(error) },
       { status: 500 },
     );
   }

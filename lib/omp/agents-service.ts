@@ -1,4 +1,5 @@
 import { execFileSync } from "child_process";
+import { errorMessage } from "../errors";
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, statSync, unlinkSync, writeFileSync } from "fs";
 import { homedir } from "os";
 import { basename, isAbsolute, join, relative, resolve, sep } from "path";
@@ -114,10 +115,10 @@ function validateFrontmatter(frontmatter: Record<string, unknown>, filename?: st
   else if (!AGENT_NAME_RE.test(name)) errors.push(`name must match ${AGENT_NAME_RE.source}`);
   if (typeof frontmatter.description !== "string" || !frontmatter.description.trim()) errors.push("description is required");
   for (const field of ["model", "tools"] as const) {
-    try { asStringArray(frontmatter[field], field); } catch (error) { errors.push(error instanceof Error ? error.message : String(error)); }
+    try { asStringArray(frontmatter[field], field); } catch (error) { errors.push(errorMessage(error)); }
   }
   if (frontmatter.spawns !== undefined && frontmatter.spawns !== "*") {
-    try { asStringArray(frontmatter.spawns, "spawns"); } catch (error) { errors.push(error instanceof Error ? error.message : String(error)); }
+    try { asStringArray(frontmatter.spawns, "spawns"); } catch (error) { errors.push(errorMessage(error)); }
   }
   if (frontmatter.thinkingLevel !== undefined && (typeof frontmatter.thinkingLevel !== "string" || !THINKING_LEVELS.has(frontmatter.thinkingLevel))) errors.push("thinkingLevel is invalid");
   for (const field of ["blocking"] as const) if (frontmatter[field] !== undefined && typeof frontmatter[field] !== "boolean") errors.push(`${field} must be a boolean`);

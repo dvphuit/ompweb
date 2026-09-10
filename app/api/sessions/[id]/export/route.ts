@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { errorMessage } from "@/lib/errors";
 import { execFile } from "child_process";
 import { mkdirSync, readFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
@@ -65,7 +66,7 @@ export async function GET(
       rmSync(outputPath, { force: true });
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorMessage(error);
     if (message.includes("omp binary not found")) {
       return NextResponse.json({ error: message, code: "omp_not_found" }, { status: 500 });
     }

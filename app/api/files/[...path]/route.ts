@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { apiErrorResponse } from "@/lib/api-utils";
+import { errorMessage } from "@/lib/errors";
+import { accessDenied, apiErrorResponse } from "@/lib/api-utils";
 import { getContentDisposition } from "@/lib/content-disposition";
 import fs from "fs";
 import path from "path";
@@ -89,7 +90,7 @@ async function getUploadDirectory(segments: string[]): Promise<
   const directory = filePathFromSegments(segments);
   const allowedRoots = await getAllowedFileRoots();
   if (!isFilePathAllowed(directory, allowedRoots)) {
-    return { response: NextResponse.json({ error: "Access denied", code: "access_denied" }, { status: 403 }) };
+    return { response: accessDenied() };
   }
 
   let stat: fs.Stats;
@@ -114,7 +115,7 @@ async function getUploadDirectory(segments: string[]): Promise<
     }
   }
   if (!isFilePathAllowed(realDirectory, realRoots)) {
-    return { response: NextResponse.json({ error: "Access denied", code: "access_denied" }, { status: 403 }) };
+    return { response: accessDenied() };
   }
 
   return { directory: realDirectory };
@@ -202,7 +203,7 @@ export async function POST(
     const skipped: string[] = [];
     const errors: Array<{ name: string; error: string }> = [];
     const recordError = (file: File, error: unknown) => {
-      errors.push({ name: file.name, error: error instanceof Error ? error.message : String(error) });
+      errors.push({ name: file.name, error: errorMessage(error) });
     };
 
     for (const file of files) {
@@ -246,7 +247,7 @@ export async function POST(
       { status: errors.length > 0 ? 207 : 200 },
     );
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+    return NextResponse.json({ error: errorMessage(error) }, { status: 500 });
   }
 }
 
@@ -430,7 +431,7 @@ export async function GET(
       type !== "list" &&
       await isFilePathReferencedBySession(filePath, sessionId);
     if (!allowedByRoot && !allowedBySessionReference) {
-      return NextResponse.json({ error: "Access denied", code: "access_denied" }, { status: 403 });
+      return accessDenied();
     }
 
     let stat: fs.Stats;
@@ -441,7 +442,7 @@ export async function GET(
     }
 
     if (!allowedBySessionReference && !isExistingFilePathAllowed(filePath, allowedRoots)) {
-      return NextResponse.json({ error: "Access denied", code: "access_denied" }, { status: 403 });
+      return accessDenied();
     }
 
     if (type === "read") {

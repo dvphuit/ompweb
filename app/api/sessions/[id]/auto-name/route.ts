@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorMessage } from "@/lib/errors";
 import { scanSessionInfo, setSessionTitle } from "@/lib/omp/session-files";
 import { deriveSessionTitleFromFirstMessage, sanitizeSessionTitle } from "@/lib/session-title";
 import { getRpcSession } from "@/lib/rpc-manager";
@@ -66,7 +67,7 @@ export async function POST(
     return NextResponse.json({ title: derived, usage: null });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : String(error) },
+      { error: errorMessage(error) },
       { status: 500 },
     );
   }

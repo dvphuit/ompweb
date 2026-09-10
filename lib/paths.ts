@@ -7,6 +7,11 @@ export function isWindowsAbsolutePath(filePath: string): boolean {
   return WINDOWS_ABSOLUTE_RE.test(filePath) || filePath.startsWith("\\\\") || filePath.startsWith("//");
 }
 
+/** True for POSIX (`/...`) or Windows (`C:\...`, `\\...`) absolute paths. */
+export function isAbsolutePath(filePath: string): boolean {
+  return filePath.startsWith("/") || isWindowsAbsolutePath(filePath);
+}
+
 export function sessionPathKey(filePath: string, platform: NodeJS.Platform = process.platform): string {
   const normalized = platform === "win32" ? path.win32.normalize(filePath) : path.posix.normalize(filePath);
   return platform === "win32" ? normalized.toLowerCase() : normalized;

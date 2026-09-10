@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorMessage } from "@/lib/errors";
 import { archiveSessionFileWithArtifacts } from "@/lib/omp/session-files";
 import {
   invalidateSessionListCache,
@@ -38,7 +39,7 @@ export async function POST(
     invalidateSessionListCache();
     return NextResponse.json({ ok: true, archived: true, archivedPath });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorMessage(error);
     return NextResponse.json({ error: message, code: "session_archive_failed" }, { status: 500 });
   }
 }

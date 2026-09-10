@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorMessage } from "@/lib/errors";
 import { apiErrorResponse } from "@/lib/api-utils";
 import { parseJsonWithinLimit, RequestBodyTooLargeError } from "@/lib/bounded-form-data";
 import { invalidateModelsCache } from "@/lib/models-cache";
@@ -32,7 +33,7 @@ export async function PUT(req: Request) {
     try {
       validateModelsConfig(body);
     } catch (error) {
-      return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
+      return NextResponse.json({ error: errorMessage(error) }, { status: 400 });
     }
     try {
       writeModelsConfig(body, { overwriteUnparseable });
