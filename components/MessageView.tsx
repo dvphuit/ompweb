@@ -270,159 +270,161 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
 
   return (
     <div
-      style={{ marginBottom: 18, display: "flex", flexDirection: "column", alignItems: "flex-end", paddingRight: 6 }}
+      className="user-message-band"
+      style={{ marginBottom: 18, display: "flex", flexDirection: "column", alignItems: "stretch" }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", maxWidth: "85%", minWidth: 0 }}>
-        <div
-          data-context-menu="message"
-          data-message-entry-id={entryId}
-          data-message-role="user"
-          data-message-content={content}
-          className="chat-message-card"
-          style={{
-            maxWidth: "100%",
-            minWidth: 0,
-            background: "var(--user-bg)",
-            border: "var(--bw) solid var(--border)",
-            borderRadius: "var(--radius-card)",
-            padding: "10px 14px",
-            fontSize: "var(--chat-user-font-size)",
-            lineHeight: "var(--chat-line-height)",
-            color: "var(--text)",
-            wordBreak: "break-word",
-            maxHeight: USER_BUBBLE_MAX_HEIGHT,
-            overflowY: "auto",
-          }}
-        >
-          {imageBlocks.length > 0 && (
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: content ? 8 : 0 }}>
-              {imageBlocks.map((img, i) => {
-                // lib/types.ts ImageContent uses {source:{type,data,media_type,url}}
-                // pi-ai on-disk format uses flat {data, mimeType} — handle both
-                const src = imageBlockSrc(img);
-                return (
-                  <ClickableImage
-                    key={i}
-                    src={src}
-                    alt=""
-                    style={{ maxWidth: 240, maxHeight: 240, borderRadius: "var(--radius-control)", objectFit: "contain", display: "block", border: "1px solid color-mix(in srgb, var(--accent) 18%, transparent)" }}
-                  />
-                );
-              })}
-            </div>
-          )}
-          {content && <SafeMarkdownBody className="markdown-user-message" cwd={cwd} onOpenFile={onOpenFile}>{content}</SafeMarkdownBody>}
-        </div>
+      <div className="user-message-label" style={{ marginBottom: 4 }}>
+        <span className="user-message-label-tag">{t("messageView.you")}</span>
+      </div>
+      <div
+        data-context-menu="message"
+        data-message-entry-id={entryId}
+        data-message-role="user"
+        data-message-content={content}
+        className="chat-message-card user-message-card"
+        style={{
+          maxWidth: "100%",
+          minWidth: 0,
+          background: "var(--user-bg)",
+          border: "var(--bw) solid var(--border)",
+          borderLeft: "6px solid var(--accent)",
+          borderRadius: "var(--radius-card)",
+          padding: "10px 14px",
+          fontSize: "var(--chat-user-font-size)",
+          lineHeight: "var(--chat-line-height)",
+          color: "var(--text)",
+          wordBreak: "break-word",
+          maxHeight: USER_BUBBLE_MAX_HEIGHT,
+          overflowY: "auto",
+        }}
+      >
+        {imageBlocks.length > 0 && (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: content ? 8 : 0 }}>
+            {imageBlocks.map((img, i) => {
+              // lib/types.ts ImageContent uses {source:{type,data,media_type,url}}
+              // pi-ai on-disk format uses flat {data, mimeType} — handle both
+              const src = imageBlockSrc(img);
+              return (
+                <ClickableImage
+                  key={i}
+                  src={src}
+                  alt=""
+                  style={{ maxWidth: 240, maxHeight: 240, borderRadius: "var(--radius-control)", objectFit: "contain", display: "block", border: "1px solid color-mix(in srgb, var(--accent) 18%, transparent)" }}
+                />
+              );
+            })}
+          </div>
+        )}
+        {content && <SafeMarkdownBody className="markdown-user-message" cwd={cwd} onOpenFile={onOpenFile}>{content}</SafeMarkdownBody>}
+      </div>
 
-        {/* Bottom row: action buttons + timestamp — inside the bubble's column,
-            spanning its width, so the timestamp aligns with its right edge. */}
-        {(time || canFork || canNavigate) && (
-          <div style={{
-            display: "flex", alignItems: "center", justifyContent: "flex-end",
-            gap: 6, marginTop: 3, width: "100%",
-          }}>
+      {/* Bottom row: action buttons + timestamp, left-aligned under the band. */}
+      {(time || canFork || canNavigate) && (
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "flex-start",
+          gap: 6, marginTop: 3, width: "100%",
+        }}>
+        <div
+          style={{
+            display: "flex", gap: 3,
+            opacity: hovered || actionsActive ? 1 : 0,
+            pointerEvents: hovered || actionsActive ? "auto" : "none",
+            transition: "opacity var(--dur-fast) var(--ease-out-warm)",
+          }}
+          onFocusCapture={() => setActionsActive(true)}
+          onBlurCapture={() => setActionsActive(false)}
+        >
+          <Tooltip content={t("messageView.copyMessage")}>
+            <button
+              onClick={() => copyContent(content)}
+              aria-label={t("messageView.copyMessage")}
+              style={{
+                display: "flex", alignItems: "center", gap: 4,
+                padding: "3px 8px", height: 24, minHeight: 24,
+                background: "none", border: "none",
+                borderRadius: "var(--radius-control)",
+                color: copied ? "var(--accent)" : "var(--text-dim)",
+                cursor: "pointer",
+                fontSize: 11, fontWeight: 400,
+                whiteSpace: "nowrap",
+                transition: "color var(--dur-fast) var(--ease-out-warm)",
+              }}
+              onMouseEnter={(e) => { if (!copied) e.currentTarget.style.color = "var(--accent)"; }}
+              onMouseLeave={(e) => { if (!copied) e.currentTarget.style.color = "var(--text-dim)"; }}
+            >
+              {copied ? <Check size={11} strokeWidth={1.8} /> : <Copy size={11} strokeWidth={1.8} />}
+              {copied ? t("messageView.copied") : t("messageView.copy")}
+            </button>
+          </Tooltip>
+        </div>
+        {(canFork || canNavigate) && (
           <div
             style={{
               display: "flex", gap: 3,
-              opacity: hovered || actionsActive ? 1 : 0,
-              pointerEvents: hovered || actionsActive ? "auto" : "none",
+              opacity: (hovered || actionsActive || forking) ? 1 : 0,
+              pointerEvents: (hovered || actionsActive || forking) ? "auto" : "none",
               transition: "opacity var(--dur-fast) var(--ease-out-warm)",
             }}
             onFocusCapture={() => setActionsActive(true)}
             onBlurCapture={() => setActionsActive(false)}
           >
-            <Tooltip content={t("messageView.copyMessage")}>
-              <button
-                onClick={() => copyContent(content)}
-                aria-label={t("messageView.copyMessage")}
-                style={{
-                  display: "flex", alignItems: "center", gap: 4,
-                  padding: "3px 8px", height: 24, minHeight: 24,
-                  background: "none", border: "none",
-                  borderRadius: "var(--radius-control)",
-                  color: copied ? "var(--accent)" : "var(--text-dim)",
-                  cursor: "pointer",
-                  fontSize: 11, fontWeight: 400,
-                  whiteSpace: "nowrap",
-                  transition: "color var(--dur-fast) var(--ease-out-warm)",
-                }}
-                onMouseEnter={(e) => { if (!copied) e.currentTarget.style.color = "var(--accent)"; }}
-                onMouseLeave={(e) => { if (!copied) e.currentTarget.style.color = "var(--text-dim)"; }}
-              >
-                {copied ? <Check size={11} strokeWidth={1.8} /> : <Copy size={11} strokeWidth={1.8} />}
-                {copied ? t("messageView.copied") : t("messageView.copy")}
-              </button>
-            </Tooltip>
-          </div>
-          {(canFork || canNavigate) && (
-            <div
-              style={{
-                display: "flex", gap: 3,
-                opacity: (hovered || actionsActive || forking) ? 1 : 0,
-                pointerEvents: (hovered || actionsActive || forking) ? "auto" : "none",
-                transition: "opacity var(--dur-fast) var(--ease-out-warm)",
-              }}
-              onFocusCapture={() => setActionsActive(true)}
-              onBlurCapture={() => setActionsActive(false)}
-            >
-              {canNavigate && (
-                <Tooltip content={t("messageView.editFromHereTitle")}>
-                  <button
-                    onClick={async () => { if (!(await onNavigate!(prevAssistantEntryId!))) return; onEditContent?.(content); }}
-                    aria-label={t("messageView.editFromHereTitle")}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 4,
-                      padding: "3px 8px", height: 24, minHeight: 24,
-                      background: "none", border: "none",
-                      borderRadius: "var(--radius-control)",
-                      color: "var(--text-dim)",
-                      cursor: "pointer",
-                      fontSize: 11, fontWeight: 400,
-                      whiteSpace: "nowrap",
-                      transition: "color var(--dur-fast) var(--ease-out-warm)",
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = "var(--accent)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-dim)"; }}
-                  >
-                    <CornerUpLeft size={11} strokeWidth={1.8} />
-                    {t("messageView.editFromHere")}
-                  </button>
-                </Tooltip>
-              )}
-              {canFork && (
-                <Tooltip content={forking ? t("messageView.creatingSession") : t("messageView.newSessionTitle")}>
-                  <button
-                    onClick={() => { onFork!(entryId!); }}
-                    disabled={forking}
-                    aria-label={forking ? t("messageView.creatingSession") : t("messageView.newSessionTitle")}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 4,
-                      padding: "3px 8px", height: 24, minHeight: 24,
-                      background: "none", border: "none",
-                      borderRadius: "var(--radius-control)",
-                      color: forking ? "var(--accent)" : "var(--text-dim)",
-                      cursor: forking ? "not-allowed" : "pointer",
-                      fontSize: 11, fontWeight: 400,
-                      whiteSpace: "nowrap",
-                      transition: "color var(--dur-fast) var(--ease-out-warm)",
-                    }}
-                    onMouseEnter={(e) => { if (!forking) e.currentTarget.style.color = "var(--accent)"; }}
-                    onMouseLeave={(e) => { if (!forking) e.currentTarget.style.color = "var(--text-dim)"; }}
-                  >
-                    <GitFork size={11} strokeWidth={1.8} />
-                    {forking ? t("messageView.creating") : t("messageView.newSession")}
-                  </button>
-                </Tooltip>
-              )}
-            </div>
-          )}
-          {time && <span style={{ fontSize: 10, color: "var(--text-dim)" }}>{time}</span>}
+            {canNavigate && (
+              <Tooltip content={t("messageView.editFromHereTitle")}>
+                <button
+                  onClick={async () => { if (!(await onNavigate!(prevAssistantEntryId!))) return; onEditContent?.(content); }}
+                  aria-label={t("messageView.editFromHereTitle")}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 4,
+                    padding: "3px 8px", height: 24, minHeight: 24,
+                    background: "none", border: "none",
+                    borderRadius: "var(--radius-control)",
+                    color: "var(--text-dim)",
+                    cursor: "pointer",
+                    fontSize: 11, fontWeight: 400,
+                    whiteSpace: "nowrap",
+                    transition: "color var(--dur-fast) var(--ease-out-warm)",
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = "var(--accent)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-dim)"; }}
+                >
+                  <CornerUpLeft size={11} strokeWidth={1.8} />
+                  {t("messageView.editFromHere")}
+                </button>
+              </Tooltip>
+            )}
+            {canFork && (
+              <Tooltip content={forking ? t("messageView.creatingSession") : t("messageView.newSessionTitle")}>
+                <button
+                  onClick={() => { onFork!(entryId!); }}
+                  disabled={forking}
+                  aria-label={forking ? t("messageView.creatingSession") : t("messageView.newSessionTitle")}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 4,
+                    padding: "3px 8px", height: 24, minHeight: 24,
+                    background: "none", border: "none",
+                    borderRadius: "var(--radius-control)",
+                    color: forking ? "var(--accent)" : "var(--text-dim)",
+                    cursor: forking ? "not-allowed" : "pointer",
+                    fontSize: 11, fontWeight: 400,
+                    whiteSpace: "nowrap",
+                    transition: "color var(--dur-fast) var(--ease-out-warm)",
+                  }}
+                  onMouseEnter={(e) => { if (!forking) e.currentTarget.style.color = "var(--accent)"; }}
+                  onMouseLeave={(e) => { if (!forking) e.currentTarget.style.color = "var(--text-dim)"; }}
+                >
+                  <GitFork size={11} strokeWidth={1.8} />
+                  {forking ? t("messageView.creating") : t("messageView.newSession")}
+                </button>
+              </Tooltip>
+            )}
           </div>
         )}
-      </div>
-    </div>
+        {time && <span style={{ fontSize: 10, color: "var(--text-dim)" }}>{time}</span>}
+        </div>
+      )}
+  </div>
   );
 }
 function isAssistantErrorVisible(message: AssistantMessage): string | null {

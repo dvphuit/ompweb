@@ -656,6 +656,7 @@
   "messageView.showDetails": "显示详情",
   "messageView.showExtensionMessage": "显示扩展消息",
   "messageView.error": "错误",
+  "messageView.you": "你",
   "messageView.thinking": "思考",
   "messageView.thinkingUnavailable": "思考内容不可用",
   "messageView.tokensPerSecond": "{tps} t/s",

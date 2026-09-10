@@ -85,12 +85,18 @@ const nativeOptionStyle = {
 } as const;
 
 const chipStyle = {
-  fontSize: 10,
-  padding: "1px 6px",
-  borderRadius: 4,
-  background: "var(--bg-subtle)",
-  color: "var(--text-muted)",
+  fontFamily: "var(--font-display)",
+  fontSize: 9.5,
   fontWeight: 500,
+  textTransform: "uppercase",
+  letterSpacing: "0.08em",
+  padding: "1px 6px",
+  border: "1px solid var(--border)",
+  borderRadius: 4,
+  background: "var(--bg)",
+  color: "var(--text-muted)",
+  whiteSpace: "nowrap",
+  flexShrink: 0,
 } as const;
 
 function slugify(value: string): string {
@@ -265,11 +271,11 @@ function ToggleSwitch({
         position: "relative",
         display: "inline-flex",
         alignItems: "center",
-        width: 40,
+        width: 44,
         height: 24,
-        borderRadius: "var(--radius-card)",
-        border: "none",
-        background: checked ? "var(--accent)" : "var(--border)",
+        borderRadius: "var(--radius-control)",
+        border: "var(--bw) solid var(--border)",
+        background: checked ? "var(--accent)" : "var(--bg)",
         cursor: disabled ? "not-allowed" : "pointer",
         transition: "background var(--dur-fast)",
         padding: 2,
@@ -278,13 +284,12 @@ function ToggleSwitch({
     >
       <span
         style={{
-          width: 20,
-          height: 20,
-          borderRadius: "var(--radius-card)",
-          background: "#fff",
-          transform: checked ? "translateX(16px)" : "translateX(0px)",
+          width: 16,
+          height: 16,
+          borderRadius: 2,
+          background: "var(--ink)",
+          transform: checked ? "translateX(20px)" : "translateX(0px)",
           transition: "transform var(--dur-fast)",
-          boxShadow: "none",
         }}
       />
     </button>
@@ -338,13 +343,13 @@ function NativeSetting({ label, description, scope, searchId, children }: { labe
         display: "flex",
         flexDirection: "column",
         gap: 8,
-        transition: "box-shadow var(--dur-fast), border-color var(--dur-fast)",
-        ...(highlighted ? { borderColor: "var(--accent)", boxShadow: "0 0 0 2px var(--accent)" } : {}),
+        transition: "border-color var(--dur-fast), background var(--dur-fast)",
+        ...(highlighted ? { borderColor: "var(--accent-3)", background: "var(--bg-selected)" } : {}),
       }}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <label id={labelId} htmlFor={settingId} style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text)", cursor: "pointer" }}>{label}</label>
+          <label id={labelId} htmlFor={settingId} style={{ fontFamily: "var(--font-display)", fontSize: 13, fontWeight: 700, color: "var(--text)", cursor: "pointer" }}>{label}</label>
           {scope && (
             <span style={chipStyle}>
               {formatScope(scope)}
@@ -395,14 +400,14 @@ function ThemePresetSetting({
         display: "flex",
         flexDirection: "column",
         gap: 10,
-        transition: "box-shadow var(--dur-fast), border-color var(--dur-fast)",
-        ...(highlighted ? { borderColor: "var(--accent)", boxShadow: "0 0 0 2px var(--accent)" } : {}),
+        transition: "border-color var(--dur-fast), background var(--dur-fast)",
+        ...(highlighted ? { borderColor: "var(--accent-3)", background: "var(--bg-selected)" } : {}),
       }}
     >
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span id="setting-label-color-theme" style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text)" }}>
+            <span id="setting-label-color-theme" style={{ fontFamily: "var(--font-display)", fontSize: 13, fontWeight: 700, color: "var(--text)" }}>
               {t("settingsConfig.colorTheme")}
             </span>
             <span style={chipStyle}>{t("settingsConfig.chipUI")}</span>
@@ -415,9 +420,10 @@ function ThemePresetSetting({
           style={{
             flexShrink: 0,
             padding: "2px 8px",
-            borderRadius: 999,
-            background: "var(--bg-selected)",
-            color: "var(--text-muted)",
+            border: "var(--bw) solid var(--border)",
+            borderRadius: 2,
+            background: "var(--accent)",
+            color: "var(--on-accent)",
             fontSize: 11,
             fontFamily: "var(--font-mono)",
             fontWeight: 500,
@@ -461,15 +467,13 @@ function ThemePresetSetting({
                 minWidth: 0,
                 height: 44,
                 padding: "4px 8px 4px 6px",
-                border: "1px solid",
-                borderColor: selected ? "var(--accent)" : "var(--border)",
+                border: "var(--bw) solid var(--border)",
                 borderRadius: "var(--radius-control)",
-                background: "var(--bg)",
+                background: selected ? "var(--bg-selected)" : "var(--bg)",
                 color: "var(--text)",
                 cursor: "pointer",
                 textAlign: "left",
-                boxShadow: selected ? "inset 0 0 0 1px var(--accent), var(--shadow-card)" : "none",
-                transition: "border-color var(--dur-fast) var(--ease-out-warm), box-shadow var(--dur-fast) var(--ease-out-warm)",
+                transition: "background var(--dur-fast) var(--ease-out-warm), border-color var(--dur-fast) var(--ease-out-warm)",
               }}
             >
               <span
@@ -478,10 +482,9 @@ function ThemePresetSetting({
                   width: 36,
                   height: 32,
                   overflow: "hidden",
-                  border: "1px solid color-mix(in srgb, var(--border) 90%, transparent)",
-                  borderRadius: "var(--radius-control)",
+                  border: "var(--bw) solid var(--border)",
+                  borderRadius: 2,
                   background: colors.bg,
-                  boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.06)",
                   flexShrink: 0,
                 }}
                 aria-hidden="true"
@@ -1244,7 +1247,7 @@ export function SettingsConfig({ activeTab, toolCallsDefaultCollapsed, onToolCal
                   padding: 20,
                   gap: 16,
                   ...(highlightId && ["agent-roster", "agent-model", "agent-tools"].includes(highlightId)
-                    ? { border: "var(--bw) solid var(--accent)", boxShadow: "0 0 0 2px var(--accent)" }
+                    ? { border: "var(--bw) solid var(--accent-3)", background: "var(--bg-selected)" }
                     : {}),
                 }}
               >

@@ -119,7 +119,7 @@ export function SettingsTabs({
                 alignItems: "flex-start",
                 gap: 10,
                 padding: "9px 10px",
-                border: "none",
+                border: selected ? "var(--bw) solid var(--border)" : "var(--bw) solid transparent",
                 borderRadius: "var(--radius-control)",
                 background: selected ? "var(--bg-selected)" : "transparent",
                 color: selected ? "var(--text)" : disabled ? "var(--text-dim)" : "var(--text-muted)",
@@ -130,9 +130,9 @@ export function SettingsTabs({
                 width: "100%",
               }}
             >
-              <Icon size={16} aria-hidden="true" style={{ marginTop: 2, flexShrink: 0, color: selected ? "var(--accent)" : "currentColor" }} />
+              <Icon size={16} aria-hidden="true" style={{ marginTop: 2, flexShrink: 0, color: selected ? "var(--text)" : "currentColor" }} />
               <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-                <div style={{ fontSize: 12.5, fontWeight: selected ? 600 : 500, lineHeight: 1.3, color: selected ? "var(--text)" : "inherit" }}>
+                <div style={{ fontFamily: "var(--font-display)", fontSize: 13, fontWeight: 700, lineHeight: 1.3, color: selected ? "var(--text)" : "inherit" }}>
                   {displayLabel}
                 </div>
                 <div style={{ fontSize: 10.5, color: "var(--text-dim)", lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>

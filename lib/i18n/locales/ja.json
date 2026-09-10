@@ -656,6 +656,7 @@
   "messageView.showDetails": "詳細を表示",
   "messageView.showExtensionMessage": "拡張機能メッセージを表示",
   "messageView.error": "エラー",
+  "messageView.you": "あなた",
   "messageView.thinking": "思考",
   "messageView.thinkingUnavailable": "思考内容は利用できません",
   "messageView.tokensPerSecond": "{tps} t/s",
