@@ -1955,15 +1955,16 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             style={{
               display: "flex",
               flexDirection: "column",
-              background: "var(--bg)",
+              background: "var(--bg-panel)",
               border: `var(--bw) solid ${bashMode ? "var(--tool-bg)" : "var(--border)"}`,
               borderRadius: (queuedCount > 0 || Boolean(statusText)) ? "0 0 var(--radius-card) var(--radius-card)" : "var(--radius-card)",
-              padding: "12px 12px 10px 14px",
+              padding: "13px 14px 11px",
               transition: "border-color var(--dur-fast) var(--ease-out-warm), background var(--dur-fast) var(--ease-out-warm)",
             } as React.CSSProperties}
           >
           <textarea
             ref={textareaRef}
+            className="chat-input-textarea"
             value={value}
             onChange={(e) => {
               setValue(e.target.value);
@@ -1998,7 +1999,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               fontSize: "var(--chat-user-font-size)",
               lineHeight: "var(--chat-line-height)",
               fontFamily: "inherit",
-              minHeight: 24,
+              minHeight: 38,
               maxHeight: 200,
               overflow: "auto",
             }}

@@ -2987,11 +2987,22 @@ html.dark .tool-icon-badge {
   border: var(--bw) solid var(--border) !important;
   border-radius: var(--radius-card) !important;
   box-shadow: none !important;
+  background: var(--bg-panel);
 }
 .chat-input-shell:focus-within {
   border-color: var(--accent-3) !important;
   outline: var(--bw) solid var(--accent-3);
   outline-offset: -1px;
+}
+.chat-input-textarea {
+  display: block;
+  min-height: 38px;
+  padding: 2px 0 4px;
+  caret-color: var(--accent-3);
+}
+.chat-input-textarea::placeholder {
+  color: var(--text-dim);
+  opacity: 0.9;
 }
 input[type="text"], input[type="search"], input[type="password"], input[type="number"], input:not([type]), textarea, select {
   border-radius: var(--radius-control);
