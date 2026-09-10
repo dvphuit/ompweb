@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { accessDenied } from "@/lib/api-utils";
+import { errorMessage } from "@/lib/errors";
 import { execFile } from "child_process";
 import { existsSync, promises as fs } from "fs";
 import { basename, extname, join } from "path";
@@ -252,7 +254,7 @@ async function readPlugins(cwd: string): Promise<PluginsResponse> {
   } catch (error) {
     diagnostics.push({
       type: "error",
-      message: error instanceof Error ? error.message : String(error),
+      message: errorMessage(error),
     });
   }
 
@@ -266,7 +268,7 @@ function readScope(scope: unknown): PluginScope {
 /** Dynamic CLI failures keep their message; a missing omp binary is the one
  * known cause worth a stable code for client-side localization. */
 function pluginErrorResponse(error: unknown): NextResponse {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = errorMessage(error);
   if (message.includes("omp binary not found")) {
     return NextResponse.json({ error: message, code: "omp_not_found" }, { status: 500 });
   }
@@ -281,7 +283,7 @@ export async function GET(req: Request) {
   try {
     const allowedRoots = await getAllowedFileRoots();
     if (!isExistingFilePathAllowed(cwd, allowedRoots)) {
-      return NextResponse.json({ error: "Access denied", code: "access_denied" }, { status: 403 });
+      return accessDenied();
     }
     return NextResponse.json(await readPlugins(cwd));
   } catch (error) {
@@ -302,7 +304,7 @@ export async function POST(req: Request) {
     if (!body.action) return NextResponse.json({ error: "action required", code: "action_required" }, { status: 400 });
     const allowedRoots = await getAllowedFileRoots();
     if (!isExistingFilePathAllowed(body.cwd, allowedRoots)) {
-      return NextResponse.json({ error: "Access denied", code: "access_denied" }, { status: 403 });
+      return accessDenied();
     }
 
     const source = body.source?.trim();

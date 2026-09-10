@@ -1,4 +1,5 @@
 import { type OmpLoginProvider, runUtilityCommand } from "@/lib/omp/rpc-utility";
+import { errorMessage } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,7 @@ export async function GET() {
       }));
     return Response.json({ providers: result });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorMessage(error);
     return Response.json({ providers: [], error: message }, { status: 500 });
   }
 }

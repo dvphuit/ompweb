@@ -1,4 +1,5 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "child_process";
+import { errorMessage } from "../errors";
 import { createInterface } from "readline";
 import { sanitizeProjectCommandEnvironment } from "../project-command-env";
 import { resolveOmpBin } from "./omp-cli";
@@ -164,7 +165,7 @@ export class RpcProcess {
         if (!decoded) return;
         frame = decoded;
       } catch (error) {
-        this.stderrTail = (this.stderrTail + `\nRPC protocol error: ${error instanceof Error ? error.message : String(error)}`).slice(-STDERR_TAIL_LIMIT);
+        this.stderrTail = (this.stderrTail + `\nRPC protocol error: ${errorMessage(error)}`).slice(-STDERR_TAIL_LIMIT);
         void this.dispose(0);
         return;
       }

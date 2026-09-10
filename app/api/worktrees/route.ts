@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
+import { errorMessage } from "@/lib/errors";
 import { parseJsonWithinLimit, RequestBodyTooLargeError } from "@/lib/bounded-form-data";
 import { existsSync } from "fs";
-import { apiErrorResponse } from "@/lib/api-utils";
+import { accessDenied, apiErrorResponse } from "@/lib/api-utils";
 import { join } from "path";
 import { addWorktree, findCurrentWorktreePath, listWorktrees, removeWorktree, resolveProject } from "@/lib/worktree";
 import { allowFileRoot, getAllowedFileRoots, isExistingFilePathAllowed, isFilePathAllowed } from "@/lib/file-access";
@@ -12,7 +13,7 @@ const MAX_WORKTREE_REQUEST_BYTES = 16 * 1024;
 async function checkCwdAllowed(cwd: string): Promise<NextResponse | null> {
   const allowedRoots = await getAllowedFileRoots();
   if (!isFilePathAllowed(cwd, allowedRoots) || !isExistingFilePathAllowed(cwd, allowedRoots)) {
-    return NextResponse.json({ error: "Access denied", code: "access_denied" }, { status: 403 });
+    return accessDenied();
   }
   return null;
 }
@@ -84,7 +85,7 @@ export async function POST(req: Request) {
   } catch (error) {
     if (error instanceof RequestBodyTooLargeError) return NextResponse.json({ error: "Worktree request is too large", code: "request_too_large" }, { status: 413 });
     if (error instanceof SyntaxError) return NextResponse.json({ error: "Invalid JSON request body", code: "invalid_json" }, { status: 400 });
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorMessage(error);
     return NextResponse.json({ error: message, code: worktreeErrorCode(message) }, { status: 400 });
   }
 }
@@ -103,7 +104,7 @@ export async function DELETE(req: Request) {
   } catch (error) {
     if (error instanceof RequestBodyTooLargeError) return NextResponse.json({ error: "Worktree request is too large", code: "request_too_large" }, { status: 413 });
     if (error instanceof SyntaxError) return NextResponse.json({ error: "Invalid JSON request body", code: "invalid_json" }, { status: 400 });
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorMessage(error);
     const dirty = /contains modified or untracked files|is dirty/i.test(message);
     const code = dirty ? "worktree_dirty" : worktreeErrorCode(message);
     return NextResponse.json({ error: message, code, dirty }, { status: dirty ? 409 : 400 });

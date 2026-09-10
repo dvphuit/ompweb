@@ -3,6 +3,13 @@ import { resolveSessionPath } from "./session-reader";
 
 const SESSION_NOT_FOUND = { error: "Session not found", code: "session_not_found" } as const;
 
+const ACCESS_DENIED = { error: "Access denied", code: "access_denied" } as const;
+
+/** Uniform 403 response for the file-access allow-list guard. */
+export function accessDenied(): NextResponse {
+  return NextResponse.json(ACCESS_DENIED, { status: 403 });
+}
+
 /** Resolve a session id to its file path, or a 404 JSON response. Replaces the
  * repeated `resolveSessionPath(id)` + "Session not found" guard across routes. */
 export async function resolveSessionPathOr404(

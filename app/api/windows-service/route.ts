@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorMessage } from "@/lib/errors";
 import {
   getWebServiceStatus,
   installTrayShortcuts,
@@ -104,7 +105,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       status: updatedStatus,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorMessage(error);
     return NextResponse.json({ error: message, code: "server_error" }, { status: 500 });
   }
 }

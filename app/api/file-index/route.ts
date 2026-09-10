@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { apiErrorResponse } from "@/lib/api-utils";
+import { accessDenied, apiErrorResponse } from "@/lib/api-utils";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import fs from "fs";
@@ -8,8 +8,8 @@ import {
   getAllowedFileRoots,
   isExistingFilePathAllowed,
   isFilePathAllowed,
-  isWindowsAbsolutePath,
 } from "@/lib/file-access";
+import { isAbsolutePath } from "@/lib/paths";
 import { buildEntriesFromFiles, filterFileEntries, parseResultLimit, type FileIndexEntry } from "@/lib/file-fuzzy";
 
 const execFileAsync = promisify(execFile);
@@ -151,14 +151,14 @@ function listWithWalk(cwd: string): FileListing {
 export async function GET(req: NextRequest) {
   try {
     const cwd = req.nextUrl.searchParams.get("cwd")?.trim() ?? "";
-    if (!cwd || (!cwd.startsWith("/") && !isWindowsAbsolutePath(cwd))) {
+    if (!isAbsolutePath(cwd)) {
       return NextResponse.json({ error: "cwd must be an absolute path", code: "cwd_must_be_absolute" }, { status: 400 });
     }
     const query = req.nextUrl.searchParams.get("q")?.slice(0, MAX_QUERY_LENGTH) ?? "";
 
     const allowedRoots = await getAllowedFileRoots();
     if (!isFilePathAllowed(cwd, allowedRoots)) {
-      return NextResponse.json({ error: "Access denied", code: "access_denied" }, { status: 403 });
+      return accessDenied();
     }
 
     let stat: fs.Stats;
@@ -171,7 +171,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Not a directory", code: "not_a_directory" }, { status: 400 });
     }
     if (!isExistingFilePathAllowed(cwd, allowedRoots)) {
-      return NextResponse.json({ error: "Access denied", code: "access_denied" }, { status: 403 });
+      return accessDenied();
     }
 
     const cache = getIndexCache();

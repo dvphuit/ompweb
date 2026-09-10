@@ -1,4 +1,5 @@
 import { realpathSync } from "fs";
+import { errorMessage } from "@/lib/errors";
 import { homedir } from "os";
 import { isAbsolute, resolve } from "path";
 import { NextResponse } from "next/server";
@@ -179,7 +180,7 @@ export async function PATCH(req: Request) {
         ({ projectRoot } = await resolveProject(normalized));
       } catch (error) {
         if (rawUpdates.length > 1) {
-          const message = error instanceof Error ? error.message : String(error);
+          const message = errorMessage(error);
           skipped.push({ cwd, code: "resolve_failed", error: message });
           continue;
         }

@@ -1,4 +1,5 @@
 import { execFile } from "child_process";
+import { errorMessage } from "./errors";
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "fs";
 import { basename, dirname, join, resolve } from "path";
 import { promisify } from "util";
@@ -365,5 +366,5 @@ export async function removeWorktree(cwd: string, worktreePath: string, force = 
 function extractGitError(error: unknown): string {
   const stderr = (error as { stderr?: string }).stderr;
   if (typeof stderr === "string" && stderr.trim()) return stderr.trim();
-  return error instanceof Error ? error.message : String(error);
+  return errorMessage(error);
 }

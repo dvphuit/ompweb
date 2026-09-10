@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorMessage } from "@/lib/errors";
 import { apiErrorResponse } from "@/lib/api-utils";
 import { listArchivedSessions, restoreArchivedSession } from "@/lib/omp/archive";
 import { invalidateSessionListCache } from "@/lib/session-reader";
@@ -37,7 +38,7 @@ export async function POST(req: Request) {
     invalidateSessionListCache();
     return NextResponse.json({ ok: true, sessionId });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorMessage(error);
     const status = message.includes("Invalid archive key") || message.includes("required") ? 400 : message.includes("not found") ? 404 : message.includes("already exists") ? 409 : 500;
     return NextResponse.json({ error: message, code: "archive_restore_failed" }, { status });
   }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { accessDenied } from "@/lib/api-utils";
 import { existsSync, readFileSync, realpathSync, writeFileSync } from "fs";
 import { basename } from "path";
 import {
@@ -23,7 +24,7 @@ export async function GET(req: Request) {
   try {
     const allowedRoots = await getAllowedFileRoots();
     if (!isExistingFilePathAllowed(cwd, allowedRoots)) {
-      return NextResponse.json({ error: "Access denied", code: "access_denied" }, { status: 403 });
+      return accessDenied();
     }
     return NextResponse.json(await loadSkillsWithInstallInfo(cwd));
   } catch (e) {
@@ -56,7 +57,7 @@ export async function PATCH(req: Request) {
     // it outside the checked roots.
     const resolvedFilePath = realpathSync(filePath);
     if (!isExistingFilePathAllowed(resolvedFilePath, allowedRoots)) {
-      return NextResponse.json({ error: "Access denied", code: "access_denied" }, { status: 403 });
+      return accessDenied();
     }
 
     const content = readFileSync(resolvedFilePath, "utf8");

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorMessage } from "@/lib/errors";
 import { resolveSessionPathOr404 } from "@/lib/api-utils";
 import { extractSubagentHistory } from "@/lib/subagent-history";
 import { getRpcSession } from "@/lib/rpc-manager";
@@ -33,7 +34,7 @@ export async function GET(
     return NextResponse.json({ subagents });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : String(error) },
+      { error: errorMessage(error) },
       { status: 500 },
     );
   }

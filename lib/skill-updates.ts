@@ -1,4 +1,5 @@
 import { execFile } from "child_process";
+import { errorMessage } from "./errors";
 import { mkdtemp, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -261,7 +262,7 @@ export async function checkSkillUpdate(
       install,
       "error",
       undefined,
-      error instanceof Error ? error.message : String(error),
+      errorMessage(error),
     );
   }
 }

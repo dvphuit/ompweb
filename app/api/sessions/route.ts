@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorMessage } from "@/lib/errors";
 import { createHash } from "crypto";
 import { listAllSessions } from "@/lib/session-reader";
 import { getRunningRpcSessions } from "@/lib/rpc-manager";
@@ -27,7 +28,7 @@ export async function GET(req: Request) {
     return new NextResponse(bodyJson, { headers: { ETag: etag, "Content-Type": "application/json", ...SESSION_LIST_HEADERS } });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : String(error), code: "internal_error" },
+      { error: errorMessage(error), code: "internal_error" },
       { status: 500, headers: { "Cache-Control": "no-store" } },
     );
   }

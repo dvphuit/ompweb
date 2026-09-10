@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { accessDenied } from "@/lib/api-utils";
 import { runNpx } from "@/lib/npx";
 import { getAllowedFileRoots, isExistingFilePathAllowed } from "@/lib/file-access";
 
@@ -23,7 +24,7 @@ export async function POST(req: Request) {
       if (!cwd) return NextResponse.json({ error: "cwd required for project install", code: "cwd_required_for_project_install" }, { status: 400 });
       const allowedRoots = await getAllowedFileRoots();
       if (!isExistingFilePathAllowed(cwd, allowedRoots)) {
-        return NextResponse.json({ error: "Access denied", code: "access_denied" }, { status: 403 });
+        return accessDenied();
       }
     }
     // The skills.sh CLI has no omp agent entry; "universal" installs into the
