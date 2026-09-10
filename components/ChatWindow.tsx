@@ -1459,6 +1459,7 @@ function ExtensionWidgets({ widgets }: { widgets: Array<{ key: string; lines: st
 }
 
 function NoticeShelf({ notices, onDismiss, floating = false, align = "left" }: { notices: NoticeItem[]; onDismiss?: (id: string) => void; floating?: boolean; align?: "left" | "right" }) {
+  const { t } = useI18n();
   if (notices.length === 0) return null;
   return (
     <div
@@ -1542,7 +1543,9 @@ function NoticeShelf({ notices, onDismiss, floating = false, align = "left" }: {
               <button
                 type="button"
                 onClick={() => onDismiss(notice.id)}
-                aria-label="Dismiss"
+                aria-label={t("messageView.dismiss")}
+                title={t("messageView.dismiss")}
+                className="notice-shelf-dismiss"
                 style={{
                   display: "inline-flex",
                   alignItems: "center",

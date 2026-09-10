@@ -141,6 +141,37 @@ export interface ChatInputHandle {
 
 const COMPOSITION_END_ENTER_GRACE_MS = 100;
 
+/**
+ * Roving keyboard cursor for the composer's picker panels (models, reasoning,
+ * tool preset). Arrow keys move it, Enter activates, Escape closes the panel.
+ * The cursor is deliberately separate from the *selected* row (which keeps
+ * `bg-selected`), so browsing with the keyboard never looks like a selection.
+ */
+function usePickerCursor({ length, open, initial = 0 }: { length: number; open: boolean; initial?: number }) {
+  const [cursor, setCursor] = useState(initial);
+  const refs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  useEffect(() => {
+    refs.current.length = length;
+  }, [length]);
+
+  useEffect(() => {
+    if (!open) return;
+    setCursor(length === 0 ? 0 : Math.min(Math.max(initial, 0), length - 1));
+  }, [open, length, initial]);
+
+  useEffect(() => {
+    if (!open) return;
+    refs.current[cursor]?.scrollIntoView({ block: "nearest" });
+  }, [cursor, open]);
+
+  const move = useCallback((delta: number) => {
+    setCursor((current) => (length === 0 ? 0 : (current + delta + length) % length));
+  }, [length]);
+
+  return { cursor, setCursor, refs, move };
+}
+
 
 export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatInput({
   onSend, onAbort, onSteer, onFollowUp, isStreaming, model, isAutoModelSelection, modelNames, modelList, modelError, modelsLoading, onModelChange, fastModeEnabled, fastModeActive, fastModeSupported, onFastModeChange,
@@ -204,7 +235,9 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   const modelDropdownPanelRef = useRef<HTMLDivElement>(null);
   const modelSearchInputRef = useRef<HTMLInputElement>(null);
   const thinkingDropdownRef = useRef<HTMLDivElement>(null);
+  const thinkingPanelRef = useRef<HTMLDivElement>(null);
   const toolPresetDropdownRef = useRef<HTMLDivElement>(null);
+  const toolPresetPanelRef = useRef<HTMLDivElement>(null);
   const historyMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isComposingRef = useRef(false);
@@ -892,6 +925,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   ];
   const firstQueued = queuedEntries[0] ?? null;
   const queuedCount = queuedEntries.length;
+  const hasAttachments = attachedImages.length > 0 || attachedTextFiles.length > 0;
 
   const [queueExpanded, setQueueExpanded] = useState(false);
 
@@ -1242,6 +1276,27 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     () => selectableThinkingLevels(availableThinkingLevels),
     [availableThinkingLevels],
   );
+  // Keyboard cursors for the picker panels (see usePickerCursor). The model
+  // cursor opens on the active model so Enter never re-selects blindly.
+  const activeModelIndex = filteredModelOptions.findIndex(
+    (opt) => opt.modelId === model?.modelId && opt.provider === model?.provider,
+  );
+  const modelPicker = usePickerCursor({
+    length: filteredModelOptions.length,
+    open: modelDropdownOpen,
+    initial: activeModelIndex >= 0 ? activeModelIndex : 0,
+  });
+  const thinkingPicker = usePickerCursor({
+    length: thinkingLevelOptions.length,
+    open: thinkingDropdownOpen,
+    initial: Math.max(0, thinkingLevelOptions.indexOf(thinkingLevel ?? "auto")),
+  });
+  const toolPresetPicker = usePickerCursor({
+    length: TOOL_PRESET_OPTIONS.length,
+    open: toolPresetDropdownOpen,
+    initial: Math.max(0, TOOL_PRESET_OPTIONS.findIndex((opt) => opt.value === (toolPreset ?? "full"))),
+  });
+
   // A run starting mid-interaction must not leave the reasoning menu
   // open: the level only applies to the next prompt, and the trigger is
   // disabled while streaming.
@@ -1254,8 +1309,22 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
       setModelSearchQuery("");
       return;
     }
+    // The search field owns arrow keys, so it takes focus on open; the panel
+    // also handles them for when focus sits on a row.
     requestAnimationFrame(() => modelSearchInputRef.current?.focus());
   }, [modelDropdownOpen]);
+
+  // Keyboard-opened menus take focus themselves: both panels own the arrow
+  // keys, and focusing the panel keeps Enter/Escape from reaching the textarea.
+  useEffect(() => {
+    if (!thinkingDropdownOpen) return;
+    requestAnimationFrame(() => thinkingPanelRef.current?.focus());
+  }, [thinkingDropdownOpen]);
+
+  useEffect(() => {
+    if (!toolPresetDropdownOpen) return;
+    requestAnimationFrame(() => toolPresetPanelRef.current?.focus());
+  }, [toolPresetDropdownOpen]);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -1617,6 +1686,10 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                                 slashItemRefs.current[index] = node;
                               }}
                               type="button"
+                              className="slash-menu-item"
+                              role="option"
+                              aria-selected={active}
+                              data-cursor={active ? "true" : undefined}
                               onMouseDown={(e) => {
                                 e.preventDefault();
                                 applySlashCommand(command);
@@ -1768,51 +1841,18 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               </div>
             );
           })()}
-        {/* Queued prompts panel / bar — attached to composer's top edge.
-            When 1 item: compact single row. When multiple items: compact row with expand toggle, or full list when expanded. */}
+        {/* Queued prompts panel — attached to the composer's top edge. A single
+            queued prompt stays as one indexed row; several collapse behind a
+            square count badge and expand to a numbered list. */}
         {queuedCount > 0 && (
-          <div
-            aria-label={t("chatInput.queuedPrompts")}
-            style={{
-              border: "var(--bw) solid var(--border)",
-              borderBottom: "none",
-              borderRadius: "var(--radius-card) var(--radius-card) 0 0",
-              background: "var(--bg-panel)",
-              overflow: "hidden",
-            }}
-          >
+          <div className="queue-panel" aria-label={t("chatInput.queuedPrompts")}>
             {queuedCount === 1 ? (
-              <div style={{
-                padding: "5px 8px 5px 12px",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                minWidth: 0,
-              }}>
-                <span style={{
-                  flexShrink: 0,
-                  fontSize: 10,
-                  fontWeight: 600,
-                  letterSpacing: "0.06em",
-                  textTransform: "uppercase", fontFamily: "var(--font-display)",
-                  color: "var(--text-muted)",
-                }}>
+              <div className="queue-item" data-kind={firstQueued?.kind}>
+                <span className="queue-index">1</span>
+                <span className="queue-kind" data-kind={firstQueued?.kind}>
                   {firstQueued?.kind === "steer" ? t("chatInput.queuedSteer") : t("chatInput.queuedFollowUp")}
                 </span>
-                <span
-                  title={firstQueued?.text}
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    fontSize: 12,
-                    color: "var(--text-muted)",
-                  }}
-                >
-                  {firstQueued?.text}
-                </span>
+                <span className="queue-preview" title={firstQueued?.text}>{firstQueued?.text}</span>
                 <QueuedActionButton onClick={handleQueuedEdit} title={t("chatInput.queuedEditTitle")}>
                   {t("chatInput.queuedEdit")}
                 </QueuedActionButton>
@@ -1824,135 +1864,49 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 </QueuedActionButton>
               </div>
             ) : (
-              <div>
-                <div style={{
-                  padding: "5px 8px 5px 12px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 8,
-                  borderBottom: queueExpanded ? "var(--bw) solid var(--border)" : "none",
-                }}>
+              <>
+                <div className="queue-bar">
                   <button
                     type="button"
+                    className="queue-toggle"
                     onClick={() => setQueueExpanded((prev) => !prev)}
                     aria-expanded={queueExpanded}
                     title={queueExpanded ? t("chatInput.collapseQueued") : t("chatInput.expandQueued")}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      background: "none",
-                      border: "none",
-                      padding: 0,
-                      cursor: "pointer",
-                      color: "var(--text-muted)",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      letterSpacing: "0.04em",
-                      textTransform: "uppercase",
-                      minWidth: 0,
-                      flex: 1,
-                      textAlign: "left",
-                    }}
                   >
                     <ChevronDown
                       size={13}
                       strokeWidth={2}
-                      style={{
-                        transform: queueExpanded ? "rotate(0deg)" : "rotate(-90deg)",
-                        transition: "transform var(--dur-fast) var(--ease-out-warm)",
-                        flexShrink: 0,
-                      }}
+                      className="composer-control-chevron"
+                      data-open={queueExpanded}
                       aria-hidden
                     />
-                    <span>{t("chatInput.queuedPrompts")}</span>
-                    <span style={{ color: "var(--text-dim)", fontFamily: "var(--font-mono)", fontSize: 10 }}>({queuedCount})</span>
+                    <span className="queue-count">{queuedCount}</span>
+                    <span className="queue-title">{t("chatInput.queuedPrompts")}</span>
                     {!queueExpanded && firstQueued && (
-                      <span
-                        style={{
-                          marginLeft: 4,
-                          color: "var(--text-dim)",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                          fontSize: 11,
-                          fontWeight: 400,
-                          textTransform: "none",
-                        }}
-                      >
+                      <span className="queue-preview">
                         {firstQueued.kind === "steer" ? `[${t("chatInput.queuedSteer")}] ` : ""}{firstQueued.text}
                       </span>
                     )}
                   </button>
-                  <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                    <button
-                      type="button"
-                      onClick={() => setQueueExpanded((prev) => !prev)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        padding: "2px 6px",
-                        cursor: "pointer",
-                        color: "var(--text-dim)",
-                        fontSize: 11,
-                      }}
-                    >
-                      {queueExpanded ? t("chatInput.collapseQueued") : t("chatInput.expandQueued")}
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    className="composer-control composer-control-tiny"
+                    onClick={() => setQueueExpanded((prev) => !prev)}
+                    aria-expanded={queueExpanded}
+                    title={queueExpanded ? t("chatInput.collapseQueued") : t("chatInput.expandQueued")}
+                  >
+                    {queueExpanded ? t("messageView.collapse") : t("messageView.expand")}
+                  </button>
                 </div>
                 {queueExpanded && (
-                  <div style={{
-                    maxHeight: 180,
-                    overflowY: "auto",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 1,
-                    background: "var(--bg-subtle)",
-                    padding: "4px 0",
-                  }}>
+                  <div className="queue-list" role="list">
                     {queuedEntries.map((entry, idx) => (
-                      <div
-                        key={`${entry.kind}:${idx}:${entry.text}`}
-                        style={{
-                          padding: "4px 8px 4px 12px",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                          background: "var(--bg-panel)",
-                          fontSize: 12,
-                        }}
-                      >
-                        <span style={{
-                          flexShrink: 0,
-                          fontSize: 9.5,
-                          fontWeight: 600,
-                          letterSpacing: "0.05em",
-                          textTransform: "uppercase",
-                          padding: "1px 4px",
-                          borderRadius: 4,
-                          background: entry.kind === "steer" ? "color-mix(in srgb, var(--accent) 15%, transparent)" : "var(--bg)",
-                          border: `var(--bw) solid ${entry.kind === "steer" ? "var(--accent)" : "var(--border)"}`,
-                          color: entry.kind === "steer" ? "var(--accent)" : "var(--text-muted)",
-                        }}>
+                      <div className="queue-item" data-kind={entry.kind} role="listitem" key={`${entry.kind}:${idx}:${entry.text}`}>
+                        <span className="queue-index">{idx + 1}</span>
+                        <span className="queue-kind" data-kind={entry.kind}>
                           {entry.kind === "steer" ? t("chatInput.queuedSteer") : t("chatInput.queuedFollowUp")}
                         </span>
-                        <span
-                          title={entry.text}
-                          style={{
-                            flex: 1,
-                            minWidth: 0,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                            color: "var(--text)",
-                            fontFamily: "var(--font-mono)",
-                            fontSize: 11.5,
-                          }}
-                        >
-                          {entry.text}
-                        </span>
+                        <span className="queue-preview" title={entry.text}>{entry.text}</span>
                         <QueuedActionButton onClick={() => handleItemEdit(entry.text)} title={t("chatInput.queuedEditTitle")}>
                           {t("chatInput.queuedEdit")}
                         </QueuedActionButton>
@@ -1968,11 +1922,10 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     ))}
                   </div>
                 )}
-              </div>
+              </>
             )}
           </div>
         )}
-        {/* Live agent status bar — attached to composer's top edge */}
         {statusText && (
           <div
             role="status"
@@ -2051,43 +2004,22 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             }}
           />
 
-          {/* Toolbar: attachment · advisor · model · settings · reasoning · fast · compact · send/queue/stop */}
-
-          {/* Toolbar: attachment · model · settings · reasoning · fast · context ring · send/stop */}
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 2,
-            marginTop: 8,
-            paddingTop: 8,
-            borderTop: "1px solid var(--border)",
-            flexWrap: isMobile ? "wrap" : "nowrap",
-          }}>
+          {/* Toolbar: attachment · advisor · model · reasoning · tools · fast ·
+              compact · send/queue/stop. Every control shares the
+              .composer-control recipe (2px border, display font, flat hover,
+              bg-selected + accent border when active) so the row reads as one
+              tool set instead of several button styles. */}
+          <div className="composer-toolbar">
             {/* Attachment */}
             <button
+              type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isStreaming}
               title={t("chatInput.attachFile")}
               aria-label={t("chatInput.attachFile")}
-              style={{
-                flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
-                width: 28, height: 28, padding: 0,
-                background: "none", border: "none",
-                borderRadius: "var(--radius-card)",
-                color: (attachedImages.length || attachedTextFiles.length) ? "var(--accent)" : "var(--text-muted)",
-                cursor: isStreaming ? "not-allowed" : "pointer",
-                opacity: isStreaming ? 0.5 : 1,
-                transition: "background var(--dur-fast) var(--ease-out-warm), color var(--dur-fast) var(--ease-out-warm)",
-              }}
-              onMouseEnter={(e) => {
-                if (isStreaming) return;
-                e.currentTarget.style.background = "var(--bg-hover)";
-                e.currentTarget.style.color = (attachedImages.length || attachedTextFiles.length) ? "var(--accent)" : "var(--text)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "none";
-                e.currentTarget.style.color = (attachedImages.length || attachedTextFiles.length) ? "var(--accent)" : "var(--text-muted)";
-              }}
+              className="composer-control composer-control-icon"
+              data-active={hasAttachments ? "true" : undefined}
+              style={hasAttachments ? { color: "var(--accent-strong)" } : undefined}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -2108,17 +2040,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 aria-label={advisorEnabled
                   ? t("chatInput.advisorDisableTitle", { model: advisorModel?.name ?? t("messageView.advisorLabel"), reasoning: advisorModel?.reasoning ?? t("chatInput.advisorReasoningDefault") })
                   : t("chatInput.advisorEnableTitle")}
-                style={{
-                  flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
-                  width: 28, height: 28, padding: 0,
-                  background: "none", border: "none",
-                  borderRadius: "var(--radius-card)",
-                  color: advisorEnabled ? "var(--accent)" : "var(--text-muted)",
-                  cursor: "pointer",
-                  transition: "background var(--dur-fast) var(--ease-out-warm), color var(--dur-fast) var(--ease-out-warm)",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
+                className="composer-control composer-control-icon"
               >
                 <Sparkles size={14} strokeWidth={2} aria-hidden="true" />
               </button>
@@ -2128,39 +2050,19 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             {(modelOptions.length > 0 || currentName || modelError || showModelsLoading) && onModelChange && (
               <div ref={dropdownRef} style={{ position: "relative", minWidth: 0 }}>
                 <button
+                  type="button"
                   onClick={() => setModelDropdownOpen((v) => !v)}
                   disabled={modelSelectorDisabled}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 5,
-                    height: 28,
-                    maxWidth: 190,
-                    padding: "0 8px",
-                    overflow: "hidden",
-                    background: modelDropdownOpen ? "var(--bg-hover)" : "none",
-                    border: "none",
-                    borderRadius: "var(--radius-card)",
-                    color: "var(--text-muted)",
-                    cursor: modelSelectorDisabled ? "not-allowed" : "pointer",
-                    fontSize: 12,
-                    opacity: modelSelectorDisabled ? 0.5 : 1,
-                    transition: "background var(--dur-fast) var(--ease-out-warm), color var(--dur-fast) var(--ease-out-warm)",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (isStreaming) return;
-                    e.currentTarget.style.background = "var(--bg-hover)";
-                    e.currentTarget.style.color = "var(--text)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = modelDropdownOpen ? "var(--bg-hover)" : "none";
-                    e.currentTarget.style.color = "var(--text-muted)";
-                  }}
+                  className="composer-control"
+                  data-active={modelDropdownOpen ? "true" : undefined}
+                  style={{ maxWidth: 190 }}
                   title={modelOptions.length > 0
                     ? t("chatInput.changeModel")
                     : showModelsLoading ? t("chatInput.loadingModels") : t("chatInput.noAvailableModels")}
                   aria-expanded={modelDropdownOpen}
                   aria-haspopup="dialog"
                 >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden="true">
                     <rect x="4" y="4" width="16" height="16" rx="2" />
                     <rect x="9" y="9" width="6" height="6" />
                     <line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" />
@@ -2168,17 +2070,29 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                     <line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="14" x2="23" y2="14" />
                     <line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="14" x2="4" y2="14" />
                   </svg>
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
+                  <span className="composer-control-label">
                     {currentName ?? (modelOptions.length > 0
                       ? t("chatInput.selectModel")
                       : showModelsLoading ? t("chatInput.loadingModels") : t("chatInput.noModels"))}
                   </span>
-                  <ChevronDown size={12} strokeWidth={1.8} style={{ flexShrink: 0, opacity: 0.7, transform: modelDropdownOpen ? "rotate(180deg)" : "none", transition: "transform var(--dur-fast) var(--ease-out-warm)" }} aria-hidden="true" />
+                  <ChevronDown className="composer-control-chevron" data-open={modelDropdownOpen} size={12} strokeWidth={1.8} aria-hidden="true" />
                 </button>
                 {modelDropdownOpen && (
                   <div
                     ref={modelDropdownPanelRef}
                     className="picker-panel"
+                    role="dialog"
+                    aria-label={t("chatInput.modelsLabel")}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        setModelDropdownOpen(false);
+                        return;
+                      }
+                      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+                      e.preventDefault();
+                      modelPicker.move(e.key === "ArrowDown" ? 1 : -1);
+                    }}
                     style={{
                       position: isMobile ? "fixed" : "absolute",
                       bottom: isMobile ? 8 : "calc(100% + 6px)",
@@ -2212,13 +2126,27 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                             if (e.key === "Escape") {
                               e.preventDefault();
                               setModelDropdownOpen(false);
+                              return;
+                            }
+                            const option = filteredModelOptions[modelPicker.cursor];
+                            if (e.key === "ArrowDown") {
+                              e.preventDefault();
+                              modelPicker.move(1);
+                            } else if (e.key === "ArrowUp") {
+                              e.preventDefault();
+                              modelPicker.move(-1);
+                            } else if (e.key === "Enter" && option) {
+                              e.preventDefault();
+                              setModelDropdownOpen(false);
+                              const isActive = option.modelId === model?.modelId && option.provider === model?.provider;
+                              if (!isActive || isAutoModelSelection) onModelChange(option.provider, option.modelId);
                             }
                           }}
                           placeholder={t("chatInput.searchModels")}
                           aria-label={t("chatInput.searchModels")}
                         />
                       </label>
-                      <div className="picker-list">
+                      <div className="picker-list" role="listbox" aria-label={t("chatInput.modelsLabel")}>
                         {modelsByProvider.length === 0 ? (
                           <div style={{ padding: "9px 8px", color: "var(--text-dim)", fontSize: 12, whiteSpace: "nowrap" }}>
                             {modelSearchQuery.trim() ? t("chatInput.noMatchingModels") : showModelsLoading ? t("chatInput.loadingModels") : t("chatInput.noAvailableModels")}
@@ -2228,10 +2156,16 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                             <div className="picker-group-label">{group.provider}</div>
                             {group.options.map((opt) => {
                               const isActive = opt.modelId === model?.modelId && opt.provider === model?.provider;
+                              const flatIndex = filteredModelOptions.indexOf(opt);
                               return (
                                 <button
+                                  type="button"
+                                  role="option"
                                   className="picker-row"
                                   data-active={isActive}
+                                  data-cursor={flatIndex === modelPicker.cursor && !isActive ? "true" : undefined}
+                                  aria-selected={isActive}
+                                  ref={(node) => { modelPicker.refs.current[flatIndex] = node; }}
                                   key={`${opt.provider}:${opt.modelId}`}
                                   onClick={() => { setModelDropdownOpen(false); if (!isActive || isAutoModelSelection) onModelChange(opt.provider, opt.modelId); }}
                                 >
@@ -2254,33 +2188,48 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             {onThinkingLevelChange && (
               <div ref={thinkingDropdownRef} style={{ position: "relative" }}>
                 <button
+                  type="button"
                   onClick={() => setThinkingDropdownOpen((v) => !v)}
                   disabled={isStreaming}
                   title={t("chatInput.changeReasoningTitle", { level: thinkingDisplayLabel })}
                   aria-label={`${t("chatInput.changeReasoning")}: ${thinkingDisplayLabel}`}
                   aria-expanded={thinkingDropdownOpen}
                   aria-haspopup="menu"
-                  style={{
-                    display: "flex", alignItems: "center", gap: 5,
-                    height: 28, padding: "0 8px", background: thinkingDropdownOpen ? "var(--bg-hover)" : "none",
-                    border: "none", borderRadius: "var(--radius-card)", color: "var(--text-muted)", cursor: isStreaming ? "not-allowed" : "pointer",
-                    opacity: isStreaming ? 0.5 : 1, fontSize: 12,
-                    transition: "background var(--dur-fast) var(--ease-out-warm), color var(--dur-fast) var(--ease-out-warm)",
-                  }}
-                  onMouseEnter={(e) => { if (!isStreaming) { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.color = "var(--text)"; } }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = thinkingDropdownOpen ? "var(--bg-hover)" : "none"; e.currentTarget.style.color = "var(--text-muted)"; }}
+                  className="composer-control"
+                  data-active={thinkingDropdownOpen ? "true" : undefined}
                 >
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden="true">
                     <path d="M9.5 2A5.5 5.5 0 0 0 4 7.5c0 1.7.78 3.21 2 4.21V14a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-2.29c1.22-1 2-2.51 2-4.21A5.5 5.5 0 0 0 9.5 2z" />
                     <line x1="7" y1="18" x2="12" y2="18" /><line x1="8" y1="21" x2="11" y2="21" />
                   </svg>
-                  <span style={{ whiteSpace: "nowrap", textTransform: "capitalize" }}>{thinkingDisplayLabel}</span>
-                  <ChevronDown size={12} strokeWidth={1.8} style={{ flexShrink: 0, opacity: 0.7, transform: thinkingDropdownOpen ? "rotate(180deg)" : "none", transition: "transform var(--dur-fast) var(--ease-out-warm)" }} aria-hidden="true" />
+                  <span className="composer-control-label" style={{ textTransform: "capitalize" }}>{thinkingDisplayLabel}</span>
+                  <ChevronDown className="composer-control-chevron" data-open={thinkingDropdownOpen} size={12} strokeWidth={1.8} aria-hidden="true" />
                 </button>
                 {thinkingDropdownOpen && (
                   <div
+                    ref={thinkingPanelRef}
                     className="picker-panel"
                     role="menu"
+                    tabIndex={-1}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        setThinkingDropdownOpen(false);
+                        return;
+                      }
+                      const level = thinkingLevelOptions[thinkingPicker.cursor];
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        thinkingPicker.move(1);
+                      } else if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        thinkingPicker.move(-1);
+                      } else if (e.key === "Enter" && level && !isStreaming) {
+                        e.preventDefault();
+                        setThinkingDropdownOpen(false);
+                        if (level !== (thinkingLevel ?? "auto")) onThinkingLevelChange(level);
+                      }
+                    }}
                     style={{
                       position: "absolute", bottom: "calc(100% + 6px)", left: 0,
                       zIndex: 100, width: 190, maxWidth: "calc(100vw - 32px)",
@@ -2295,7 +2244,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                       <span className="picker-panel-count">{thinkingLevelOptions.length}</span>
                     </div>
                     <div className="picker-thinking-cards">
-                      {thinkingLevelOptions.map((lvl) => {
+                      {thinkingLevelOptions.map((lvl, index) => {
                         const isActive = (thinkingLevel ?? "auto") === lvl;
                         const mappedVal = (lvl !== "auto" && thinkingLevelMap) ? thinkingLevelMap[lvl] : undefined;
                         const displayLabel = (mappedVal != null && mappedVal !== lvl) ? mappedVal : lvl;
@@ -2303,8 +2252,10 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                           <button
                             className="picker-thinking-card"
                             data-active={isActive}
+                            data-cursor={index === thinkingPicker.cursor && !isActive ? "true" : undefined}
                             role="menuitemradio"
                             aria-checked={isActive}
+                            ref={(node) => { thinkingPicker.refs.current[index] = node; }}
                             key={lvl}
                             onClick={() => { setThinkingDropdownOpen(false); if (!isActive && !isStreaming) onThinkingLevelChange(lvl); }}
                           >
@@ -2331,29 +2282,44 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             {onToolPresetChange && (
               <div ref={toolPresetDropdownRef} style={{ position: "relative" }}>
                 <button
+                  type="button"
                   onClick={() => setToolPresetDropdownOpen((v) => !v)}
                   title={t("chatInput.changeToolPresetTitle", { preset: toolPreset ?? "full" })}
                   aria-label={`${t("chatInput.changeToolPreset")}: ${toolPreset ?? "full"}`}
                   aria-expanded={toolPresetDropdownOpen}
                   aria-haspopup="menu"
-                  style={{
-                    display: "flex", alignItems: "center", gap: 5,
-                    height: 28, padding: "0 8px", background: toolPresetDropdownOpen ? "var(--bg-hover)" : "none",
-                    border: "none", borderRadius: "var(--radius-card)", color: "var(--text-muted)", cursor: "pointer",
-                    fontSize: 12,
-                    transition: "background var(--dur-fast) var(--ease-out-warm), color var(--dur-fast) var(--ease-out-warm)",
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.color = "var(--text)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = toolPresetDropdownOpen ? "var(--bg-hover)" : "none"; e.currentTarget.style.color = "var(--text-muted)"; }}
+                  className="composer-control"
+                  data-active={toolPresetDropdownOpen ? "true" : undefined}
                 >
                   <Wrench size={11} strokeWidth={1.8} style={{ flexShrink: 0 }} aria-hidden="true" />
-                  <span style={{ whiteSpace: "nowrap", textTransform: "capitalize" }}>{toolPreset ?? "full"}</span>
-                  <ChevronDown size={12} strokeWidth={1.8} style={{ flexShrink: 0, opacity: 0.7, transform: toolPresetDropdownOpen ? "rotate(180deg)" : "none", transition: "transform var(--dur-fast) var(--ease-out-warm)" }} aria-hidden="true" />
+                  <span className="composer-control-label" style={{ textTransform: "capitalize" }}>{toolPreset ?? "full"}</span>
+                  <ChevronDown className="composer-control-chevron" data-open={toolPresetDropdownOpen} size={12} strokeWidth={1.8} aria-hidden="true" />
                 </button>
                 {toolPresetDropdownOpen && (
                   <div
+                    ref={toolPresetPanelRef}
                     className="picker-panel"
                     role="menu"
+                    tabIndex={-1}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        setToolPresetDropdownOpen(false);
+                        return;
+                      }
+                      const option = TOOL_PRESET_OPTIONS[toolPresetPicker.cursor];
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        toolPresetPicker.move(1);
+                      } else if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        toolPresetPicker.move(-1);
+                      } else if (e.key === "Enter" && option) {
+                        e.preventDefault();
+                        setToolPresetDropdownOpen(false);
+                        if (option.value !== (toolPreset ?? "full")) onToolPresetChange(option.value);
+                      }
+                    }}
                     style={{
                       position: "absolute", bottom: "calc(100% + 6px)", left: 0,
                       zIndex: 100, width: 260, maxWidth: "calc(100vw - 32px)",
@@ -2365,14 +2331,16 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                       <span className="picker-panel-count">{TOOL_PRESET_OPTIONS.length}</span>
                     </div>
                     <div className="picker-thinking-cards">
-                      {TOOL_PRESET_OPTIONS.map((opt) => {
+                      {TOOL_PRESET_OPTIONS.map((opt, index) => {
                         const isActive = (toolPreset ?? "full") === opt.value;
                         return (
                           <button
                             className="picker-thinking-card"
                             data-active={isActive}
+                            data-cursor={index === toolPresetPicker.cursor && !isActive ? "true" : undefined}
                             role="menuitemradio"
                             aria-checked={isActive}
+                            ref={(node) => { toolPresetPicker.refs.current[index] = node; }}
                             key={opt.value}
                             title={t(opt.descriptionKey)}
                             onClick={() => { setToolPresetDropdownOpen(false); if (!isActive) onToolPresetChange(opt.value); }}
@@ -2405,20 +2373,10 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 disabled={isStreaming}
                 title={fastModeEnabled && fastModeActive === false ? "Fast mode is enabled but inactive for this model" : `Turn OMP Fast mode ${fastModeEnabled ? "off" : "on"} for this model`}
                 aria-pressed={fastModeEnabled}
-                style={{
-                  display: "flex", alignItems: "center", gap: 5,
-                  height: 28,
-                  padding: "0 8px",
-                  background: fastModeEnabled ? "var(--bg-selected)" : "none",
-                  border: "none",
-                  borderRadius: "var(--radius-card)",
-                  color: fastModeEnabled && fastModeActive === false ? "var(--status-warning)" : fastModeEnabled ? "var(--accent)" : "var(--text-muted)",
-                  cursor: isStreaming ? "not-allowed" : "pointer",
-                  opacity: isStreaming ? 0.5 : 1,
-                  fontSize: 12,
-                  fontWeight: 600,
-                  transition: "background var(--dur-fast) var(--ease-out-warm), color var(--dur-fast) var(--ease-out-warm)",
-                }}
+                className="composer-control"
+                style={fastModeEnabled && fastModeActive === false
+                  ? { color: "var(--status-warning)", borderColor: "var(--status-warning)" }
+                  : undefined}
               >
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
@@ -2454,18 +2412,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 disabled={isStreaming && !isCompacting}
                 title={isCompacting ? t("chatInput.stopCompaction") : t("chatInput.compactContext")}
                 aria-label={isCompacting ? t("chatInput.stopCompaction") : t("chatInput.compactContext")}
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  width: 28, height: 28, padding: 0,
-                  background: "none", border: "none",
-                  borderRadius: "var(--radius-card)",
-                  color: isCompacting ? "var(--accent)" : "var(--text-muted)",
-                  cursor: isStreaming && !isCompacting ? "not-allowed" : "pointer",
-                  opacity: isStreaming && !isCompacting ? 0.5 : 1,
-                  transition: "background var(--dur-fast) var(--ease-out-warm), color var(--dur-fast) var(--ease-out-warm)",
-                }}
-                onMouseEnter={(e) => { if (!(isStreaming && !isCompacting)) e.currentTarget.style.background = "var(--bg-hover)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
+                className="composer-control composer-control-icon"
+                data-active={isCompacting ? "true" : undefined}
               >
                 <Shrink size={14} strokeWidth={1.8} aria-hidden="true" />
               </button>
@@ -2477,20 +2425,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 type="button"
                 onClick={() => sendQueued("followup")}
                 title={t("chatInput.queueMessage")}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  height: 28,
-                  padding: "0 14px",
-                  background: "var(--accent-strong)",
-                  border: "var(--bw) solid var(--border)",
-                  borderRadius: "var(--radius-control)",
-                  color: "var(--on-accent)",
-                  cursor: "pointer",
-                  fontFamily: "var(--font-display)",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  transition: "background var(--dur-fast) var(--ease-out-warm)",
-                }}
+                className="composer-control composer-control-primary"
+                data-variant="stop"
               >
                 <ListChecks size={13} strokeWidth={2} aria-hidden="true" />
                 {t("chatInput.queue")}
@@ -2500,20 +2436,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 type="button"
                 onClick={isCompacting ? onAbortCompaction : onAbort}
                 title={t("chatInput.stopAgent")}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  height: 28,
-                  padding: "0 14px",
-                  background: "var(--accent-strong)",
-                  border: "var(--bw) solid var(--border)",
-                  borderRadius: "var(--radius-control)",
-                  color: "var(--on-accent)",
-                  cursor: "pointer",
-                  fontFamily: "var(--font-display)",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  transition: "background var(--dur-fast) var(--ease-out-warm)",
-                }}
+                className="composer-control composer-control-primary"
+                data-variant="stop"
               >
                 <svg width="9" height="9" viewBox="0 0 10 10" fill="none" aria-hidden="true">
                   <rect x="1.5" y="1.5" width="7" height="7" rx="1.5" fill="currentColor" />
@@ -2524,21 +2448,8 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               <button
                 type="button"
                 onClick={handleSend}
-                disabled={!value.trim() && !attachedImages.length && !attachedTextFiles.length}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  height: 28,
-                  padding: "0 14px",
-                  background: (value.trim() || attachedImages.length || attachedTextFiles.length) ? "var(--accent)" : "var(--bg-panel)",
-                  border: "var(--bw) solid var(--border)",
-                  borderRadius: "var(--radius-control)",
-                  fontFamily: "var(--font-display)",
-                  color: (value.trim() || attachedImages.length || attachedTextFiles.length) ? "var(--on-accent)" : "var(--text-dim)",
-                  cursor: (value.trim() || attachedImages.length || attachedTextFiles.length) ? "pointer" : "not-allowed",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  transition: "background var(--dur-fast) var(--ease-out-warm)",
-                }}
+                disabled={!value.trim() && !hasAttachments}
+                className="composer-control composer-control-primary"
               >
                 <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="2" y1="7" x2="11" y2="7" />

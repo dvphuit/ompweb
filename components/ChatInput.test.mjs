@@ -201,8 +201,11 @@ test("renders multiple queued prompts with count and expand action", () => {
     }),
   );
 
-  assert.match(html, /\(3\)/);
-  assert.match(html, />(Show all queued prompts|Show all|chatInput\.expandQueued)</);
+  // Square count badge (never a pill) carries the queued total.
+  assert.match(html, /class="queue-count">3</);
+  // The expand affordance is a real button: short label, full sentence as title.
+  assert.match(html, /title="(Show all queued prompts|chatInput\.expandQueued)"/);
+  assert.match(html, />(Expand|Show all|chatInput\.expandQueued)</);
   assert.match(html, /First task/);
 });
 
