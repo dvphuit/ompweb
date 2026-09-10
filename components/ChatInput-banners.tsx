@@ -23,26 +23,11 @@ export function QueuedActionButton({
       type="button"
       onClick={onClick}
       title={title}
-      style={{
-        flexShrink: 0,
-        padding: "4px 8px", minHeight: 24,
-        border: "none",
-        borderRadius: "var(--radius-control)",
-        background: "transparent",
-        color: accent ? "var(--accent)" : "var(--text-dim)",
-        cursor: "pointer",
-        fontSize: 11,
-        fontWeight: accent ? 600 : 400,
-        transition: "background var(--dur-fast) var(--ease-out-warm), color var(--dur-fast) var(--ease-out-warm)",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = "var(--bg-hover)";
-        if (!accent) e.currentTarget.style.color = "var(--text-muted)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = "transparent";
-        if (!accent) e.currentTarget.style.color = "var(--text-dim)";
-      }}
+      aria-label={title}
+      className="composer-control composer-control-tiny"
+      /* Accent marks the queue action that changes how the message is
+         delivered (STEER); the label keeps AA contrast on the panel. */
+      style={accent ? { borderColor: "var(--accent)" } : undefined}
     >
       {children}
     </button>

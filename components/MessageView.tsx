@@ -12,8 +12,10 @@ import { useCopyFeedback } from "@/hooks/useCopyFeedback";
 import { formatCompactNumber } from "@/lib/format";
 import { getToolDisplay } from "@/lib/tool-display";
 import { TaskResultPanel } from "./MessageView-task-panel";
-import { getResultDiff, PairedDiffResult, PairedResult } from "./MessageView-diff-view";
+import { getResultDiff, PairedDiffResult } from "./MessageView-diff-view";
+import { ToolOutputBlock } from "./MessageView-tool-output";
 import { getToolPreview, formatToolCommand, formatToolOutput, getToolResultMeta } from "./MessageView-tool-format";
+import { isRecord } from "@/lib/type-guards";
 export { TaskResultPanel } from "./MessageView-task-panel";
 import type {
   AgentMessage,
@@ -277,6 +279,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
     >
       <div className="user-message-label" style={{ marginBottom: 4 }}>
         <span className="user-message-label-tag">{t("messageView.you")}</span>
+        <span className="user-message-label-rule" aria-hidden />
       </div>
       <div
         data-context-menu="message"
@@ -287,9 +290,6 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
         style={{
           maxWidth: "100%",
           minWidth: 0,
-          background: "var(--user-bg)",
-          border: "var(--bw) solid var(--border)",
-          borderLeft: "6px solid var(--accent)",
           borderRadius: "var(--radius-card)",
           padding: "10px 14px",
           fontSize: "var(--chat-user-font-size)",
@@ -340,19 +340,8 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
             <button
               onClick={() => copyContent(content)}
               aria-label={t("messageView.copyMessage")}
-              style={{
-                display: "flex", alignItems: "center", gap: 4,
-                padding: "3px 8px", height: 24, minHeight: 24,
-                background: "none", border: "none",
-                borderRadius: "var(--radius-control)",
-                color: copied ? "var(--accent)" : "var(--text-dim)",
-                cursor: "pointer",
-                fontSize: 11, fontWeight: 400,
-                whiteSpace: "nowrap",
-                transition: "color var(--dur-fast) var(--ease-out-warm)",
-              }}
-              onMouseEnter={(e) => { if (!copied) e.currentTarget.style.color = "var(--accent)"; }}
-              onMouseLeave={(e) => { if (!copied) e.currentTarget.style.color = "var(--text-dim)"; }}
+              className="composer-control composer-control-tiny message-action-button"
+              style={copied ? { color: "var(--status-success)", borderColor: "var(--status-success)" } : undefined}
             >
               {copied ? <Check size={11} strokeWidth={1.8} /> : <Copy size={11} strokeWidth={1.8} />}
               {copied ? t("messageView.copied") : t("messageView.copy")}
@@ -375,19 +364,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
                 <button
                   onClick={async () => { if (!(await onNavigate!(prevAssistantEntryId!))) return; onEditContent?.(content); }}
                   aria-label={t("messageView.editFromHereTitle")}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 4,
-                    padding: "3px 8px", height: 24, minHeight: 24,
-                    background: "none", border: "none",
-                    borderRadius: "var(--radius-control)",
-                    color: "var(--text-dim)",
-                    cursor: "pointer",
-                    fontSize: 11, fontWeight: 400,
-                    whiteSpace: "nowrap",
-                    transition: "color var(--dur-fast) var(--ease-out-warm)",
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = "var(--accent)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-dim)"; }}
+                  className="composer-control composer-control-tiny message-action-button"
                 >
                   <CornerUpLeft size={11} strokeWidth={1.8} />
                   {t("messageView.editFromHere")}
@@ -400,19 +377,8 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
                   onClick={() => { onFork!(entryId!); }}
                   disabled={forking}
                   aria-label={forking ? t("messageView.creatingSession") : t("messageView.newSessionTitle")}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 4,
-                    padding: "3px 8px", height: 24, minHeight: 24,
-                    background: "none", border: "none",
-                    borderRadius: "var(--radius-control)",
-                    color: forking ? "var(--accent)" : "var(--text-dim)",
-                    cursor: forking ? "not-allowed" : "pointer",
-                    fontSize: 11, fontWeight: 400,
-                    whiteSpace: "nowrap",
-                    transition: "color var(--dur-fast) var(--ease-out-warm)",
-                  }}
-                  onMouseEnter={(e) => { if (!forking) e.currentTarget.style.color = "var(--accent)"; }}
-                  onMouseLeave={(e) => { if (!forking) e.currentTarget.style.color = "var(--text-dim)"; }}
+                  className="composer-control composer-control-tiny message-action-button"
+                  style={forking ? { color: "var(--accent)", borderColor: "var(--accent)" } : undefined}
                 >
                   <GitFork size={11} strokeWidth={1.8} />
                   {forking ? t("messageView.creating") : t("messageView.newSession")}
@@ -575,14 +541,13 @@ function AssistantMessageView({
 
   return (
     <div
-      className="chat-message"
+      className="chat-message assistant-message-band"
       style={{ marginBottom: 6 }}
     >
-      {/* Model label */}
+      {/* Model label — a mono chip only when the turn is plain prose; tool and
+          thinking rows already carry their own headers. */}
       <div
         style={{
-          fontSize: 11,
-          color: "var(--text-dim)",
           marginBottom: 4,
           display: hasActivityBlocks ? "none" : "flex",
           alignItems: "center",
@@ -590,7 +555,9 @@ function AssistantMessageView({
         }}
       >
         {message.provider && (
-          <span>{modelNames?.[`${message.provider}:${message.model}`] ?? modelNames?.[message.model] ?? message.model}</span>
+          <span className="assistant-model-chip">
+            {modelNames?.[`${message.provider}:${message.model}`] ?? modelNames?.[message.model] ?? message.model}
+          </span>
         )}
         {isStreaming && (() => {
           let chars = 0;
@@ -656,21 +623,10 @@ function AssistantMessageView({
       {errorText && (
         <div style={{ marginTop: blocks.length > 0 ? 8 : 0, display: "flex", justifyContent: "flex-start" }}>
           <div
+            className="assistant-error-frame"
             style={{
-              display: "flex",
-              gap: 8,
               alignItems: "flex-start",
               maxWidth: "85%",
-              padding: "10px 12px",
-              background: "var(--bg-selected)",
-              border: "var(--bw) solid var(--status-error)",
-              borderRadius: "var(--radius-card)",
-
-              fontSize: 14,
-              lineHeight: 1.6,
-              color: "var(--text)",
-              whiteSpace: "pre-wrap",
-              overflowWrap: "anywhere",
             }}
           >
             <svg
@@ -1029,7 +985,16 @@ const ToolCallBlock = memo(function ToolCallBlock({ block, result, duration, isS
   const display = getToolDisplay(block.toolName);
   const ToolIcon = TOOL_ICONS[display.iconName];
   const status: "success" | "error" | "running" = isError ? "error" : result ? "success" : "running";
-  const statusLabel = status === "error" ? "Failed" : status === "success" ? "Completed" : "Running";
+  const statusLabel = status === "error"
+    ? t("messageView.toolStatusError")
+    : status === "success"
+      ? t("messageView.toolStatusSuccess")
+      : t("messageView.toolStatusRunning");
+  // Bash-style tools report their process status under `details.exitCode`;
+  // the rest simply have none, and the meta row hides the field.
+  const resultExitCode = result && isRecord(result.details) && typeof result.details.exitCode === "number"
+    ? result.details.exitCode
+    : null;
 
   return (
     <div className="activity-row" data-activity-operation="true" data-status={status} style={{ ["--tool-color" as unknown as string]: isError ? "var(--status-error)" : `var(${display.varName})` } as React.CSSProperties}>
@@ -1097,7 +1062,14 @@ const ToolCallBlock = memo(function ToolCallBlock({ block, result, duration, isS
                     </div>
                   )}
                   {!(resultIsEmpty && resultImages.length > 0) && (
-                    <PairedResult text={formatToolOutput(resultText ?? "", block.toolName)} isEmpty={resultIsEmpty} isError={isError} />
+                    <ToolOutputBlock
+                      text={formatToolOutput(resultText ?? "", block.toolName)}
+                      toolName={block.toolName}
+                      status={status}
+                      duration={duration}
+                      exitCode={resultExitCode}
+                      isEmpty={resultIsEmpty}
+                    />
                   )}
                 </>
               )

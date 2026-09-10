@@ -232,18 +232,3 @@ function PatchTextView({ text }: { text: string }) {
     </div>
   );
 }
-
-export function PairedResult({ text, isEmpty, isError }: {
-  text: string;
-  isEmpty: boolean;
-  isError: boolean;
-}) {
-  const { t } = useI18n();
-  return (
-    <div className={`tool-call-output${isError ? " tool-call-output-error" : ""}`}>
-      <pre className="tool-call-output-text" data-tool-output="true">
-        {isEmpty ? t("messageView.noOutput") : text}
-      </pre>
-    </div>
-  );
-}
