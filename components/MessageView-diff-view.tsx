@@ -24,7 +24,7 @@ export function PairedDiffResult({ diff }: { diff: ResultDiff }) {
   return (
     <div
       style={{
-        borderTop: "1px solid color-mix(in srgb, var(--status-success) 15%, transparent)",
+        border: "1px solid var(--border)",
         background: "var(--bg)",
       }}
     >

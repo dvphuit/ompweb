@@ -1312,7 +1312,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         {retryInfo && (
           <div style={{
             marginBottom: 8, padding: "5px 10px",
-            background: "color-mix(in srgb, var(--status-warning) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--status-warning) 25%, transparent)",
+            background: "var(--bg)", border: "1px solid var(--status-warning)",
             borderRadius: "var(--radius-control)", fontSize: 12, color: "var(--status-warning)",
             display: "flex", alignItems: "center", gap: 6,
           }}>
@@ -1332,13 +1332,13 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   fontSize: 11,
                   color: "var(--status-warning)",
                   background: "transparent",
-                  border: "1px solid color-mix(in srgb, var(--status-warning) 45%, transparent)",
+                  border: "1px solid var(--status-warning)",
                   borderRadius: "var(--radius-control)",
                   cursor: "pointer",
                   whiteSpace: "nowrap",
                   transition: "background var(--dur-fast) var(--ease-out-warm)",
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "color-mix(in srgb, var(--status-warning) 12%, transparent)"; }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-selected)"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
               >
                 Abort retry
@@ -1349,7 +1349,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         {compactResultText && (
           <div style={{
             marginBottom: 8, padding: "5px 10px",
-            background: "color-mix(in srgb, var(--status-success) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--status-success) 24%, transparent)",
+            background: "var(--bg)", border: "1px solid var(--status-success)",
             borderRadius: "var(--radius-control)", fontSize: 12, color: "var(--status-success)",
             display: "flex", alignItems: "center", gap: 6,
           }}>
@@ -1363,7 +1363,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         {attachError && (
           <div role="alert" style={{
             marginBottom: 8, padding: "5px 10px",
-            background: "color-mix(in srgb, var(--status-error) 7%, transparent)", border: "1px solid color-mix(in srgb, var(--status-error) 30%, transparent)",
+            background: "var(--bg)", border: "1px solid var(--status-error)",
             borderRadius: "var(--radius-control)", fontSize: 12, color: "var(--status-error)",
           }}>
             {attachError}
@@ -1637,7 +1637,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                                 color: dormant ? "var(--text-dim)" : "var(--text)",
                                 cursor: "pointer",
                                 textAlign: "left",
-                                boxShadow: active ? "0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent)" : "none",
+
                               }}
                             >
                               <span style={{
@@ -1978,7 +1978,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             role="status"
             aria-live="polite"
             style={{
-              border: `var(--bw) solid ${bashMode ? "var(--tool-bg)" : "color-mix(in srgb, var(--border) 70%, transparent)"}`,
+              border: `var(--bw) solid ${bashMode ? "var(--tool-bg)" : "var(--border)"}`,
               borderBottom: "none",
               borderRadius: queuedCount > 0 ? 0 : "var(--radius-card) var(--radius-card) 0 0",
               background: "var(--bg-panel)",
@@ -1992,7 +1992,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
           >
             <span
               aria-hidden
-              className="live-status-dot live-pulse inline-block h-2 w-2 shrink-0 rounded-full bg-accent"
+              className="live-status-dot live-pulse inline-block h-2 w-2 shrink-0 rounded-sm bg-accent"
             />
             <span>{statusText}</span>
           </div>
@@ -2003,11 +2003,10 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               display: "flex",
               flexDirection: "column",
               background: "var(--bg)",
-              border: `var(--bw) solid ${bashMode ? "var(--tool-bg)" : "color-mix(in srgb, var(--border) 70%, transparent)"}`,
+              border: `var(--bw) solid ${bashMode ? "var(--tool-bg)" : "var(--border)"}`,
               borderRadius: (queuedCount > 0 || Boolean(statusText)) ? "0 0 var(--radius-card) var(--radius-card)" : "var(--radius-card)",
               padding: "12px 12px 10px 14px",
-              boxShadow: "var(--shadow-card)",
-              transition: "border-color var(--dur-fast) var(--ease-out-warm), background var(--dur-fast) var(--ease-out-warm), box-shadow var(--dur-fast) var(--ease-out-warm)",
+              transition: "border-color var(--dur-fast) var(--ease-out-warm), background var(--dur-fast) var(--ease-out-warm)",
             } as React.CSSProperties}
           >
           <textarea
@@ -2061,7 +2060,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
             gap: 2,
             marginTop: 8,
             paddingTop: 8,
-            borderTop: "1px solid color-mix(in srgb, var(--border) 62%, transparent)",
+            borderTop: "1px solid var(--border)",
             flexWrap: isMobile ? "wrap" : "nowrap",
           }}>
             {/* Attachment */}
@@ -2483,12 +2482,13 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   height: 28,
                   padding: "0 14px",
                   background: "var(--accent-strong)",
-                  border: "none",
-                  borderRadius: "var(--radius-card)",
+                  border: "var(--bw) solid var(--border)",
+                  borderRadius: "var(--radius-control)",
                   color: "var(--on-accent)",
                   cursor: "pointer",
+                  fontFamily: "var(--font-display)",
                   fontSize: 12,
-                  fontWeight: 600,
+                  fontWeight: 700,
                   transition: "background var(--dur-fast) var(--ease-out-warm)",
                 }}
               >
@@ -2505,12 +2505,13 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                   height: 28,
                   padding: "0 14px",
                   background: "var(--accent-strong)",
-                  border: "none",
-                  borderRadius: "var(--radius-card)",
+                  border: "var(--bw) solid var(--border)",
+                  borderRadius: "var(--radius-control)",
                   color: "var(--on-accent)",
                   cursor: "pointer",
+                  fontFamily: "var(--font-display)",
                   fontSize: 12,
-                  fontWeight: 600,
+                  fontWeight: 700,
                   transition: "background var(--dur-fast) var(--ease-out-warm)",
                 }}
               >
