@@ -13,8 +13,25 @@
 
 /** Complete JSON body accepted by POST /api/agent/[id] and /api/agent/new. */
 export const MAX_AGENT_COMMAND_REQUEST_BYTES = 8 * 1024 * 1024;
-/** Decoded bytes of all images in one message (~6.7 MiB once base64-encoded). */
-export const MAX_TOTAL_ATTACHED_IMAGE_BYTES = 5 * 1024 * 1024;
+/**
+ * The omp stdin wire limit: one JSON object per line, 1 MiB max, and omp has
+ * NO inbound chunk reassembler (rpc_chunk is stdout-only). This — not the HTTP
+ * body cap — is the binding ceiling for a prompt carrying base64 images.
+ */
+export const MAX_AGENT_WIRE_FRAME_BYTES = 1024 * 1024;
+/**
+ * Headroom inside the 1 MiB frame reserved for the prompt text, mime types,
+ * per-entry overhead and the JSON envelope. Base64 inflates image bytes 4:3.
+ */
+const WIRE_FRAME_RESERVED_BYTES = 96 * 1024;
+/**
+ * Decoded bytes of all images in one message. Derived from the wire limit:
+ * base64 of this budget plus the reserved headroom stays under 1 MiB. A lone
+ * image may fill the whole budget (~696 KiB decoded ≈ 928 KiB base64).
+ */
+export const MAX_TOTAL_ATTACHED_IMAGE_BYTES = Math.floor(
+  ((MAX_AGENT_WIRE_FRAME_BYTES - WIRE_FRAME_RESERVED_BYTES) / 4) * 3,
+);
 /** Decoded bytes of a single image; a lone image may fill the whole budget. */
 export const MAX_ATTACHED_IMAGE_BYTES = MAX_TOTAL_ATTACHED_IMAGE_BYTES;
 export const MAX_ATTACHED_IMAGES = 10;
@@ -31,6 +48,12 @@ export interface Base64ImageAttachment {
 
 function megabytes(bytes: number): number {
   return bytes / (1024 * 1024);
+}
+
+/** Human-readable size, e.g. "696 KB" / "5 MB" (all budgets are KiB-rounded). */
+export function describeByteSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${Math.round(megabytes(bytes))} MB`;
+  return `${Math.round(bytes / 1024)} KB`;
 }
 
 function isBase64DataChar(code: number): boolean {
@@ -78,12 +101,12 @@ function validateImageBudget(images: readonly unknown[]): string | null {
   for (const image of images) {
     const bytes = getImageByteLengthWithinLimits(image);
     if (bytes === null) {
-      return `Each image must be valid base64 image data of ${megabytes(MAX_ATTACHED_IMAGE_BYTES)}MB or smaller`;
+      return `Each image must be valid base64 image data of ${describeByteSize(MAX_ATTACHED_IMAGE_BYTES)} or smaller (omp accepts at most 1 MB per message including images)`;
     }
     totalBytes += bytes;
   }
   if (totalBytes > MAX_TOTAL_ATTACHED_IMAGE_BYTES) {
-    return `Attached images must total ${megabytes(MAX_TOTAL_ATTACHED_IMAGE_BYTES)}MB or less`;
+    return `Attached images must total ${describeByteSize(MAX_TOTAL_ATTACHED_IMAGE_BYTES)} or less (omp accepts at most 1 MB per message)`;
   }
   return null;
 }
@@ -124,6 +147,12 @@ export function validateOutgoingPrompt(
 ): string | null {
   const imageError = validateImageBudget(images);
   if (imageError) return imageError;
+  // The omp wire limit (1 MiB/frame, no inbound chunking) binds far before the
+  // HTTP body cap; check it first with a specific message. getAgentRequestByteLength
+  // already includes envelope/per-entry overhead, mirroring the server-side guard.
+  if (getAgentRequestByteLength(message, images) > MAX_AGENT_WIRE_FRAME_BYTES) {
+    return `This message is too large to send: omp accepts at most about 1 MB per message including images. Attach fewer or smaller images.`;
+  }
   if (getAgentRequestByteLength(message, images) > MAX_AGENT_COMMAND_REQUEST_BYTES) {
     return `This message is too large to send: keep it under ${megabytes(MAX_AGENT_COMMAND_REQUEST_BYTES)}MB including attachments.`;
   }

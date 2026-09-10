@@ -471,6 +471,7 @@
   "errors.file_not_found": "ファイルが見つかりません",
   "errors.file_path_required": "ファイルパスが必要です",
   "errors.file_too_large_preview": "ファイルが大きすぎてプレビューできません（256KB 超）",
+  "errors.frame_too_large": "このメッセージはエンコード後に omp の 1 メッセージあたり 1 MB の上限を超えます（多くは画像が大きすぎるためです）。画像の数を減らすか、小さい画像を添付してください。",
   "errors.generic": "リクエストに失敗しました",
   "errors.image_too_large": "画像が大きすぎます（10MB 超）",
   "errors.invalid_block_index": "有効なブロックインデックスが必要です",

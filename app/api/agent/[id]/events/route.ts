@@ -88,6 +88,19 @@ export async function GET(
       // Heartbeat every 30s to prevent server/proxy timeout (Next.js default ~120-150s)
       heartbeatTimer = setInterval(() => {
         if (closed) return;
+        // The wrapper this stream subscribed to can disappear underneath us:
+        // idle reaping, an unresponsive-child recycle (ack/get_state timeout),
+        // or --advisor replacement all destroy it while the registry may
+        // already hold a DIFFERENT wrapper for the same id. Heartbeats would
+        // otherwise keep this stream — and the browser's EventSource, which
+        // sees an open connection and never errors — alive forever, attached
+        // to a dead object. Close so the client can reconnect (and, per the
+        // observer-only contract, 409 until a command respawns a wrapper).
+        const current = getRpcSession(id);
+        if (current !== session || !session.isAlive()) {
+          cleanup();
+          return;
+        }
         if (!flushPendingUpdate()) return;
         try {
           controller.enqueue(encoder.encode(":\n\n"));
