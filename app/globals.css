@@ -1408,7 +1408,7 @@ pre, code {
   animation: none;
 }
 .chat-input-shell {
-  transition: border-color var(--dur-med) var(--ease-out-warm), box-shadow var(--dur-med) var(--ease-out-warm), transform var(--dur-med) var(--ease-out-warm);
+  transition: border-color var(--dur-med) var(--ease-out-warm), transform var(--dur-med) var(--ease-out-warm);
 }
 .chat-input-shell:focus-within {
   transform: none;
@@ -1550,8 +1550,7 @@ span.token.table {
 
 /* Chat input shell: warm focus glow when the textarea inside receives focus. */
 .chat-input-shell:focus-within {
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent) !important;
-  box-shadow: var(--shadow-card), 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent) !important;
+  border-color: var(--accent-3) !important;
 }
 
 /* Fade + scale/slide entrance utilities for dropdowns, popovers, panels. */
@@ -1908,7 +1907,8 @@ html.dark .dropdown-surface :is(select, option) {
 .live-status-dot {
   position: relative;
   isolation: isolate;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
+  border-radius: 2px;
+  box-shadow: none;
 }
 
 /* Live status pulse: the accent ring breathes outward while the dot itself
@@ -1926,7 +1926,7 @@ html.dark .dropdown-surface :is(select, option) {
   content: "";
   position: absolute;
   inset: 0;
-  border-radius: 9999px;
+  border-radius: 2px;
   border: 1.5px solid color-mix(in srgb, var(--accent) 55%, transparent);
   animation: live-dot-pulse 1.5s var(--ease-out-warm) infinite;
   pointer-events: none;

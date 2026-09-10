@@ -311,7 +311,7 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
                   key={i}
                   src={src}
                   alt=""
-                  style={{ maxWidth: 240, maxHeight: 240, borderRadius: "var(--radius-control)", objectFit: "contain", display: "block", border: "1px solid color-mix(in srgb, var(--accent) 18%, transparent)" }}
+                  style={{ maxWidth: 240, maxHeight: 240, borderRadius: "var(--radius-control)", objectFit: "contain", display: "block", border: "var(--bw) solid var(--border)" }}
                 />
               );
             })}
@@ -662,10 +662,10 @@ function AssistantMessageView({
               alignItems: "flex-start",
               maxWidth: "85%",
               padding: "10px 12px",
-              background: "color-mix(in srgb, var(--status-error) 8%, var(--bg-panel))",
-              border: "1px solid color-mix(in srgb, var(--status-error) 22%, transparent)",
+              background: "var(--bg-selected)",
+              border: "var(--bw) solid var(--status-error)",
               borderRadius: "var(--radius-card)",
-              boxShadow: "var(--shadow-card)",
+
               fontSize: 14,
               lineHeight: 1.6,
               color: "var(--text)",
@@ -1091,7 +1091,7 @@ const ToolCallBlock = memo(function ToolCallBlock({ block, result, duration, isS
                           key={i}
                           src={imageBlockSrc(img)}
                           alt=""
-                          style={{ maxWidth: 240, maxHeight: 240, borderRadius: "var(--radius-control)", objectFit: "contain", display: "block", border: "1px solid color-mix(in srgb, var(--accent) 18%, transparent)" }}
+                          style={{ maxWidth: 240, maxHeight: 240, borderRadius: "var(--radius-control)", objectFit: "contain", display: "block", border: "var(--bw) solid var(--border)" }}
                         />
                       ))}
                     </div>
@@ -1258,9 +1258,9 @@ function HiddenExtensionView({ message, cwd, onOpenFile }: { message: CustomMess
               gap: 6,
               maxWidth: "78%",
               padding: "4px 10px",
-              border: "1px dashed color-mix(in srgb, var(--border) 88%, transparent)",
-              borderRadius: 999,
-              background: "color-mix(in srgb, var(--bg-subtle) 92%, var(--bg))",
+              border: "1px dashed var(--border)",
+              borderRadius: 2,
+              background: "var(--bg-subtle)",
               color: "var(--text-dim)",
               cursor: "pointer",
               fontSize: 11,
