@@ -2845,6 +2845,22 @@ html.dark .dropdown-surface :is(select, option) {
   transform: none !important;
   box-shadow: none !important;
 }
+.user-message-label-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border: var(--bw) solid var(--border);
+  border-radius: 2px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font: 700 10px var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.user-message-card {
+  max-width: 100%;
+}
 .process-details-toggle {
   border: var(--bw) solid var(--border);
   border-radius: var(--radius-control);

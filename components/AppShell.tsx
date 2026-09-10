@@ -1738,7 +1738,7 @@ export function AppShell() {
             }}
           >
             {/* Provider limits pill */}
-            {showChat && providerUsageVisible && (providerUsage || providerUsageLoading || providerUsageError) && (
+            {showChat && providerUsageVisible && currentProviderUsageText && (
               <button
                 ref={usageBtnRef}
                 type="button"

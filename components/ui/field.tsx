@@ -60,17 +60,19 @@ export function Field({ label, hint, error, required, children, style, id }: Fie
       <label
         htmlFor={fieldId}
         style={{
-          fontSize: 11,
-          fontWeight: 500,
-          color: error ? "var(--accent)" : "var(--text-muted)",
-          letterSpacing: "0.01em",
+          fontFamily: "var(--font-display)",
+          fontSize: 10.5,
+          fontWeight: 700,
+          textTransform: "uppercase",
+          color: error ? "var(--status-error)" : "var(--text-muted)",
+          letterSpacing: "0.1em",
           display: "flex",
           alignItems: "center",
           gap: 4,
         }}
       >
         {label}
-        {required && <span style={{ color: "var(--accent)" }}>*</span>}
+        {required && <span style={{ color: "var(--accent-2)" }}>*</span>}
       </label>
       {enhancedChildren}
       {error ? (
@@ -199,20 +201,33 @@ export function FieldGroup({
         background: "var(--bg-panel)",
         border: "var(--bw) solid var(--border)",
         borderRadius: "var(--radius-card)",
-        boxShadow: "var(--shadow-card)",
         minWidth: 0,
         ...style,
       }}
     >
       <div
         style={{
-          fontSize: 11,
-          fontWeight: 600,
-          color: "var(--text-muted)",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          fontFamily: "var(--font-display)",
+          fontSize: 12,
+          fontWeight: 700,
+          color: "var(--text)",
           textTransform: "uppercase",
           letterSpacing: "0.06em",
         }}
       >
+        <span
+          aria-hidden="true"
+          style={{
+            width: 8,
+            height: 8,
+            flexShrink: 0,
+            background: "var(--accent)",
+            border: "var(--bw) solid var(--border)",
+          }}
+        />
         {label}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>{children}</div>
@@ -230,25 +245,24 @@ function inputShellStyle({ invalid }: InputShellStyleOptions): CSSProperties {
   return {
     padding: "6px 9px",
     background: "var(--bg)",
-    borderWidth: "1px",
+    borderWidth: "var(--bw)",
     borderStyle: "solid",
-    borderColor: invalid ? "var(--accent)" : "var(--border)",
+    borderColor: invalid ? "var(--status-error)" : "var(--border)",
     borderRadius: "var(--radius-control)",
     color: "var(--text)",
     fontSize: 12,
     outline: "none",
     width: "100%",
     boxSizing: "border-box",
-    transition: "border-color var(--dur-fast) var(--ease-out-warm), box-shadow var(--dur-fast) var(--ease-out-warm)",
+    transition: "border-color var(--dur-fast) var(--ease-out-warm)",
   };
 }
 
-/** Internal: applied border + box-shadow on focus. */
-function focusGlowStyle(focused: boolean, invalid: boolean): CSSProperties {
+/** Internal: focus state only swaps the border color (flat, no focus ring). */
+function focusGlowStyle(focused: boolean): CSSProperties {
   if (!focused) return {};
   return {
-    borderColor: invalid ? "var(--accent)" : "var(--accent)",
-    boxShadow: "var(--focus-ring)",
+    borderColor: "var(--accent-3)",
   };
 }
 
@@ -303,7 +317,7 @@ export function TextInput({
       }}
       style={{
         ...inputShellStyle({ invalid: isInvalid }),
-        ...focusGlowStyle(focused, isInvalid),
+        ...focusGlowStyle(focused),
         fontFamily: mono ? "var(--font-mono)" : "inherit",
         opacity: disabled ? 0.6 : 1,
       }}
@@ -352,7 +366,7 @@ export function NumInput({
       }}
       style={{
         ...inputShellStyle({ invalid: isInvalid }),
-        ...focusGlowStyle(focused, isInvalid),
+        ...focusGlowStyle(focused),
         opacity: disabled ? 0.6 : 1,
       }}
     />
@@ -413,7 +427,7 @@ export function SecretInput({
         }}
         style={{
           ...inputShellStyle({ invalid: isInvalid }),
-          ...focusGlowStyle(focused, isInvalid),
+          ...focusGlowStyle(focused),
           paddingRight: 34,
           fontFamily: "var(--font-mono)",
           opacity: disabled ? 0.6 : 1,
@@ -487,7 +501,7 @@ export function Select({
       onBlur={() => setFocused(false)}
       style={{
         ...inputShellStyle({ invalid: isInvalid }),
-        ...focusGlowStyle(focused, isInvalid),
+        ...focusGlowStyle(focused),
         color: value ? "var(--text)" : "var(--text-dim)",
         appearance: "none",
         width: "100%",
