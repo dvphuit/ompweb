@@ -471,6 +471,7 @@
   "errors.file_not_found": "File not found",
   "errors.file_path_required": "A file path is required",
   "errors.file_too_large_preview": "File too large for preview (over 256KB)",
+  "errors.frame_too_large": "This message exceeds omp's 1 MB per-message limit once encoded (usually from large images). Send fewer or smaller images.",
   "errors.generic": "Request failed",
   "errors.image_too_large": "Image too large (over 10MB)",
   "errors.invalid_block_index": "A valid block index is required",

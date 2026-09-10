@@ -3,6 +3,7 @@ import { homedir } from "os";
 import { validateAgentImages } from "./image-attachments";
 import { invalidateModelsCache } from "./models-cache";
 import { RpcCommandError, RpcCommandTimeoutError, RpcProcess, type RpcFrame } from "./omp/rpc-process";
+import { MAX_RPC_FRAME_BYTES } from "./omp/rpc-frame";
 import { readNativeSettings } from "./omp/settings-config";
 import { cacheSessionPath, invalidateSessionListCache } from "./session-reader";
 import { PRESET_FULL } from "./tool-presets";
@@ -351,15 +352,30 @@ export class AgentSessionWrapper {
     // A restart disposes the old child on purpose — not a crash.
     if (!this._alive || this.restarting) return;
     const detail = stderrTail.trim().split("\n").pop() ?? "";
-    this.emit({
-      type: "notice",
-      level: "error",
-      message: `The omp process for this session exited unexpectedly${detail ? `: ${detail}` : "."}`,
-    });
+    this.emitTerminalRun(
+      `The omp process for this session exited unexpectedly${detail ? `: ${detail}` : "."}`,
+    );
+    this.destroy();
+  }
+
+  /**
+   * Emit the same notice + terminal agent_end a crash exit produces, before
+   * deliberately recycling a wedged child (ack/get-state timeout). Without
+   * this, SSE clients OTHER than the one whose request timed out — e.g. a
+   * second browser tab — keep spinning until their next reconcile poll, and
+   * their stream then dangles on a destroyed wrapper.
+   */
+  private emitTerminalRun(message: string): void {
+    this.emit({ type: "notice", level: "error", message });
     // Terminal agent_end so a client mid-stream stops spinning immediately
     // instead of waiting for the reconcile poll.
     if (this.streaming || this.promptRunning) this.emit({ type: "agent_end", isTerminal: true, messages: [] });
-    this.destroy();
+    this.streaming = false;
+    this.promptRunning = false;
+    this.awaitingAgentStart = false;
+    this.awaitingAgentStartDeadline = 0;
+    this.continuationGraceUntil = 0;
+    notifyRunningChange();
   }
 
   private handleFrame(frame: RpcFrame): void {
@@ -973,6 +989,28 @@ export class AgentSessionWrapper {
     notifyRunningChange();
   }
 
+  /**
+   * Fail fast if a command's on-wire frame (one JSONL line + the correlation
+   * id omp's client adds) would exceed the 1 MiB physical frame limit. omp
+   * cannot reassemble inbound chunks, so such a frame could never be parsed;
+   * previously it was written anyway and the caller hung until the ack
+   * timeout, which then destroyed the session. This is a 400-class user
+   * error (typically too many/large base64 images), not a session failure.
+   */
+  private assertOutboundFrameFits(command: Record<string, unknown>): void {
+    // The process layer prepends a short correlation id ("w" + counter); the
+    // fixed placeholder comfortably overestimates that overhead.
+    const probe = { ...command, id: "w0000000000" };
+    const frameBytes = Buffer.byteLength(JSON.stringify(probe), "utf8") + 1; // + newline
+    if (frameBytes > MAX_RPC_FRAME_BYTES) {
+      const mib = (bytes: number) => `${Math.round((bytes / (1024 * 1024)) * 10) / 10} MB`;
+      throw new WebRpcError(
+        `This message is about ${mib(frameBytes)} once encoded, which exceeds the ${mib(MAX_RPC_FRAME_BYTES)} per-message limit of the agent transport. Send fewer or smaller images and try again.`,
+        "frame_too_large",
+      );
+    }
+  }
+
   async send(command: Record<string, unknown>): Promise<unknown> {
     if (this.restarting) throw new WebRpcError(RESTARTING_MESSAGE, "session_restarting");
     if (!this.isAlive()) throw new Error("Session is no longer running");
@@ -986,6 +1024,13 @@ export class AgentSessionWrapper {
 
     const unsupported = UNSUPPORTED_COMMANDS[type];
     if (unsupported) throw new RpcCommandError(type, unsupported, "unsupported");
+
+    // omp parses stdin as exactly one JSON object per line and has NO inbound
+    // chunk reassembler, so any command whose wire frame exceeds 1 MiB can
+    // never be delivered. Reject up front (a user-input error: too many/large
+    // images) instead of writing an undeliverable frame and waiting 30s for
+    // the ack timeout, which used to recycle the whole session.
+    this.assertOutboundFrameFits(command);
 
     switch (type) {
       case "prompt": {
@@ -1025,18 +1070,20 @@ export class AgentSessionWrapper {
             this.awaitingAgentStartDeadline = Date.now() + AWAITING_AGENT_START_TIMEOUT_MS;
           }
         } catch (error) {
-          this.promptRunning = false;
-          this.awaitingAgentStart = false;
-          this.awaitingAgentStartDeadline = 0;
-          notifyRunningChange();
           if (error instanceof RpcCommandTimeoutError) {
             // The child took the frame but never acked it, so nothing will ever
             // report this run: recycle it exactly like the get_state timeout
             // path so the next request spawns a fresh child instead of talking
-            // to a wedged one.
+            // to a wedged one. emitTerminalRun runs BEFORE the flag resets
+            // below so attached SSE clients still get the terminal agent_end.
+            this.emitTerminalRun("The OMP session stopped responding and was reset.");
             await this.destroyAndWait();
             throw new WebRpcError("The OMP session stopped responding and was reset.", "session_unresponsive");
           }
+          this.promptRunning = false;
+          this.awaitingAgentStart = false;
+          this.awaitingAgentStartDeadline = 0;
+          notifyRunningChange();
           throw error;
         } finally {
           if (!streamingBehavior) {
@@ -1079,6 +1126,7 @@ export class AgentSessionWrapper {
           return this.buildWebState(state);
         } catch (error) {
           if (error instanceof RpcCommandTimeoutError) {
+            this.emitTerminalRun("The OMP session stopped responding and was reset.");
             await this.destroyAndWait();
             throw new WebRpcError("The OMP session stopped responding and was reset.", "session_unresponsive");
           }

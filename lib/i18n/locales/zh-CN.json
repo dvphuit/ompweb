@@ -471,6 +471,7 @@
   "errors.file_not_found": "未找到文件",
   "errors.file_path_required": "需要提供文件路径",
   "errors.file_too_large_preview": "文件过大，无法预览（超过 256KB）",
+  "errors.frame_too_large": "该消息编码后超过了 omp 每条消息 1 MB 的限制（通常是因为图片过大）。请减少图片数量或发送更小的图片。",
   "errors.generic": "请求失败",
   "errors.image_too_large": "图片过大（超过 10MB）",
   "errors.invalid_block_index": "需要提供有效的块索引",

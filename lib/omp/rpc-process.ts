@@ -9,8 +9,12 @@ import { encodeRpcFrames, RpcFrameDecoder, type RpcFrameRecord, type RpcProtocol
  * Protocol v1: commands `{id, type, ...}` on stdin; `{type:"response", id, ...}`
  * plus interleaved event frames on stdout. omp announces readiness with a
  * `{type:"ready"}` frame before accepting commands. When readiness advertises
- * protocol v2, callers negotiate it before sending normal commands; oversized
- * logical frames are then carried as bounded `rpc_chunk` sequences.
+ * protocol v2, callers negotiate it before sending normal commands; v2 then
+ * allows omp to split OUTBOUND-FROM-OMP event frames (stdout) into bounded
+ * `rpc_chunk` sequences, which RpcFrameDecoder reassembles. Frames WE write to
+ * stdin are never chunked: omp parses stdin one JSON object per line and has
+ * no reassembler. Oversized commands fail synchronously with
+ * RpcFrameTooLargeError instead of hanging until the ack timeout.
  */
 
 export interface RpcResponseFrame {
@@ -86,7 +90,7 @@ export class RpcProcess {
   private exited = false;
   private exitInfo: { code: number | null; signal: NodeJS.Signals | null } | null = null;
   private protocolVersion: RpcProtocolVersion = 1;
-  private nextChunkId = 1;
+
   private readonly spawnProcess: typeof spawn;
   // Serializes physical stdin writes: a v2 logical frame can span multiple
   // `rpc_chunk` records (>1 MiB payloads), and two frames written concurrently
@@ -293,15 +297,17 @@ export class RpcProcess {
   }
 
   private writeFrame(frame: RpcFrame, callback: (error?: Error | null) => void): void {
-    let lines: string[];
+    let line: string;
     try {
-      lines = encodeRpcFrames(frame, this.protocolVersion, `web-${this.nextChunkId++}`);
+      // Outbound framing is a single JSONL object per command (omp stdin has
+      // no chunk reassembler). Oversized frames throw here, before any bytes
+      // are written, so the command fails fast instead of hanging.
+      line = encodeRpcFrames(frame)[0];
     } catch (error) {
       callback(error instanceof Error ? error : new Error(String(error)));
       return;
     }
-    // Enqueue the entire encoded logical frame; the next frame's physical
-    // records only start after this frame's last write callback completes.
+    // Serialize writes so backpressure on one frame delays the next.
     this.writeQueue = this.writeQueue.then(
       () => new Promise<void>((resolve) => {
         if (this.exited || this.child.stdin.destroyed) {
@@ -309,16 +315,10 @@ export class RpcProcess {
           resolve();
           return;
         }
-        let index = 0;
-        const writeNext = (error?: Error | null) => {
-          if (error || index === lines.length) {
-            callback(error ?? null);
-            resolve();
-            return;
-          }
-          this.child.stdin.write(lines[index++], writeNext);
-        };
-        writeNext();
+        this.child.stdin.write(line, (error) => {
+          callback(error ?? null);
+          resolve();
+        });
       }),
     );
   }

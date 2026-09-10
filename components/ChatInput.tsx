@@ -43,6 +43,7 @@ import {
   MAX_ATTACHED_TEXT_FILES,
 } from "@/lib/chat-attachments";
 import {
+  describeByteSize,
   MAX_ATTACHED_IMAGE_BYTES,
   MAX_ATTACHED_IMAGES,
   validateOutgoingPrompt,
@@ -336,7 +337,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
         setAttachError(
           remaining === 0
             ? `Maximum of ${MAX_ATTACHED_IMAGES} attached images reached.`
-            : `${files.length} image(s) skipped: images up to ${Math.round(MAX_ATTACHED_IMAGE_BYTES / 1024 / 1024)} MB are supported.`,
+            : `${files.length} image(s) skipped: images up to ${describeByteSize(MAX_ATTACHED_IMAGE_BYTES)} are supported (1 MB per message limit).`,
         );
       }
       return;
