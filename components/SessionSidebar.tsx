@@ -18,14 +18,15 @@ import {
   EMPTY_PROJECT_SET,
   INITIAL_RESTORE_MAX_ATTEMPTS,
   INITIAL_RESTORE_RETRY_MS,
-  MAX_PROJECT_SESSIONS,
   buildSessionTree,
   displayCwd,
   loadExpandedProjects,
+  loadPinnedSessionIds,
   loadUnreadSessionIds,
   normalizeProjectKey,
   projectLabel,
   saveExpandedProjects,
+  savePinnedSessionIds,
   saveUnreadSessionIds,
   type WorktreeEntry,
   type WorktreeState,
@@ -115,6 +116,7 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
   const [runningSessionCwds, setRunningSessionCwds] = useState<Record<string, string>>({});
   const knownRunningCwdsRef = useRef<Map<string, string>>(new Map());
   const [unreadSessionIds, setUnreadSessionIds] = useState<Set<string>>(() => loadUnreadSessionIds());
+  const [pinnedSessionIds, setPinnedSessionIds] = useState<Set<string>>(() => loadPinnedSessionIds());
   const previousRunningSessionIdsRef = useRef<Set<string>>(new Set());
   // Relative session times must age while the sidebar stays open; one shared
   // minute clock avoids a timer per session row.
@@ -170,6 +172,12 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
       // Drop unread markers for sessions that no longer exist (e.g. deleted).
       const existingIds = new Set(data.sessions.map((s) => s.id));
       setUnreadSessionIds((prev) => {
+        if (prev.size === 0) return prev;
+        const next = new Set([...prev].filter((id) => existingIds.has(id)));
+        return next.size === prev.size ? prev : next;
+      });
+      // Same pruning for pins so deleted sessions never haunt the storage.
+      setPinnedSessionIds((prev) => {
         if (prev.size === 0) return prev;
         const next = new Set([...prev].filter((id) => existingIds.has(id)));
         return next.size === prev.size ? prev : next;
@@ -234,6 +242,19 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
   useEffect(() => {
     saveUnreadSessionIds(unreadSessionIds);
   }, [unreadSessionIds]);
+
+  useEffect(() => {
+    savePinnedSessionIds(pinnedSessionIds);
+  }, [pinnedSessionIds]);
+
+  const handleTogglePin = useCallback((sessionId: string) => {
+    setPinnedSessionIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(sessionId)) next.delete(sessionId);
+      else next.add(sessionId);
+      return next;
+    });
+  }, []);
 
   // Debounce refresh bursts (agent_start + session_info_update + file-appear signal can fire within 250ms)
   const pendingRefreshRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1330,8 +1351,15 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
           }}
         >
           {loading && (
-            <div style={{ padding: "10px 4px", color: "var(--text-muted)", fontSize: 12 }}>
-              {t("sessionSidebar.loading")}
+            <div role="status" aria-label={t("sessionSidebar.loading")} style={{ padding: "6px 2px", display: "flex", flexDirection: "column", gap: 10 }}>
+              {[0, 1].map((group) => (
+                <div key={group} aria-hidden="true">
+                  <div className="skeleton" style={{ height: 14, width: "45%", margin: "2px 0 8px 2px" }} />
+                  {[0, 1, 2].map((row) => (
+                    <div key={row} className="skeleton" style={{ height: 22, width: `${88 - row * 9}%`, margin: "0 0 5px 22px" }} />
+                  ))}
+                </div>
+              ))}
             </div>
           )}
           {projectsError && (
@@ -1372,10 +1400,12 @@ export const SessionSidebar = memo(function SessionSidebar({ selectedSessionId, 
                 activity={projectActivity.get(comparableProjectPath(project.path))}
                 tree={tree}
                 isExpanded={expandedProjectKeys.has(comparableProjectPath(project.path))}
-                hiddenCount={filtersActive ? 0 : Math.max(0, tree.length - MAX_PROJECT_SESSIONS)}
+                filtersActive={filtersActive}
                 selectedSessionId={selectedSessionId}
                 runningSessionIds={runningSessionIds}
                 unreadSessionIds={unreadSessionIds}
+                pinnedSessionIds={pinnedSessionIds}
+                onTogglePin={handleTogglePin}
                 relativeTimeNow={relativeTimeNow}
                 onNewSession={handleNewSessionForProject}
                 onToggleExpand={toggleProjectExpanded}

@@ -64,7 +64,7 @@ test("keeps the model selector visible when a model error leaves no options", ()
   );
 
   assert.match(html, />(No models|chatInput\.noModels)</);
-  assert.match(html, /title="(No available models|chatInput\.noAvailableModels)"/);
+  assert.match(html, /title="Model setup: (No models|chatInput\\.noModels)"/);
 });
 
 
@@ -288,7 +288,7 @@ test("model picker dropdown source uses scale-immune anchored positioning", asyn
   assert.match(source, /bottom:\s*isMobile\s*\?\s*8\s*:\s*["']calc\(100%\s*\+\s*6px\)["']/);
 });
 
-test("renders the tool preset picker trigger when a handler is provided", () => {
+test("renders the unified model setup trigger when a picker handler is provided", () => {
   const html = renderToStaticMarkup(
     React.createElement(ChatInput, {
       onSend() {},
@@ -299,11 +299,11 @@ test("renders the tool preset picker trigger when a handler is provided", () => 
     }),
   );
 
-  assert.match(html, /aria-label="Change tool preset: full"/);
-  assert.match(html, /aria-haspopup="menu"/);
+  assert.match(html, /aria-label="Model setup: full"/);
+  assert.match(html, /aria-haspopup="dialog"/);
 });
 
-test("tool preset picker is absent without a change handler", () => {
+test("model setup trigger is absent without any picker handler", () => {
   const html = renderToStaticMarkup(
     React.createElement(ChatInput, {
       onSend() {},
@@ -312,7 +312,7 @@ test("tool preset picker is absent without a change handler", () => {
     }),
   );
 
-  assert.doesNotMatch(html, /Change tool preset/);
+  assert.doesNotMatch(html, /Model setup/);
 });
 
 test("renders live status bar attached to the composer top edge when statusText is provided", () => {

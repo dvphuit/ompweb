@@ -1482,7 +1482,7 @@ pre, code {
   content: "";
   position: absolute;
   inset: -1px;
-  border: 1px solid color-mix(in srgb, var(--accent) 48%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 48%, transparent);
   border-radius: 50%;
   animation: sidebar-activity-ring 2.2s var(--ease-out-warm) infinite;
   pointer-events: none;
