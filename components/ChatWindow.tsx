@@ -1218,10 +1218,9 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
             <NoticeShelf notices={notices} onDismiss={dismissNotice} floating align="right" />
           </div>
         </div>
-        {/* Hide the Firefox scrollbar on desktop only: ChatMinimap provides the
-            position indicator there, but on mobile there is no minimap and
-            users need the scrollbar (Chrome's overlay scrollbar still shows). */}
-        <div ref={scrollContainerRef} className={`flex-1 overflow-y-auto pt-6` + (isMobile ? "" : " [scrollbar-width:none]")}>
+        {/* Desktop uses ChatMinimap as scroll affordance; hide native scrollbar
+            on fine-pointer devices only, keep it on mobile where no minimap. */}
+        <div ref={scrollContainerRef} className={`flex-1 overflow-y-auto pt-6 scrollbar-gutter-stable` + (isMobile ? "" : " chat-scroll-desktop")}>
           <div style={{ padding: `0 ${CHAT_COLUMN_PADDING}px` }}>
             <div style={{ maxWidth: isMobile ? CHAT_COLUMN_MAX_WIDTH : CHAT_COLUMN_MAX_WIDTH_DESKTOP, margin: "0 auto" }}>
               <ExtensionStatusBar statuses={extensionStatuses} />
