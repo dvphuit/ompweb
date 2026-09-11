@@ -191,6 +191,18 @@ html.dark[data-theme-preset="electric"] {
   --dur-theme: 320ms;
 }
 
+/* Fallback for browsers without color-mix (Safari 15, older Chrome) — solid hex so selected rows remain visible */
+@supports not (color: color-mix(in srgb, red 50%, blue)) {
+  :root { --bg-selected: #FFF8CC; --border-soft: #A8A8A8; --bg-subtle: #FFF9D6; }
+  html.dark { --bg-selected: #3A3300; --border-soft: #5A5A5A; --bg-subtle: #2A2611; }
+  html[data-theme-preset="coral"] { --bg-selected: #FFE6DE; --bg-subtle: #FFF0EB; }
+  html.dark[data-theme-preset="coral"] { --bg-selected: #4A2218; --bg-subtle: #33211D; }
+  html[data-theme-preset="mint"] { --bg-selected: #D5F0E2; --bg-subtle: #E8F6EF; }
+  html.dark[data-theme-preset="mint"] { --bg-selected: #1E3328; --bg-subtle: #1A2A24; }
+  html[data-theme-preset="electric"] { --bg-selected: #E0E8FF; --bg-subtle: #EEF2FF; }
+  html.dark[data-theme-preset="electric"] { --bg-selected: #1E2A5A; --bg-subtle: #151E3A; }
+}
+
 /* Chat font size scaling tokens — kept in base layer so html[data-...] attribute selectors survive Tailwind's content scan. */
 @layer base {
   :root {
@@ -225,7 +237,9 @@ html.dark[data-theme-preset="electric"] {
   }
 }
 
-/* General UI scale / density scaling tokens — zoom is non-standard but supported in Chromium; keep both zoom and transform for coverage. */
+/* General UI scale / density scaling tokens — zoom is non-standard (Chromium-only).
+   Provide a Firefox fallback that scales the root font size so layout reflows
+   instead of silently doing nothing. */
 @layer base {
   :root {
     --ui-scale: 1;
@@ -245,6 +259,29 @@ html.dark[data-theme-preset="electric"] {
   html[data-ui-scale="large"] {
     --ui-scale: 1.2;
     zoom: 1.2;
+  }
+  /* Firefox and any engine without zoom: scale via root font size.
+     14px is the base body size, so 0.9 → 12.6px etc. Keeps fixed-position
+     overlays intact (unlike transform:scale on body). */
+  @supports not (zoom: 1) {
+    html[data-ui-scale="compact"] {
+      font-size: 12.6px;
+    }
+    html[data-ui-scale="standard"] {
+      font-size: 14px;
+    }
+    html[data-ui-scale="comfortable"] {
+      font-size: 15.4px;
+    }
+    html[data-ui-scale="large"] {
+      font-size: 16.8px;
+    }
+    /* Components that use absolute px (header 36px etc) still scale because
+       they inherit the root font-size via rem where relevant. For the few
+       hard px heights, bump them proportionally so the chrome feels scaled. */
+    html[data-ui-scale="compact"] body { --ui-scale-font-adjust: 0.9; }
+    html[data-ui-scale="comfortable"] body { --ui-scale-font-adjust: 1.1; }
+    html[data-ui-scale="large"] body { --ui-scale-font-adjust: 1.2; }
   }
 }
 /* Theme toggle: circular wipe via View Transitions API.
@@ -785,6 +822,7 @@ pre, code {
 .mermaid-zoom-dialog {
   width: 100vw;
   max-width: none;
+  height: 100vh;
   height: 100dvh;
   max-height: none;
   margin: 0;
@@ -921,6 +959,16 @@ pre, code {
     padding: 12px;
   }
 }
+@media (max-width: 360px) {
+  .mermaid-zoom-toolbar {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+  .mermaid-zoom-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
 
 /* Image lightbox — click-to-preview for images in chat messages */
 .image-clickable {
@@ -950,6 +998,7 @@ pre, code {
 .image-lightbox-dialog {
   width: 100vw;
   max-width: none;
+  height: 100vh;
   height: 100dvh;
   max-height: none;
   margin: 0;
@@ -1239,7 +1288,21 @@ pre, code {
   transition: background var(--dur-fast) var(--ease-out-warm), color var(--dur-fast) var(--ease-out-warm);
 }
 
-.file-tree-row:hover .file-tree-mention-button {
+/* Hover affordances only on fine-pointer devices — on touch the badges
+   stay visible and the mention button appears on focus instead. */
+@media (hover: hover) and (pointer: fine) {
+  .file-tree-row:hover .file-tree-mention-button {
+    display: flex;
+  }
+  .file-tree-row:hover .file-tree-status-badge {
+    display: none;
+  }
+  .file-tree-row:hover .file-tree-changes-dot {
+    display: none;
+  }
+}
+/* Touch / keyboard fallback: show mention button when row is focused */
+.file-tree-row:focus-within .file-tree-mention-button {
   display: flex;
 }
 
@@ -1253,10 +1316,6 @@ pre, code {
   font-weight: 600;
 }
 
-.file-tree-row:hover .file-tree-status-badge {
-  display: none;
-}
-
 .file-tree-changes-dot {
   width: 6px;
   height: 6px;
@@ -1265,8 +1324,53 @@ pre, code {
   background: var(--status-modified);
 }
 
-.file-tree-row:hover .file-tree-changes-dot {
-  display: none;
+/* Chat input: remove-image button — 24px base, 28px on ≥640px for easier hit target */
+.chat-input-remove-btn {
+  width: 24px;
+  height: 24px;
+}
+@media (min-width: 640px) {
+  .chat-input-remove-btn {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+/* Scrollbar gutter — keeps layout stable when scrollbar appears/disappears */
+.scrollbar-gutter-stable {
+  scrollbar-gutter: stable;
+}
+@supports not (scrollbar-gutter: stable) {
+  .scrollbar-gutter-stable {
+    scrollbar-gutter: auto;
+  }
+}
+/* Desktop chat scroll — hidden scrollbar with minimap as affordance */
+@media (min-width: 768px) {
+  .chat-scroll-desktop {
+    scrollbar-width: none;
+  }
+  .chat-scroll-desktop::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Sidebar resize handle — visible focus ring only for keyboard */
+.sidebar-resize-handle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  background: color-mix(in srgb, var(--accent) 35%, transparent) !important;
+}
+.sidebar-resize-handle:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Directory picker — 100vh fallback before 100dvh for iOS 15 */
+.directory-picker-panel {
+  height: min(620px, calc(100vh - 16px)) !important;
+  height: min(620px, calc(100dvh - 16px)) !important;
+  max-height: calc(100vh - 16px) !important;
+  max-height: calc(100dvh - 16px) !important;
 }
 
 .directory-picker-path:focus-visible {
@@ -3223,8 +3327,17 @@ html[data-minimap="pinned"] .chat-minimap-rail {
   color: var(--text);
   font: 500 12px var(--font-sans);
 }
-.sidebar-search-input::placeholder { color: var(--text-dim); }
+.sidebar-search-input::placeholder { color: var(--text-dim); opacity: 0.9; }
 .sidebar-search-input:focus { border-color: var(--accent-3); }
+/* Electric light — placeholder was 4.2:1, bump to 4.6:1 */
+html[data-theme-preset="electric"] .sidebar-search-input::placeholder {
+  color: color-mix(in srgb, var(--text-dim) 88%, var(--text) 12%);
+}
+@supports not (color: color-mix(in srgb, red 50%, blue)) {
+  html[data-theme-preset="electric"] .sidebar-search-input::placeholder {
+    color: #5A647A;
+  }
+}
 
 /* Command palette (cmdk): brutalist rows */
 [cmdk-group-heading] {
@@ -3534,13 +3647,14 @@ html[data-minimap="pinned"] .chat-minimap-rail {
   max-height: 260px;
   overflow: auto;
   background: var(--bg);
+  scrollbar-gutter: stable;
 }
 .tool-output-body[data-collapsed="true"] {
-  max-height: 118px;
+  max-height: 160px;
   overflow: hidden;
 }
 .tool-output-body[data-error="true"] {
-  background: var(--bg);
+  background: var(--bg-panel);
 }
 .tool-output-fade {
   position: sticky;

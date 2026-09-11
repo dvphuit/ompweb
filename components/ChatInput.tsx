@@ -1540,16 +1540,18 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={img.previewUrl}
-                  alt=""
+                  alt={`Attached image ${i + 1}`}
                   style={{ width: 56, height: 56, objectFit: "cover", borderRadius: "var(--radius-control)", border: "var(--bw) solid var(--border)", display: "block" }}
                 />
                 <button
+                  type="button"
+                  className="chat-input-remove-btn"
                   onClick={() => removeImage(i)}
-                  title="Remove image"
-                  aria-label="Remove image"
+                  title={`Remove image ${i + 1}`}
+                  aria-label={`Remove attached image ${i + 1}`}
                   style={{
                     position: "absolute", top: -5, right: -5,
-                    width: 24, height: 24, borderRadius: "50%",
+                    borderRadius: "50%",
                     background: "var(--bg-panel)", border: "var(--bw) solid var(--border)",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     cursor: "pointer", padding: 0, color: "var(--text-muted)",

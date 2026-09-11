@@ -1491,6 +1491,7 @@ export function AppShell() {
           aria-orientation="vertical"
           aria-label={t("appShell.resizeSidebar")}
           tabIndex={0}
+          className="sidebar-resize-handle"
           onMouseDown={handleSidebarResizeStart}
           onDoubleClick={resetSidebarWidth}
           onKeyDown={handleSidebarResizeKey}
@@ -1506,9 +1507,7 @@ export function AppShell() {
             transition: "background var(--dur-fast) var(--ease-out-warm)",
           }}
           onMouseEnter={(e) => { e.currentTarget.style.background = "color-mix(in srgb, var(--accent) 35%, transparent)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-          onFocus={(e) => { e.currentTarget.style.background = "color-mix(in srgb, var(--accent) 35%, transparent)"; }}
-          onBlur={(e) => { e.currentTarget.style.background = "transparent"; }}
+          onMouseLeave={(e) => { if (document.activeElement !== e.currentTarget) e.currentTarget.style.background = "transparent"; }}
         />
       )}
 
