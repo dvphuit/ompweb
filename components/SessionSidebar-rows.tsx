@@ -4,7 +4,7 @@ import { memo, useCallback, useRef, useState, type Dispatch, type ReactNode, typ
 import type { ManagedProject, ProjectLaunchConfig, SessionInfo } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { comparableProjectPath } from "@/lib/comparable-path";
-import { Check, ChevronDown, ChevronRight, Folder, GitBranch, MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Folder, GitBranch, MoreHorizontal, Pin, Plus, Trash2 } from "lucide-react";
 import { Tooltip } from "./ui/primitives";
 import { toast } from "./ui/toast";
 import {
@@ -12,6 +12,8 @@ import {
   displayCwd,
   formatRelativeTime,
   projectLabel,
+  sessionTimeBucket,
+  type SessionTimeBucket,
   type SessionTreeNode,
   type WorktreeState,
 } from "./SessionSidebar-helpers";
@@ -40,11 +42,13 @@ interface ProjectRowProps {
   isExpanded: boolean;
   activity: { running: number; unread: number } | undefined;
   tree: SessionTreeNode[];
-  /** Sessions beyond the cap (0 when a filter is active — show all matches). */
-  hiddenCount: number;
+  /** True while search/running-only filters are active: show all matches flat. */
+  filtersActive: boolean;
   selectedSessionId: string | null;
   runningSessionIds: Set<string>;
   unreadSessionIds: Set<string>;
+  pinnedSessionIds: Set<string>;
+  onTogglePin: (sessionId: string) => void;
   relativeTimeNow: number;
   onNewSession: (path: string) => void;
   onToggleExpand: (path: string) => void;
@@ -68,20 +72,63 @@ interface ProjectRowProps {
   homeDir: string;
 }
 
+const TIME_BUCKET_ORDER: SessionTimeBucket[] = ["today", "yesterday", "week", "older"];
+
+/** Group root nodes by recency, preserving the tree's newest-first order. */
+function groupRootsByTime(
+  roots: SessionTreeNode[],
+  now: number,
+): { bucket: SessionTimeBucket; nodes: SessionTreeNode[] }[] {
+  const groups = new Map<SessionTimeBucket, SessionTreeNode[]>();
+  for (const node of roots) {
+    const bucket = sessionTimeBucket(node.session.modified, now);
+    const list = groups.get(bucket);
+    if (list) list.push(node);
+    else groups.set(bucket, [node]);
+  }
+  return TIME_BUCKET_ORDER
+    .filter((bucket) => (groups.get(bucket)?.length ?? 0) > 0)
+    .map((bucket) => ({ bucket, nodes: groups.get(bucket)! }));
+}
+
+/** Small uppercase divider above a session group (Pinned / Today / …). */
+function SessionGroupLabel({ text, first }: { text: string; first: boolean }) {
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        padding: first ? "4px 8px 1px 34px" : "7px 8px 1px 34px",
+        color: "var(--text-dim)",
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+        fontFamily: "var(--font-display)",
+        userSelect: "none",
+      }}
+    >
+      {text}
+    </div>
+  );
+}
+
 /** One project in the sidebar: a card row matching the session items' visual
  *  language, with the active project's worktree selector directly below and
- *  the project's session tree (capped at MAX_PROJECT_SESSIONS roots, with a
- *  show-more toggle) nested under it when expanded. */
+ *  the project's session tree (pinned roots first, then recency groups capped
+ *  at MAX_PROJECT_SESSIONS roots with a show-more toggle) nested under it
+ *  when expanded. */
 function ProjectRow({
   project,
   isActive,
   isExpanded,
   activity,
   tree,
-  hiddenCount,
+  filtersActive,
   selectedSessionId,
   runningSessionIds,
   unreadSessionIds,
+  pinnedSessionIds,
+  onTogglePin,
   relativeTimeNow,
   onNewSession,
   onToggleExpand,
@@ -132,10 +179,37 @@ function ProjectRow({
   }, [aliasValue, project.alias, project.path, onUpdatePresentation]);
   const label = project.alias ?? projectLabel(project.path);
   const hasActivity = Boolean(activity && (activity.running > 0 || activity.unread > 0));
-  const visibleRoots = hiddenCount > 0 && !showAllSessions
-    ? tree.slice(0, MAX_PROJECT_SESSIONS)
-    : tree;
+  const hasRunning = (activity?.running ?? 0) > 0;
+  // Pinned roots always stay visible above the recency groups; the session
+  // cap only applies to the unpinned roots below them.
+  const pinnedRoots = tree.filter((node) => pinnedSessionIds.has(node.session.id));
+  const restRoots = tree.filter((node) => !pinnedSessionIds.has(node.session.id));
+  const hiddenCount = filtersActive || showAllSessions
+    ? 0
+    : Math.max(0, restRoots.length - MAX_PROJECT_SESSIONS);
+  const visibleRoots = hiddenCount > 0
+    ? restRoots.slice(0, MAX_PROJECT_SESSIONS)
+    : restRoots;
+  // Recency groups only at rest: a filtered list reads as one result set.
+  const groupByTime = !filtersActive;
+  const groupedRoots = groupByTime ? groupRootsByTime(visibleRoots, relativeTimeNow) : null;
   const showActions = hovered || focusWithin || actionMenuOpen;
+  const renderRoot = (node: SessionTreeNode) => (
+    <SessionTreeItem
+      key={node.session.id}
+      node={node}
+      selectedSessionId={selectedSessionId}
+      runningSessionIds={runningSessionIds}
+      unreadSessionIds={unreadSessionIds}
+      pinnedSessionIds={pinnedSessionIds}
+      onTogglePin={onTogglePin}
+      relativeTimeNow={relativeTimeNow}
+      onSelectSession={onSelectSession}
+      onRenamed={onRenamed}
+      onSessionDeleted={onSessionDeleted}
+      depth={0}
+    />
+  );
 
   return (
     <section className="sidebar-project" data-active={isActive ? "true" : "false"} style={{ marginBottom: 12 }}>
@@ -319,7 +393,9 @@ function ProjectRow({
                 width: 7,
                 height: 7,
                 borderRadius: "50%",
-                background: "var(--accent)",
+                // Running work reads green; unread completions keep the accent.
+                background: hasRunning ? "var(--status-success)" : "var(--accent)",
+                color: hasRunning ? "var(--status-success)" : "var(--accent)",
               }}
             />
           </span>
@@ -399,26 +475,31 @@ function ProjectRow({
 
       {isExpanded && (
         <div className="sidebar-project-sessions" style={{ margin: "2px 0 0" }}>
-          {visibleRoots.length === 0 ? (
+          {pinnedRoots.length === 0 && visibleRoots.length === 0 ? (
             <div style={{ padding: "6px 12px 8px 34px", color: "var(--text-dim)", fontSize: 11 }}>
               {t("projects.emptyProject")}
             </div>
           ) : (
             <>
-              {visibleRoots.map((node) => (
-                <SessionTreeItem
-                  key={node.session.id}
-                  node={node}
-                  selectedSessionId={selectedSessionId}
-                  runningSessionIds={runningSessionIds}
-                  unreadSessionIds={unreadSessionIds}
-                  relativeTimeNow={relativeTimeNow}
-                  onSelectSession={onSelectSession}
-                  onRenamed={onRenamed}
-                  onSessionDeleted={onSessionDeleted}
-                  depth={0}
-                />
-              ))}
+              {pinnedRoots.length > 0 && (
+                <>
+                  <SessionGroupLabel text={t("projects.pinned")} first />
+                  {pinnedRoots.map(renderRoot)}
+                </>
+              )}
+              {groupedRoots ? (
+                groupedRoots.map(({ bucket, nodes }, index) => (
+                  <div key={bucket}>
+                    <SessionGroupLabel
+                      text={t(bucket === "today" ? "projects.timeToday" : bucket === "yesterday" ? "projects.timeYesterday" : bucket === "week" ? "projects.timeWeek" : "projects.timeOlder")}
+                      first={pinnedRoots.length === 0 && index === 0}
+                    />
+                    {nodes.map(renderRoot)}
+                  </div>
+                ))
+              ) : (
+                visibleRoots.map(renderRoot)
+              )}
               {hiddenCount > 0 && (
                 <button
                   onClick={() => setShowAllSessions((v) => !v)}
@@ -716,6 +797,8 @@ const SessionTreeItem = memo(function SessionTreeItem({
   selectedSessionId,
   runningSessionIds,
   unreadSessionIds,
+  pinnedSessionIds,
+  onTogglePin,
   relativeTimeNow,
   onSelectSession,
   onRenamed,
@@ -726,6 +809,8 @@ const SessionTreeItem = memo(function SessionTreeItem({
   selectedSessionId: string | null;
   runningSessionIds: Set<string>;
   unreadSessionIds: Set<string>;
+  pinnedSessionIds: Set<string>;
+  onTogglePin: (sessionId: string) => void;
   relativeTimeNow: number;
   onSelectSession: (s: SessionInfo) => void;
   onRenamed?: () => void;
@@ -741,6 +826,7 @@ const SessionTreeItem = memo(function SessionTreeItem({
   const isSelected = sessionId === selectedSessionId;
   const isRunning = runningSessionIds.has(sessionId);
   const isUnread = unreadSessionIds.has(sessionId);
+  const isPinned = pinnedSessionIds.has(sessionId);
 
   // Stable callbacks: depend only on primitives / stable parent callbacks so
   // SessionItem's React.memo stays effective across re-renders.
@@ -773,6 +859,8 @@ const SessionTreeItem = memo(function SessionTreeItem({
           isSelected={isSelected}
           isRunning={isRunning}
           isUnread={isUnread}
+          isPinned={isPinned}
+          onTogglePin={onTogglePin}
           relativeTimeNow={relativeTimeNow}
           onClick={handleClick}
           onRenamed={onRenamed}
@@ -792,6 +880,8 @@ const SessionTreeItem = memo(function SessionTreeItem({
               selectedSessionId={selectedSessionId}
               runningSessionIds={runningSessionIds}
               unreadSessionIds={unreadSessionIds}
+              pinnedSessionIds={pinnedSessionIds}
+              onTogglePin={onTogglePin}
               relativeTimeNow={relativeTimeNow}
               onSelectSession={onSelectSession}
               onRenamed={onRenamed}
@@ -819,10 +909,15 @@ const SessionTreeItem = memo(function SessionTreeItem({
     const id = prev.node.session.id;
     if (prev.unreadSessionIds.has(id) !== next.unreadSessionIds.has(id)) return false;
   }
+  if (prev.pinnedSessionIds !== next.pinnedSessionIds) {
+    const id = prev.node.session.id;
+    if (prev.pinnedSessionIds.has(id) !== next.pinnedSessionIds.has(id)) return false;
+  }
   if (prev.relativeTimeNow !== next.relativeTimeNow) return false;
   if (prev.onSelectSession !== next.onSelectSession
     || prev.onRenamed !== next.onRenamed
-    || prev.onSessionDeleted !== next.onSessionDeleted) return false;
+    || prev.onSessionDeleted !== next.onSessionDeleted
+    || prev.onTogglePin !== next.onTogglePin) return false;
   return true;
 });
 const SessionItem = memo(function SessionItem({
@@ -830,6 +925,8 @@ const SessionItem = memo(function SessionItem({
   isSelected,
   isRunning,
   isUnread,
+  isPinned,
+  onTogglePin,
   onClick,
   onRenamed,
   onDeleted,
@@ -843,6 +940,8 @@ const SessionItem = memo(function SessionItem({
   isSelected: boolean;
   isRunning?: boolean;
   isUnread?: boolean;
+  isPinned?: boolean;
+  onTogglePin?: (sessionId: string) => void;
   onClick: () => void;
   onRenamed?: () => void;
   onDeleted?: (id: string) => void;
@@ -852,7 +951,7 @@ const SessionItem = memo(function SessionItem({
   collapsed?: boolean;
   onToggleCollapse?: () => void;
 }) {
-  const { t, locale } = useI18n();
+  const { t, tn, locale } = useI18n();
   const [hovered, setHovered] = useState(false);
   const [focusWithin, setFocusWithin] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -869,11 +968,15 @@ const SessionItem = memo(function SessionItem({
   const relativeTime = formatRelativeTime(session.modified, locale, relativeTimeNow);
  const confirming = confirmArchive || confirmDelete;
  const showActions = hovered || focusWithin || actionMenuOpen;
+  // A running row keeps a green tint at rest so live work stands out even
+  // when it is not the open session; hover/selection still win on top.
   const rowBackground = confirming
     ? "color-mix(in srgb, var(--accent) 6%, transparent)"
     : isSelected
       ? "color-mix(in srgb, var(--bg-selected) 70%, transparent)"
-      : hovered ? "var(--bg-hover)" : "transparent";
+      : hovered ? "var(--bg-hover)" : isRunning ? "color-mix(in srgb, var(--status-success) 9%, transparent)" : "transparent";
+  const showEdgeBar = isSelected || confirming || isRunning;
+  const edgeBarColor = isRunning && !isSelected && !confirming ? "var(--status-success)" : "var(--accent-2)";
 
   const startRename = useCallback((event: React.MouseEvent) => {
     event.stopPropagation();
@@ -967,7 +1070,7 @@ const SessionItem = memo(function SessionItem({
         transition: "background var(--dur-fast) var(--ease-out-warm), opacity var(--dur-fast) var(--ease-out-warm)",
       }}
     >
-      {(isSelected || confirming) && (
+      {showEdgeBar && (
         <span
           aria-hidden="true"
           style={{
@@ -977,7 +1080,7 @@ const SessionItem = memo(function SessionItem({
             bottom: 0,
             width: 3,
             borderRadius: 0,
-            background: "var(--accent-2)",
+            background: edgeBarColor,
             pointerEvents: "none",
           }}
         />
@@ -1001,11 +1104,29 @@ const SessionItem = memo(function SessionItem({
       ) : (
         <>
           {depth > 0 && <GitBranch size={11} strokeWidth={2} style={{ flexShrink: 0, color: "var(--text-dim)" }} aria-hidden="true" />}
-          <button ref={contentButtonRef} type="button" className="session-item-button" aria-current={isSelected ? "true" : undefined} onKeyDown={(event) => { if (event.key === "Delete") { event.preventDefault(); setConfirmDelete(true); } }} style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
-            <span title={title} style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text)", fontSize: 12.5, fontWeight: isSelected ? 600 : 500, lineHeight: 1.35, letterSpacing: "-0.005em" }}>
-              {title}
-            </span>
-          </button>
+          {isPinned && <Pin size={11} strokeWidth={2.2} style={{ flexShrink: 0, color: "var(--accent)" }} aria-label={t("sessionSidebar.unpin")} />}
+          <Tooltip
+            content={(
+              <span style={{ display: "grid", gap: 4, maxWidth: 300 }}>
+                <strong style={{ fontSize: 12, overflowWrap: "anywhere" }}>{title}</strong>
+                {session.firstMessage.trim() && (
+                  <span style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.45, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden", whiteSpace: "normal", overflowWrap: "anywhere" }}>
+                    {session.firstMessage.trim()}
+                  </span>
+                )}
+                <span style={{ fontSize: 10, color: "var(--text-dim)", fontFamily: "var(--font-mono)" }}>
+                  {tn("chatWindow.messageCount", session.messageCount)} · {new Date(session.modified).toLocaleString(locale)}
+                </span>
+              </span>
+            )}
+            side="right"
+          >
+            <button ref={contentButtonRef} type="button" className="session-item-button" aria-current={isSelected ? "true" : undefined} onKeyDown={(event) => { if (event.key === "Delete") { event.preventDefault(); setConfirmDelete(true); } }} style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
+              <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text)", fontSize: 12.5, fontWeight: isSelected ? 600 : 500, lineHeight: 1.35, letterSpacing: "-0.005em" }}>
+                {title}
+              </span>
+            </button>
+          </Tooltip>
           {session.worktreeBranch && <span title={t("sessionSidebar.worktreeTitle", { path: session.cwd })} style={{ display: "flex", alignItems: "center", gap: 3, maxWidth: 56, minWidth: 0, overflow: "hidden", color: "var(--text-dim)", fontSize: 10, flexShrink: 1 }}><GitBranch size={10} strokeWidth={2.4} aria-hidden="true" /><span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.worktreeBranch}</span></span>}
           {hasChildren && <button className="session-item-icon-button" onClick={(event) => { event.stopPropagation(); onToggleCollapse?.(); }} title={collapsed ? t("sessionSidebar.expandForks") : t("sessionSidebar.collapseForks")} aria-label={collapsed ? t("sessionSidebar.expandForks") : t("sessionSidebar.collapseForks")} aria-expanded={!collapsed} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, padding: 0, flexShrink: 0, border: "none", background: "none", color: "var(--text-dim)", cursor: "pointer", transform: collapsed ? "rotate(-90deg)" : "none", transition: "transform var(--dur-fast) var(--ease-out-warm)" }}><ChevronDown size={12} strokeWidth={1.8} aria-hidden="true" /></button>}
           <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
@@ -1021,6 +1142,7 @@ const SessionItem = memo(function SessionItem({
                   <MoreHorizontal size={14} strokeWidth={2} aria-hidden="true" />
                 </button>
                 <SidebarPortalMenu anchor={menuButtonRef} open={actionMenuOpen} onClose={() => setActionMenuOpen(false)} placement="below" minWidth={128}>
+                  <button type="button" role="menuitem" className="sidebar-menu-item" onClick={(event) => { event.stopPropagation(); setActionMenuOpen(false); onTogglePin?.(session.id); }} style={{ display: "block", width: "100%", padding: "6px 9px", border: "none", borderRadius: "var(--radius-control)", background: "transparent", color: "var(--text-muted)", cursor: "pointer", textAlign: "left", fontSize: 11 }}>{isPinned ? t("sessionSidebar.unpin") : t("sessionSidebar.pin")}</button>
  <button type="button" role="menuitem" className="sidebar-menu-item" onClick={(event) => { event.stopPropagation(); setActionMenuOpen(false); void handleArchive(); }} disabled={hasChildren} title={hasChildren ? t("sessionSidebar.archiveLeafOnly") : t("sessionSidebar.archive")} style={{ display: "block", width: "100%", padding: "6px 9px", border: "none", borderRadius: "var(--radius-control)", background: "transparent", color: hasChildren ? "var(--text-dim)" : "var(--text-muted)", cursor: hasChildren ? "not-allowed" : "pointer", textAlign: "left", fontSize: 11, opacity: hasChildren ? 0.55 : 1 }}>{t("sessionSidebar.archive")}</button>
                   <button type="button" role="menuitem" className="sidebar-menu-item" onClick={(event) => { startRename(event); setActionMenuOpen(false); }} style={{ display: "block", width: "100%", padding: "6px 9px", border: "none", borderRadius: "var(--radius-control)", background: "transparent", color: "var(--text-muted)", cursor: "pointer", textAlign: "left", fontSize: 11 }}>{t("sessionSidebar.rename")}</button>
                   <button type="button" role="menuitem" className="sidebar-menu-item" onClick={(event) => { event.stopPropagation(); setActionMenuOpen(false); void handleDelete(); }} style={{ display: "block", width: "100%", padding: "6px 9px", border: "none", borderRadius: "var(--radius-control)", background: "transparent", color: "var(--status-error)", cursor: "pointer", textAlign: "left", fontSize: 11 }}>{t("sessionSidebar.delete")}</button>

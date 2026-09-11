@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { getFileIcon } from "./FileIcons";
+import { SidebarPortalMenu } from "./SessionSidebar-chrome";
 
 export interface Tab {
   id: string;
@@ -22,7 +23,10 @@ interface Props {
 export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
   const { t } = useI18n();
   const [hoveredClose, setHoveredClose] = useState<string | null>(null);
+  const [overflowing, setOverflowing] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   // Keep the active tab visible when the bar overflows horizontally.
   useEffect(() => {
@@ -39,21 +43,52 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
     }
   }, [activeTabId, tabs]);
 
+  // Overflow detection: the dropdown chevron only appears when tabs actually
+  // clip. Re-check on tab changes and on resizes of the bar itself.
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const update = () => setOverflowing((prev) => {
+      const next = list.scrollWidth > list.clientWidth + 1;
+      return prev === next ? prev : next;
+    });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(list);
+    return () => ro.disconnect();
+  }, [tabs]);
+
+  // Closing tabs from inside the menu can unmount its anchor button — shut
+  // the menu when there is nothing to overflow anymore.
+  useEffect(() => {
+    if (!overflowing) setMenuOpen(false);
+  }, [overflowing]);
+
   return (
     <div
-      ref={listRef}
-      role="tablist"
-      aria-label="Open files"
-      className="tabbar-scroll"
       style={{
         display: "flex",
-        alignItems: "flex-end",
+        alignItems: "stretch",
         background: "var(--bg-panel)",
-        overflowX: "auto",
         flexShrink: 0,
         height: 36,
       }}
     >
+      <div
+        ref={listRef}
+        role="tablist"
+        aria-label="Open files"
+        className="tabbar-scroll"
+        style={{
+          display: "flex",
+          alignItems: "flex-end",
+          background: "var(--bg-panel)",
+          overflowX: "auto",
+          flex: 1,
+          minWidth: 0,
+          height: 36,
+        }}
+      >
       {tabs.map((tab) => {
         const isActive = tab.id === activeTabId;
         return (
@@ -170,6 +205,113 @@ export function TabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: Props) {
           </div>
         );
       })}
+      </div>
+      {overflowing && (
+        <button
+          ref={menuButtonRef}
+          type="button"
+          onClick={() => setMenuOpen((open) => !open)}
+          title={t("tabBar.showAllTabs")}
+          aria-label={t("tabBar.showAllTabs")}
+          aria-expanded={menuOpen}
+          aria-haspopup="menu"
+          className="ui-focus-ring"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 32,
+            flexShrink: 0,
+            padding: 0,
+            background: menuOpen ? "var(--bg-hover)" : "transparent",
+            border: "none",
+            borderLeft: "var(--bw) solid var(--border)",
+            color: "var(--text-muted)",
+            cursor: "pointer",
+          }}
+        >
+          <ChevronDown
+            size={14}
+            strokeWidth={2}
+            aria-hidden="true"
+            style={{
+              transform: menuOpen ? "rotate(180deg)" : "none",
+              transition: "transform var(--dur-fast) var(--ease-out-warm)",
+            }}
+          />
+        </button>
+      )}
+      <SidebarPortalMenu
+        anchor={menuButtonRef}
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        placement="below"
+        align="end"
+        minWidth={220}
+        style={{ padding: 4, maxHeight: "min(50vh, 360px)", overflowY: "auto" }}
+      >
+        {tabs.map((tab) => {
+          const isActive = tab.id === activeTabId;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="menuitem"
+              aria-current={isActive ? "true" : undefined}
+              onClick={() => { onSelectTab(tab.id); setMenuOpen(false); }}
+              onKeyDown={(event) => {
+                // Delete closes without leaving the menu, so several tabs can
+                // be pruned in one pass; Enter/Space selects and dismisses.
+                if (event.key === "Delete" || event.key === "Backspace") {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onCloseTab(tab.id);
+                }
+              }}
+              className="sidebar-menu-item"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                width: "100%",
+                padding: "6px 6px 6px 9px",
+                border: "none",
+                borderRadius: "var(--radius-control)",
+                background: isActive ? "var(--bg-selected)" : "transparent",
+                color: "var(--text)",
+                cursor: "pointer",
+                fontSize: 12,
+                textAlign: "left",
+              }}
+            >
+              <span style={{ flexShrink: 0, display: "flex", alignItems: "center", opacity: isActive ? 1 : 0.7 }}>
+                {getFileIcon(tab.label, 13)}
+              </span>
+              <span
+                title={tab.filePath}
+                style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+              >
+                {tab.label}
+              </span>
+              {/* Mouse-only affordance (keyboard: Delete on the row); kept out of
+                  the a11y tree so the row stays a single menuitem. */}
+              <span
+                aria-hidden="true"
+                title={t("tabBar.close")}
+                onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id); }}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  width: 22, height: 22, flexShrink: 0,
+                  borderRadius: "var(--radius-control)",
+                  color: "var(--text-dim)", cursor: "pointer",
+                }}
+              >
+                <X size={11} strokeWidth={2} aria-hidden="true" />
+              </span>
+            </button>
+          );
+        })}
+      </SidebarPortalMenu>
     </div>
   );
 }

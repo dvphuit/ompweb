@@ -3,15 +3,19 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Command } from "cmdk";
-import { Moon, Plus, Sun, MessageSquare } from "lucide-react";
+import { Archive, MessageSquare, Moon, PanelLeft, Plus, Sun } from "lucide-react";
 import type { SessionInfo } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { useTheme } from "@/hooks/useTheme";
+import { SETTINGS_CATEGORIES, type SettingsTab } from "./SettingsTabs";
+import { RunningSessionIndicator } from "./SessionSidebar-chrome";
 
 type Props = {
   onSelectSession: (session: SessionInfo) => void;
   onNewSession: () => void;
-  currentModel?: string | null;
+  onToggleSidebar?: () => void;
+  onOpenSettings?: (tab: SettingsTab) => void;
+  onOpenArchive?: () => void;
 };
 
 function relativeTime(value: string, locale: string): string {
@@ -24,11 +28,12 @@ function relativeTime(value: string, locale: string): string {
   return new Intl.RelativeTimeFormat(locale, { numeric: "always" }).format(-Math.floor(hours / 24), "day");
 }
 
-export const CommandPalette = memo(function CommandPalette({ onSelectSession, onNewSession, currentModel }: Props) {
+export const CommandPalette = memo(function CommandPalette({ onSelectSession, onNewSession, onToggleSidebar, onOpenSettings, onOpenArchive }: Props) {
   const { t, locale } = useI18n();
   const { isDark, toggleTheme } = useTheme();
   const [open, setOpen] = useState(false);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [runningSessionIds, setRunningSessionIds] = useState<Set<string>>(() => new Set());
   const [loading, setLoading] = useState(false);
   const loadSeqRef = useRef(0);
   const lastFocusedElementRef = useRef<HTMLElement | null>(null);
@@ -39,14 +44,16 @@ export const CommandPalette = memo(function CommandPalette({ onSelectSession, on
     const seq = ++loadSeqRef.current;
     setLoading(true);
     void fetch("/api/sessions")
-      .then((response) => response.ok ? response.json() as Promise<{ sessions?: SessionInfo[] }> : Promise.reject(new Error("request failed")))
+      .then((response) => response.ok ? response.json() as Promise<{ sessions?: SessionInfo[]; runningSessionIds?: string[] }> : Promise.reject(new Error("request failed")))
       .then((data) => {
         if (seq !== loadSeqRef.current) return;
         setSessions(data.sessions ?? []);
+        setRunningSessionIds(new Set(data.runningSessionIds ?? []));
       })
       .catch(() => {
         if (seq !== loadSeqRef.current) return;
         setSessions([]);
+        setRunningSessionIds(new Set());
       })
       .finally(() => {
         if (seq !== loadSeqRef.current) return;
@@ -85,6 +92,7 @@ export const CommandPalette = memo(function CommandPalette({ onSelectSession, on
   if (!open || typeof document === "undefined") return null;
 
   const choose = (action: () => void) => { action(); setOpen(false); };
+  const itemStyle = { display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", borderRadius: "var(--radius-control)", color: "var(--text)", cursor: "pointer" } as const;
   return createPortal(
     <div role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setOpen(false); }} style={{ position: "fixed", inset: 0, zIndex: 2000, background: "var(--overlay-backdrop)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", paddingTop: "18vh" }}>
       <Command label={t("commandPalette.label")} role="dialog" aria-modal="true" shouldFilter style={{ width: "min(92vw, 560px)", maxHeight: "min(70vh, 560px)", margin: "0 auto", overflow: "hidden", background: "var(--bg)", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-modal)", boxShadow: "var(--shadow-modal)", animation: "ui-scale-in var(--dur-med) var(--ease-out-warm)" }}>
@@ -92,17 +100,46 @@ export const CommandPalette = memo(function CommandPalette({ onSelectSession, on
           <Command.Input autoFocus placeholder={t("commandPalette.placeholder")} style={{ width: "100%", border: 0, outline: 0, background: "transparent", color: "var(--text)", fontSize: 15 }} />
         </div>
         <Command.List style={{ padding: "8px", overflowY: "auto", maxHeight: "min(55vh, 440px)" }}>
-          <Command.Empty style={{ padding: 20, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>{loading ? "Loading sessions..." : t("commandPalette.empty")}</Command.Empty>
+          <Command.Empty style={{ padding: 20, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>{loading ? t("commandPalette.loadingSessions") : t("commandPalette.empty")}</Command.Empty>
           <Command.Group heading={t("commandPalette.sessions")}>
-            {sessions.map((session) => <Command.Item key={session.id} value={`${session.name ?? session.id} ${session.cwd}`} onSelect={() => choose(() => onSelectSession(session))} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", borderRadius: "var(--radius-control)", color: "var(--text)", cursor: "pointer" }}><MessageSquare size={15} color="var(--accent)" /><span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.name || session.id}</span><span style={{ color: "var(--text-dim)", fontSize: 11 }}>{relativeTime(session.modified, locale)}</span></Command.Item>)}
+            {sessions.map((session) => (
+              <Command.Item key={session.id} value={`${session.name ?? session.id} ${session.cwd}`} onSelect={() => choose(() => onSelectSession(session))} style={itemStyle}>
+                <MessageSquare size={15} color="var(--accent)" />
+                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.name || session.id}</span>
+                {runningSessionIds.has(session.id) && <RunningSessionIndicator size={12} />}
+                <span style={{ color: "var(--text-dim)", fontSize: 11 }}>{relativeTime(session.modified, locale)}</span>
+              </Command.Item>
+            ))}
           </Command.Group>
           <Command.Group heading={t("commandPalette.actions")}>
-            <Command.Item value={t("commandPalette.newSession")} onSelect={() => choose(onNewSession)} style={{ display: "flex", gap: 10, padding: "9px 10px", borderRadius: "var(--radius-control)", color: "var(--text)", cursor: "pointer" }}><Plus size={15} color="var(--accent)" />{t("commandPalette.newSession")}</Command.Item>
-            <Command.Item value={t("commandPalette.toggleTheme")} onSelect={() => choose(toggleTheme)} style={{ display: "flex", gap: 10, padding: "9px 10px", borderRadius: "var(--radius-control)", color: "var(--text)", cursor: "pointer" }}>{isDark ? <Sun size={15} color="var(--accent)" /> : <Moon size={15} color="var(--accent)" />}{t("commandPalette.toggleTheme")}</Command.Item>
+            <Command.Item value={t("commandPalette.newSession")} onSelect={() => choose(onNewSession)} style={itemStyle}><Plus size={15} color="var(--accent)" />{t("commandPalette.newSession")}</Command.Item>
+            {onToggleSidebar && (
+              <Command.Item value={t("commandPalette.toggleSidebar")} onSelect={() => choose(onToggleSidebar)} style={itemStyle}><PanelLeft size={15} color="var(--accent)" />{t("commandPalette.toggleSidebar")}</Command.Item>
+            )}
+            {onOpenArchive && (
+              <Command.Item value={t("commandPalette.openArchive")} onSelect={() => choose(onOpenArchive)} style={itemStyle}><Archive size={15} color="var(--accent)" />{t("commandPalette.openArchive")}</Command.Item>
+            )}
+            <Command.Item value={t("commandPalette.toggleTheme")} onSelect={() => choose(toggleTheme)} style={itemStyle}>{isDark ? <Sun size={15} color="var(--accent)" /> : <Moon size={15} color="var(--accent)" />}{t("commandPalette.toggleTheme")}</Command.Item>
           </Command.Group>
-          <Command.Group heading={t("commandPalette.models")}>
-            <Command.Item value={currentModel ?? t("commandPalette.currentModel")} disabled style={{ padding: "9px 10px", color: "var(--text-muted)", fontSize: 13 }}>{t("commandPalette.currentModel")}: {currentModel ?? t("commandPalette.notAvailable")}</Command.Item>
-          </Command.Group>
+          {onOpenSettings && (
+            <Command.Group heading={t("commandPalette.settings")}>
+              {SETTINGS_CATEGORIES.map((category) => {
+                const label = t(`settingsTabs.${category.id}.label`);
+                const CategoryIcon = category.Icon;
+                return (
+                  <Command.Item
+                    key={category.id}
+                    value={`${label} ${t("commandPalette.settings")}`}
+                    onSelect={() => choose(() => onOpenSettings(category.id))}
+                    style={itemStyle}
+                  >
+                    <CategoryIcon size={15} aria-hidden="true" style={{ color: "var(--accent)" }} />
+                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+                  </Command.Item>
+                );
+              })}
+            </Command.Group>
+          )}
         </Command.List>
         <div style={{ borderTop: "var(--bw) solid var(--border)", padding: "8px 14px", color: "var(--text-dim)", fontSize: 11 }}>{t("commandPalette.hints")}</div>
       </Command>

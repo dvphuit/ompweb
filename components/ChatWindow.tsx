@@ -1,7 +1,7 @@
 "use client";
 import { registerAbortHandler } from "@/hooks/useKeyboardShortcuts";
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
-import { ChevronDown, ChevronUp, Folder, Paperclip, Square } from "lucide-react";
+import { ChevronDown, ChevronUp, Compass, FileDiff, FileSearch, Folder, ListChecks, Paperclip, Square } from "lucide-react";
 import type { AgentMessage, AssistantContentBlock, AssistantMessage, BashExecutionMessage, CustomMessage, ExtensionUiRequest, SessionInfo, SessionTreeNode, ToolResultMessage, ToolCallContent } from "@/lib/types";
 import { translate, useI18n } from "@/lib/i18n";
 import { countToolCallBlocks, getDisplayableAssistantBlocks, splitFinalAssistantBlocks } from "@/lib/message-display";
@@ -17,6 +17,7 @@ import { useAgentSession, type AgentPhase, type NoticeItem, type SubagentInfo } 
 import { useAudio } from "@/hooks/useAudio";
 import { useDragDrop } from "@/hooks/useDragDrop";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import type { SessionStatsInfo, GenerationSpeedInfo } from "@/lib/pi-types";
 import type { ProviderUsageContext } from "@/lib/provider-usage-types";
 import { normalizeCustomPanelLines, parseAnsiLine } from "@/lib/ansi";
@@ -528,6 +529,7 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
   const { t, tn } = useI18n();
   const { playDoneSound, unlockAudio } = useAudio();
   const isMobile = useIsMobile();
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   // Wrap onAgentEnd to play the completion sound. This is more reliable than
   // wrapping handleAgentEventRef because useAgentSession overwrites that ref
@@ -1197,6 +1199,12 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
             </div>
             <NoticeShelf notices={notices} onDismiss={dismissNotice} align="right" />
             {chatInputElement}
+            <EmptyChatSuggestions
+              onPick={(prompt) => {
+                chatInputRef?.current?.insertText(prompt);
+                chatInputRef?.current?.focus();
+              }}
+            />
           </div>
         </div>
         </div>
@@ -1328,6 +1336,44 @@ export function ChatWindow({ session, newSessionCwd, toolCallsDefaultCollapsed =
             />
           </div>
         )}
+        {/* Jump back to the live tail while reading history. Sits left of the
+            minimap rail on desktop so it never covers the scroll affordance. */}
+        {!nearBottom && (
+          <button
+            type="button"
+            onClick={() => {
+              scrollContainerRef.current?.scrollTo({
+                top: scrollContainerRef.current.scrollHeight,
+                behavior: prefersReducedMotion ? "auto" : "smooth",
+              });
+            }}
+            title={t("chatWindow.scrollToBottom")}
+            aria-label={t("chatWindow.scrollToBottom")}
+            className="chat-scroll-bottom ui-focus-ring"
+            style={{
+              position: "absolute",
+              bottom: 12,
+              right: isMobile ? 12 : MINIMAP_WIDTH + 12,
+              zIndex: 35,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 32,
+              height: 32,
+              padding: 0,
+              background: "var(--bg-panel)",
+              border: "var(--bw) solid var(--border)",
+              borderRadius: "50%",
+              color: "var(--text-muted)",
+              cursor: "pointer",
+              animation: "ui-scale-in var(--dur-fast) var(--ease-out-warm) both",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text)"; e.currentTarget.style.borderColor = "var(--accent)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; e.currentTarget.style.borderColor = "var(--border)"; }}
+          >
+            <ChevronDown size={16} strokeWidth={2.2} aria-hidden="true" />
+          </button>
+        )}
       </div>
 
       {/* Minimized pill bar - shown when composer is collapsed */}
@@ -1456,6 +1502,67 @@ function ExtensionWidgets({ widgets }: { widgets: Array<{ key: string; lines: st
     </div>
   );
 }
+
+const EMPTY_SUGGESTION_CARDS = [
+  { id: "explore", Icon: Compass },
+  { id: "review", Icon: FileDiff },
+  { id: "plan", Icon: ListChecks },
+  { id: "explain", Icon: FileSearch },
+] as const;
+
+/** Starter prompts under a fresh composer — one click fills the input. */
+const EmptyChatSuggestions = memo(function EmptyChatSuggestions({ onPick }: { onPick: (prompt: string) => void }) {
+  const { t } = useI18n();
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+        gap: 8,
+        marginTop: 12,
+      }}
+    >
+      {EMPTY_SUGGESTION_CARDS.map(({ id, Icon }) => (
+        <button
+          key={id}
+          type="button"
+          onClick={() => onPick(t(`chatWindow.suggest_${id}_prompt`))}
+          className="empty-suggestion-card ui-focus-ring"
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 9,
+            padding: "10px 12px",
+            background: "var(--bg-panel)",
+            border: "var(--bw) solid var(--border)",
+            borderRadius: "var(--radius-card)",
+            cursor: "pointer",
+            textAlign: "left",
+            transition: "border-color var(--dur-fast) var(--ease-out-warm), background var(--dur-fast) var(--ease-out-warm), transform var(--dur-fast) var(--ease-out-warm)",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = "var(--accent)";
+            e.currentTarget.style.background = "var(--bg-hover)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = "var(--border)";
+            e.currentTarget.style.background = "var(--bg-panel)";
+          }}
+        >
+          <Icon size={15} strokeWidth={1.9} style={{ flexShrink: 0, marginTop: 1, color: "var(--accent)" }} aria-hidden="true" />
+          <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text)", lineHeight: 1.35 }}>
+              {t(`chatWindow.suggest_${id}_title`)}
+            </span>
+            <span style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.4 }}>
+              {t(`chatWindow.suggest_${id}_sub`)}
+            </span>
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+});
 
 function NoticeShelf({ notices, onDismiss, floating = false, align = "left" }: { notices: NoticeItem[]; onDismiss?: (id: string) => void; floating?: boolean; align?: "left" | "right" }) {
   const { t } = useI18n();

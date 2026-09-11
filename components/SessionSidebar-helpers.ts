@@ -36,6 +36,7 @@ function normalizeProjectKey(value: string): string {
 const INITIAL_RESTORE_RETRY_MS = 1000;
 const INITIAL_RESTORE_MAX_ATTEMPTS = 8;
 const UNREAD_SESSIONS_STORAGE_KEY = "omp-web:unread-session-ids";
+const PINNED_SESSIONS_STORAGE_KEY = "omp-web:pinned-session-ids";
 
 function loadUnreadSessionIds(): Set<string> {
   if (typeof window === "undefined") return new Set();
@@ -55,6 +56,30 @@ function saveUnreadSessionIds(ids: Set<string>): void {
   try {
     if (ids.size === 0) window.localStorage.removeItem(UNREAD_SESSIONS_STORAGE_KEY);
     else window.localStorage.setItem(UNREAD_SESSIONS_STORAGE_KEY, JSON.stringify([...ids]));
+  } catch {
+    // ignore storage quota / privacy-mode errors
+  }
+}
+
+/** Pinned sessions float to a dedicated section at the top of their project. */
+function loadPinnedSessionIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = window.localStorage.getItem(PINNED_SESSIONS_STORAGE_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) return new Set(parsed.filter((id): id is string => typeof id === "string"));
+    return new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function savePinnedSessionIds(ids: Set<string>): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (ids.size === 0) window.localStorage.removeItem(PINNED_SESSIONS_STORAGE_KEY);
+    else window.localStorage.setItem(PINNED_SESSIONS_STORAGE_KEY, JSON.stringify([...ids]));
   } catch {
     // ignore storage quota / privacy-mode errors
   }
@@ -118,6 +143,25 @@ function formatRelativeTime(value: string, _locale: string, now: number): string
   if (months < 12) return `${months}mo`;
   return `${Math.floor(months / 12)}y`;
 }
+/** Recency bucket for grouping session roots inside an expanded project. */
+type SessionTimeBucket = "today" | "yesterday" | "week" | "older";
+
+/** Bucket a session's modified timestamp into a calendar-day recency group. */
+function sessionTimeBucket(modified: string, now: number): SessionTimeBucket {
+  const timestamp = new Date(modified).getTime();
+  if (!Number.isFinite(timestamp)) return "older";
+  // Compare calendar days (not 24h periods): 23:59 yesterday is yesterday.
+  // Math.round tolerates the 23/25-hour days around DST transitions.
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const startOfDay = new Date(timestamp);
+  startOfDay.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((startOfToday.getTime() - startOfDay.getTime()) / 86_400_000);
+  if (diffDays <= 0) return "today";
+  if (diffDays === 1) return "yesterday";
+  if (diffDays < 7) return "week";
+  return "older";
+}
 interface SessionTreeNode {
   session: SessionInfo;
   children: SessionTreeNode[];
@@ -173,16 +217,21 @@ export {
   INITIAL_RESTORE_MAX_ATTEMPTS,
   INITIAL_RESTORE_RETRY_MS,
   MAX_PROJECT_SESSIONS,
+  PINNED_SESSIONS_STORAGE_KEY,
   UNREAD_SESSIONS_STORAGE_KEY,
   buildSessionTree,
   displayCwd,
   formatRelativeTime,
   loadExpandedProjects,
+  loadPinnedSessionIds,
   loadUnreadSessionIds,
   normalizeProjectKey,
   projectLabel,
   saveExpandedProjects,
+  savePinnedSessionIds,
   saveUnreadSessionIds,
+  sessionTimeBucket,
+  type SessionTimeBucket,
   type SessionTreeNode,
   type WorktreeEntry,
   type WorktreeState,

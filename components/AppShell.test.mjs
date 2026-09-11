@@ -25,11 +25,12 @@ test("session info popover renders colored metric cards without wrapping counts"
   assert.match(source, /className="session-info-layout"/);
 });
 
-test("top bar renders 3-zone layout with center breadcrumb and segmented metric pills", async () => {
+test("top bar renders 3-zone layout with center breadcrumb and a unified status cluster", async () => {
   const source = await readFile(new URL("./AppShell.tsx", import.meta.url), "utf8");
   assert.match(source, /className="shell-topbar-breadcrumb"/);
   assert.match(source, /className="shell-metric-pill/);
-  assert.match(source, /activeTopPanel === "session"/);
+  assert.match(source, /activeTopPanel === "status"/);
+  assert.doesNotMatch(source, /toggleTopPanel\("(usage|session)"\)/);
 });
 
 test("sidebar drag scales pointer deltas by the interface zoom", async () => {

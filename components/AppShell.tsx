@@ -11,7 +11,7 @@ import { ChatWindow } from "./ChatWindow";
 import { TabBar, type Tab } from "./TabBar";
 import { BranchNavigator } from "./BranchNavigator";
 import { LanguageSwitcher } from "./LanguageSwitcher";
-import { ArrowDown, ArrowUp, ArrowUpRight, Bot, Check, CheckCheck, CircleCheck, Copy, Database, DollarSign, Folder, Gauge, Hash, History, Menu, Moon, PanelLeft, Percent, Sun, Terminal, User, Wand2, Wrench, Zap } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpRight, Bot, Check, CheckCheck, ChevronDown, CircleCheck, Copy, Database, DollarSign, Folder, Gauge, Hash, History, Menu, Moon, PanelLeft, Percent, Sun, Terminal, User, Wand2, Wrench, Zap } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 import { formatCompactNumber, formatPercent, getCacheHitRate } from "@/lib/format";
 import { translate, useI18n } from "@/lib/i18n";
@@ -533,8 +533,7 @@ export function AppShell() {
   const systemPromptLoaderRef = useRef<(() => Promise<void>) | null>(null);
   const systemPromptLoadIdRef = useRef(0);
   const systemBtnRef = useRef<HTMLButtonElement>(null);
-  const usageBtnRef = useRef<HTMLButtonElement>(null);
-  const sessionStatsBtnRef = useRef<HTMLButtonElement>(null);
+  const statusBtnRef = useRef<HTMLButtonElement>(null);
 
   const handleSystemPromptChange = useCallback((prompt: string | null) => {
     setSystemPrompt(prompt);
@@ -579,7 +578,7 @@ export function AppShell() {
   const providerUsageQuery = providerUsageVisible && activeProvider
     ? new URLSearchParams({ provider: activeProvider, ...(activeModelId ? { model: activeModelId } : {}) }).toString()
     : null;
-  const { snapshot: providerUsage, loading: providerUsageLoading, error: providerUsageError } =
+  const { snapshot: providerUsage } =
     useProviderUsage(providerUsageQuery, 5 * 60_000);
 
 
@@ -601,18 +600,14 @@ export function AppShell() {
   }, []);
 
   // Single active panel — only one dropdown open at a time
-  const [activeTopPanel, setActiveTopPanel] = useState<"branches" | "system" | "usage" | "session" | null>(null);
+  const [activeTopPanel, setActiveTopPanel] = useState<"branches" | "system" | "status" | null>(null);
   const [topPanelPos, setTopPanelPos] = useState<{ top: number; left: number; width: number } | null>(null);
-  const toggleTopPanel = useCallback((panel: "branches" | "system" | "usage" | "session") => {
+  const toggleTopPanel = useCallback((panel: "branches" | "system" | "status") => {
     if (isMobile) setSidebarOpen(false);
     setActiveTopPanel((cur) => cur === panel ? null : panel);
   }, [isMobile]);
   const { snapshot: allProviderUsage, loading: allProviderUsageLoading, error: allProviderUsageError } =
-    useProviderUsage(activeTopPanel === "usage" ? "" : null, 5 * 60_000);
-
-  useEffect(() => {
-    if (!providerUsageVisible && activeTopPanel === "usage") setActiveTopPanel(null);
-  }, [activeTopPanel, providerUsageVisible]);
+    useProviderUsage(activeTopPanel === "status" && providerUsageVisible ? "" : null, 5 * 60_000);
   useEffect(() => {
     if (!activeTopPanel || !topBarRef.current) return;
     const update = () => {
@@ -646,9 +641,9 @@ export function AppShell() {
     });
   }, [activeTopPanel, systemPrompt, systemPromptLoading, toggleTopPanel]);
 
-  const openSessionStatsPanel = useCallback(() => {
+  const openStatusPanel = useCallback(() => {
     if (isMobile) setSidebarOpen(false);
-    setActiveTopPanel("session");
+    setActiveTopPanel("status");
   }, [isMobile]);
 
   const handleSidebarToggle = useCallback(() => {
@@ -743,8 +738,7 @@ export function AppShell() {
     const onPointerDown = (event: MouseEvent) => {
       if (event.target instanceof Element && event.target.closest("[data-top-panel]")) return;
       if (systemBtnRef.current?.contains(event.target as Node)) return;
-      if (usageBtnRef.current?.contains(event.target as Node)) return;
-      if (sessionStatsBtnRef.current?.contains(event.target as Node)) return;
+      if (statusBtnRef.current?.contains(event.target as Node)) return;
       setActiveTopPanel(null);
     };
     const onKeyDown = (event: KeyboardEvent) => {
@@ -1256,7 +1250,9 @@ export function AppShell() {
             })
             .catch(() => toast.error(translate("errors.generic")));
         }}
-        currentModel={null}
+        onToggleSidebar={handleSidebarToggle}
+        onOpenSettings={(tab) => setSettingsTab(tab)}
+        onOpenArchive={() => setArchiveBrowserOpen(true)}
       />
       <SessionSidebar
         selectedSessionId={selectedSession?.id ?? null}
@@ -1723,7 +1719,7 @@ export function AppShell() {
             );
           })()}
 
-          {/* Right Zone: Segmented metric pills (Provider limits, Session Stats/Usage, Speed) */}
+          {/* Right Zone: unified status cluster (provider · context · cache · cost · live speed) */}
           <div
             data-topbar-right-group
             style={{
@@ -1736,52 +1732,8 @@ export function AppShell() {
               flexShrink: 0,
             }}
           >
-            {/* Provider limits pill */}
-            {showChat && providerUsageVisible && currentProviderUsageText && (
-              <button
-                ref={usageBtnRef}
-                type="button"
-                data-provider-usage-trigger
-                onClick={() => toggleTopPanel("usage")}
-                title={currentProviderUsageText
-                  ? t("appShell.tooltipProviderUsage", { value: currentProviderUsageText })
-                  : currentProviderUsageReport?.noLimits
-                    ? `${t("appShell.providerUsageNoData")}${activeProvider ? ` (${activeProvider})` : ""}`
-                    : providerUsageLoading
-                      ? t("appShell.providerUsageLoading")
-                      : providerUsageError
-                        ? t("appShell.providerUsageUnavailable")
-                        : t("appShell.providerUsageButton")}
-                aria-label={t("appShell.providerUsageButton")}
-                aria-pressed={activeTopPanel === "usage"}
-                className="shell-metric-pill ui-focus-ring"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 4,
-                  height: 26,
-                  padding: currentProviderUsageText ? "0 8px" : "0 6px",
-                  borderRadius: "var(--radius-control)",
-                  border: "var(--bw) solid var(--border)",
-                  background: activeTopPanel === "usage" ? "var(--bg-selected)" : "var(--bg-subtle)",
-                  color: currentProviderUsageText ? currentProviderUsageColor : "var(--text-dim)",
-                  fontSize: 11,
-                  fontFamily: "var(--font-mono)",
-                  fontVariantNumeric: "tabular-nums",
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  flexShrink: 0,
-                  transition: "background var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast)",
-                }}
-              >
-                <Gauge size={13} strokeWidth={1.8} aria-hidden="true" />
-                {currentProviderUsageText && <span>{currentProviderUsageText}</span>}
-              </button>
-            )}
-
-            {/* Session Stats and context/cost pill */}
-            {showChat && (sessionStats || contextUsage || modelCapacity) && (() => {
+            {/* Single status cluster: provider · context · cache · cost · live speed */}
+            {showChat && (() => {
               const tok = sessionStats?.tokens;
               const c = sessionStats?.cost ?? 0;
               const costStr = c > 0 ? (c >= 0.01 ? `$${c.toFixed(2)}` : `<$0.01`) : null;
@@ -1797,7 +1749,14 @@ export function AppShell() {
                 ctxStr = pct !== null ? `${formatPercent(pct)} / ${formatCompactNumber(contextUsage.contextWindow)}` : `? / ${formatCompactNumber(contextUsage.contextWindow)}`;
               }
 
+              const showProvider = providerUsageVisible && Boolean(currentProviderUsageText);
+              // At rest the session average is noise — surface speed only while generating.
+              const liveSpeed = generationSpeed?.current ?? null;
+              const liveSpeedStr = liveSpeed !== null ? `${liveSpeed.toFixed(1)} t/s` : null;
+              if (!showProvider && !ctxStr && !cacheRateStr && !costStr && !liveSpeedStr) return null;
+
               const tooltipParts: string[] = [];
+              if (showProvider) tooltipParts.push(t("appShell.tooltipProviderUsage", { value: currentProviderUsageText ?? "" }));
               if (tok) {
                 tooltipParts.push(t("appShell.tooltipInput", { value: tok.input.toLocaleString(locale) }));
                 tooltipParts.push(t("appShell.tooltipOutput", { value: tok.output.toLocaleString(locale) }));
@@ -1814,16 +1773,18 @@ export function AppShell() {
                   tokens: contextUsage.contextWindow.toLocaleString(locale),
                 }));
               }
+              if (liveSpeedStr) tooltipParts.push(t("appShell.tooltipCurrentSpeed", { value: liveSpeedStr }));
               const tooltip = tooltipParts.join("  |  ");
 
               return (
                 <button
-                  ref={sessionStatsBtnRef}
+                  ref={statusBtnRef}
                   type="button"
-                  onClick={() => toggleTopPanel("session")}
-                  title={tooltip || t("appShell.sessionInfo")}
-                  aria-label={t("appShell.sessionInfo")}
-                  aria-pressed={activeTopPanel === "session"}
+                  data-provider-usage-trigger
+                  onClick={() => toggleTopPanel("status")}
+                  title={tooltip || t("appShell.statusPanel")}
+                  aria-label={t("appShell.statusPanel")}
+                  aria-pressed={activeTopPanel === "status"}
                   className="shell-metric-pill ui-focus-ring"
                   style={{
                     display: "inline-flex",
@@ -1833,7 +1794,7 @@ export function AppShell() {
                     padding: "0 8px",
                     borderRadius: "var(--radius-control)",
                     border: "var(--bw) solid var(--border)",
-                    background: activeTopPanel === "session" ? "var(--bg-selected)" : "var(--bg-subtle)",
+                    background: activeTopPanel === "status" ? "var(--bg-selected)" : "var(--bg-subtle)",
                     color: "var(--text)",
                     fontSize: 11,
                     fontFamily: "var(--font-mono)",
@@ -1844,6 +1805,12 @@ export function AppShell() {
                     transition: "background var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast)",
                   }}
                 >
+                  {showProvider && (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: currentProviderUsageColor }}>
+                      <Gauge size={13} strokeWidth={1.8} aria-hidden="true" />
+                      {currentProviderUsageText}
+                    </span>
+                  )}
                   {ctxStr && (
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: ctxColor }}>
                       <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 10, letterSpacing: "0.08em", color: "var(--text-muted)" }}>CTX</span>
@@ -1872,60 +1839,24 @@ export function AppShell() {
                       {costStr}
                     </span>
                   )}
+                  {liveSpeedStr && (
+                    <span className="shell-pill-extra" style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "var(--accent)", fontWeight: 600 }}>
+                      <Zap size={11} strokeWidth={2} aria-hidden="true" />
+                      {liveSpeedStr}
+                    </span>
+                  )}
+                  <ChevronDown size={11} strokeWidth={2} aria-hidden="true" style={{ color: "var(--text-dim)", flexShrink: 0 }} />
                 </button>
               );
             })()}
-
-            {/* Generation speed pill */}
-            {showChat && (() => {
-              const currentSpeedStr = generationSpeed?.current !== null && generationSpeed?.current !== undefined
-                ? `${generationSpeed.current.toFixed(1)} t/s`
-                : null;
-              const averageSpeedStr = generationSpeed?.average !== null && generationSpeed?.average !== undefined
-                ? `AVG ${generationSpeed.average.toFixed(1)} t/s`
-                : null;
-              if (!currentSpeedStr && !averageSpeedStr) return null;
-              const speedTitle = currentSpeedStr
-                ? t("appShell.tooltipCurrentSpeed", { value: currentSpeedStr })
-                : t("appShell.tooltipAverageSpeed", { value: averageSpeedStr! });
-
-              return (
-                <div
-                  title={speedTitle}
-                  className="shell-metric-pill shell-pill-extra"
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                    height: 26,
-                    padding: "0 8px",
-                    borderRadius: "var(--radius-control)",
-                    border: "var(--bw) solid var(--border)",
-                    background: "var(--bg-subtle)",
-                    color: currentSpeedStr ? "var(--accent)" : "var(--text-muted)",
-                    fontSize: 11,
-                    fontFamily: "var(--font-mono)",
-                    fontVariantNumeric: "tabular-nums",
-                    whiteSpace: "nowrap",
-                    cursor: "default",
-                    flexShrink: 0,
-                  }}
-                >
-                  <Zap size={11} strokeWidth={2} aria-hidden="true" style={{ color: currentSpeedStr ? "var(--accent)" : "var(--text-dim)" }} />
-                  <span style={{ fontWeight: currentSpeedStr ? 600 : 400 }}>
-                    {currentSpeedStr ?? averageSpeedStr}
-                  </span>
-                </div>
-              );
-            })()}
           </div>
-          {(activeTopPanel === "system" || activeTopPanel === "usage" || activeTopPanel === "session") && topPanelPos && (
+          {(activeTopPanel === "system" || activeTopPanel === "status") && topPanelPos && (
             <div data-top-panel className="dropdown-surface" style={{
               position: "fixed",
               top: topPanelPos.top,
               right: isMobile ? 8 : 12,
               left: "auto",
-              width: activeTopPanel === "session"
+              width: activeTopPanel === "status"
                 ? "min(720px, calc(100vw - 24px))"
                 : "min(560px, calc(100vw - 24px))",
               minWidth: 0,
@@ -1935,7 +1866,7 @@ export function AppShell() {
               boxSizing: "border-box",
               zIndex: 500,
             }}>
-              {activeTopPanel === "usage" && (
+              {activeTopPanel === "status" && providerUsageVisible && (
                 <div className="session-info-popover" style={{
                   background: "var(--bg-panel)",
                   borderBottom: "var(--bw) solid var(--border)",
@@ -2109,7 +2040,7 @@ export function AppShell() {
                   )}
                 </div>
               )}
-              {activeTopPanel === "session" && (
+              {activeTopPanel === "status" && (
                 <div className="session-info-popover">
                   {sessionStats ? (() => {
                     const sessionRows = [
@@ -2143,11 +2074,13 @@ export function AppShell() {
                       ...(sessionStats.tokens.cacheWrite > 0 ? [{ label: t("appShell.statCacheWrite"), value: sessionStats.tokens.cacheWrite.toLocaleString(locale), icon: <Database size={12} strokeWidth={1.8} aria-hidden="true" />, color: "var(--status-modified)" } as MetricRow] : []),
                       { label: t("appShell.statTotal"), value: sessionStats.tokens.total.toLocaleString(locale), icon: <Hash size={12} strokeWidth={1.8} aria-hidden="true" /> },
                     ];
+                    // Live rate while generating, session average at rest.
+                    const statusSpeed = generationSpeed?.current ?? generationSpeed?.average ?? null;
                     const extraTokenRows: MetricRow[] = [
                       ...(cacheHitRate !== null ? [{ label: t("appShell.statCacheRate"), value: formatPercent(cacheHitRate), icon: <Percent size={12} strokeWidth={1.8} aria-hidden="true" />, color: cacheRateColor } as MetricRow] : []),
                       ...(ctx?.contextWindow ? [{ label: t("appShell.statContext"), value: `${ctx.percent !== null ? formatPercent(ctx.percent) : "?"} / ${formatCompactNumber(ctx.contextWindow)}`, icon: <Gauge size={12} strokeWidth={1.8} aria-hidden="true" />, color: ctxColor } as MetricRow] : []),
                       ...(sessionStats.cost > 0 ? [{ label: t("appShell.statCost"), value: `$${sessionStats.cost.toFixed(4)}`, icon: <DollarSign size={12} strokeWidth={1.8} aria-hidden="true" /> } as MetricRow] : []),
-                      ...(generationSpeed?.current != null ? [{ label: "Speed", value: `${generationSpeed.current.toFixed(1)} t/s`, icon: <Zap size={12} strokeWidth={1.8} aria-hidden="true" />, color: "var(--status-success)" } as MetricRow] : []),
+                      ...(statusSpeed != null ? [{ label: generationSpeed?.current != null ? "Speed" : "Avg speed", value: `${statusSpeed.toFixed(1)} t/s`, icon: <Zap size={12} strokeWidth={1.8} aria-hidden="true" />, color: generationSpeed?.current != null ? "var(--status-success)" : "var(--text-dim)" } as MetricRow] : []),
                       ...(modelCapacity?.maxTokens ? [{ label: "Max Output", value: formatCompactNumber(modelCapacity.maxTokens), icon: <ArrowUpRight size={12} strokeWidth={1.8} aria-hidden="true" />, color: "var(--text-dim)" } as MetricRow] : []),
                     ];
                     const metricCard = (title: string, sectionRows: MetricRow[]) => (
@@ -2241,7 +2174,7 @@ export function AppShell() {
               onSystemPromptChange={handleSystemPromptChange}
               onSystemPromptLoaderChange={handleSystemPromptLoaderChange}
               onSessionStatsChange={handleSessionStatsChange}
-              onSessionStatsPanelOpen={openSessionStatsPanel}
+              onSessionStatsPanelOpen={openStatusPanel}
               onProviderUsageContextChange={handleProviderUsageContextChange}
               onContextUsageChange={handleContextUsageChange}
               onModelCapacityChange={handleModelCapacityChange}
