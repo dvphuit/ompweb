@@ -56,6 +56,50 @@ export async function resolveDirectory(directory: string): Promise<string> {
   return fsPromises.realpath(normalizeDirectory(directory));
 }
 
+/**
+ * A directory whose name starts with `.` is a hidden (dot-prefixed) entry on
+ * every OS — `.git`, `.cache`, or a whole workspace like `~/projects/.secrets`.
+ * `.` and `..` are path components rather than listings, so they never match.
+ */
+export function isHiddenDirectoryName(name: string): boolean {
+  return name.startsWith(".") && name !== "." && name !== "..";
+}
+
+/**
+ * Query-param form of the "show hidden folders" toggle. Anything besides the
+ * truthy spellings — including a missing parameter — keeps hidden directories
+ * out of the listing, so the picker defaults to `false`.
+ */
+export function parseShowHiddenParam(value: string | null | undefined): boolean {
+  return value === "1" || value === "true" || value === "yes";
+}
+
+export interface DirectoryListing {
+  /** Entries the caller should render, already sorted by name. */
+  directories: BrowsableDirectory[];
+  /** Dot-prefixed entries left out of `directories` (0 when showing hidden). */
+  hiddenCount: number;
+}
+
+/**
+ * Split a raw listing by the picker's "hidden dirs (`. prefix`)" option. The
+ * count is returned alongside the visible entries so the UI can hint that more
+ * folders exist behind the toggle without a second filesystem walk.
+ */
+export function partitionHiddenDirectories(
+  entries: readonly BrowsableDirectory[],
+  includeHidden: boolean,
+): DirectoryListing {
+  if (includeHidden) return { directories: [...entries], hiddenCount: 0 };
+  const directories = entries.filter((entry) => !isHiddenDirectoryName(entry.name));
+  return { directories, hiddenCount: entries.length - directories.length };
+}
+
+/**
+ * Raw listing of readable subdirectories, hidden (dot-prefixed) ones included.
+ * Whether they reach the UI is the caller's decision — see
+ * `partitionHiddenDirectories`.
+ */
 export async function listDirectories(directory: string): Promise<BrowsableDirectory[]> {
   // Keep the directory argument opaque to Next's NFT build tracer. This is a
   // user-selected path and must only be inspected at request time; tracing it

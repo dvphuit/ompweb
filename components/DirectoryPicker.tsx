@@ -1,10 +1,12 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useModalDialog } from "@/hooks/useModalDialog";
 import { useI18n } from "@/lib/i18n";
 import { formatApiError } from "@/lib/i18n/api-error";
+import { getShowHiddenDirectories, setShowHiddenDirectories } from "@/lib/directory-picker-prefs";
+import { Check } from "./ui/field";
 
 interface DirectoryEntry {
   name: string;
@@ -16,13 +18,24 @@ interface BrowseResponse {
   parentPath?: string | null;
   directories?: DirectoryEntry[];
   drives?: DirectoryEntry[];
+  /** Dot-prefixed folders left out of `directories` (only while hidden dirs are off). */
+  hiddenCount?: number;
   error?: string;
   code?: string;
 }
 
-async function loadDirectories(directory?: string): Promise<BrowseResponse> {
-  const query = directory ? `?path=${encodeURIComponent(directory)}` : "";
-  const response = await fetch(`/api/cwd/browse${query}`);
+/** Build the browse query for one listing request. `hidden` is omitted rather
+ *  than sent as "0": the endpoint treats a missing flag as false, so the
+ *  option's default cannot drift between client and server. */
+export function buildBrowseQuery(directory: string | undefined, includeHidden: boolean): string {
+  const params: string[] = [];
+  if (directory) params.push(`path=${encodeURIComponent(directory)}`);
+  if (includeHidden) params.push("hidden=1");
+  return params.length > 0 ? `?${params.join("&")}` : "";
+}
+
+async function loadDirectories(directory: string | undefined, includeHidden: boolean): Promise<BrowseResponse> {
+  const response = await fetch(`/api/cwd/browse${buildBrowseQuery(directory, includeHidden)}`);
   const data = await response.json() as BrowseResponse;
   if (!response.ok || data.error) {
     throw new Error(formatApiError({ ...data, error: data.error ?? `HTTP ${response.status}` }));
@@ -60,7 +73,7 @@ interface Props {
 }
 
 export function DirectoryPicker({ onCancel, onSelect, busy = false, error }: Props) {
-  const { t } = useI18n();
+  const { t, tn } = useI18n();
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const [currentPath, setCurrentPath] = useState("");
   const [parentDirectory, setParentDirectory] = useState<string | null>(null);
@@ -72,32 +85,65 @@ export function DirectoryPicker({ onCancel, onSelect, busy = false, error }: Pro
   const [advisor, setAdvisor] = useState(false);
   const [extraArgs, setExtraArgs] = useState("");
   const [loading, setLoading] = useState(true);
+  // "hidden dirs (`. prefix`)" — dot-prefixed folders in the browse listing.
+  // Off by default; the choice is remembered across openings, not per project.
+  const [showHidden, setShowHidden] = useState(false);
+  const [hiddenCount, setHiddenCount] = useState(0);
+  // Refs mirror the two values the async listing needs at call time, so
+  // `navigateTo` stays stable and a toggle never races a stale state read.
+  const showHiddenRef = useRef(false);
+  const currentPathRef = useRef("");
+  const requestSeqRef = useRef(0);
   const dialogRef = useModalDialog<HTMLDivElement>({
     onClose: () => { if (!busy) onCancel(); },
     active: portalTarget !== null,
   });
 
-  const navigateTo = useCallback(async (directory?: string) => {
+  const navigateTo = useCallback(async (directory?: string, options?: { includeHidden?: boolean; keepPathInput?: boolean }) => {
+    const includeHidden = options?.includeHidden ?? showHiddenRef.current;
+    const requestId = ++requestSeqRef.current;
     setLoading(true);
     setLoadError(null);
     try {
-      const data = await loadDirectories(directory);
+      const data = await loadDirectories(directory, includeHidden);
+      // A slow response must not land after a newer one (fast toggle clicks, or
+      // clicking into a folder and back) and resurrect the previous listing.
+      if (requestId !== requestSeqRef.current) return;
       const nextPath = data.path ?? directory ?? "/";
+      currentPathRef.current = nextPath;
       setCurrentPath(nextPath);
       setParentDirectory(data.parentPath ?? null);
-      setPathInput(nextPath);
+      // Re-listing the current folder (hidden-dirs toggle) must not clobber a
+      // path the user typed but has not submitted yet.
+      if (!options?.keepPathInput) setPathInput(nextPath);
       setDirectories(data.directories ?? []);
       setDrives(data.drives ?? null);
+      setHiddenCount(data.hiddenCount ?? 0);
     } catch (cause) {
+      if (requestId !== requestSeqRef.current) return;
       setLoadError(cause instanceof Error ? cause.message : String(cause));
     } finally {
-      setLoading(false);
+      if (requestId === requestSeqRef.current) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     setPortalTarget(document.body);
-    void navigateTo();
+    // Hydration-safe: the stored preference only exists in the browser, so it
+    // is applied just before the first listing instead of in a useState init.
+    const stored = getShowHiddenDirectories();
+    showHiddenRef.current = stored;
+    setShowHidden(stored);
+    void navigateTo(undefined, { includeHidden: stored });
+  }, [navigateTo]);
+
+  /** Flip the option, persist it, and re-read the folder that is on screen. */
+  const toggleShowHidden = useCallback(() => {
+    const next = !showHiddenRef.current;
+    showHiddenRef.current = next;
+    setShowHidden(next);
+    setShowHiddenDirectories(next);
+    void navigateTo(currentPathRef.current || undefined, { includeHidden: next, keepPathInput: true });
   }, [navigateTo]);
 
   const handlePathSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -179,6 +225,20 @@ export function DirectoryPicker({ onCancel, onSelect, busy = false, error }: Pro
             {t("directoryPicker.go")}
           </button>
         </form>
+
+        <div className="directory-picker-options" style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, padding: "7px 14px", borderBottom: "var(--bw) solid var(--border)" }}>
+          <Check
+            label={<span title={t("directoryPicker.showHiddenHint")}>{t("directoryPicker.showHidden")}</span>}
+            checked={showHidden}
+            onChange={toggleShowHidden}
+            disabled={loading}
+          />
+          {!showHidden && hiddenCount > 0 && (
+            <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-dim)", textAlign: "right" }}>
+              {tn("directoryPicker.hiddenFolders", hiddenCount)}
+            </span>
+          )}
+        </div>
 
         <div className="directory-picker-list" style={{ flex: 1, minHeight: 0, overflow: "auto", padding: "8px 10px" }}>
           {loading ? (
