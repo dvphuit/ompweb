@@ -2695,6 +2695,10 @@ html.dark .dropdown-surface :is(select, option) {
     flex-wrap: wrap;
     padding-bottom: max(10px, env(safe-area-inset-bottom)) !important;
   }
+  /* Hidden-dirs toggle gets the same tap height as the picker's other controls. */
+  .directory-picker-options label {
+    min-height: 44px;
+  }
 }
 
 /* Desktop Context Menu */

@@ -245,6 +245,22 @@ handled or safely ignored.
   treatment, and the active project's worktree selector renders directly
   below its row.
 
+### Directory picker — add-workspace flow (`components/DirectoryPicker.tsx`, `/api/cwd/browse`)
+- The picker lists subdirectories only; "Select this folder" registers the folder
+  that is currently open. It carries the same launch-config fields as
+  `ProjectLaunchConfigDialog` so a workspace can be configured while it is added.
+- **Hidden dirs (`. prefix`) default to OFF**: dot-prefixed folders (`.git`,
+  `.cache`, `~/.dotfiles`) are left out of the listing. `listDirectories` still
+  returns them — the filtering is applied by the route via
+  `partitionHiddenDirectories`, which also reports `hiddenCount` so the UI can say
+  how many folders the toggle is hiding. Keep that split: the option is a browsing
+  filter, never a registration rule, so a hand-typed `~/projects/.secrets` must
+  stay addable through `POST /api/projects`.
+- The toggle is an ompweb UI preference in `localStorage`
+  (`omp-web:directory-picker-show-hidden`, see `lib/directory-picker-prefs.ts`) —
+  not part of the registry or the launch config. The picker must NOT import
+  `lib/directory-browser.ts` (it pulls `fs/promises` into the client bundle).
+
 ### File access allow-list
 - `/api/files` is intentionally not a general filesystem browser. Allowed roots come from session cwds, their resolved project roots, `~/omp-cwd-*`, and roots explicitly added with `allowFileRoot()`.
 - `/api/cwd/validate`, `/api/default-cwd`, and `/api/worktrees` call `allowFileRoot()` when they make a new location browsable.
