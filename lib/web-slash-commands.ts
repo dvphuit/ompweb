@@ -9,7 +9,10 @@
  * actually receives a clear instruction rather than a stray "/goal ..." line.
  *
  * Pure definitions — no I/O. Prompt text is deliberately concise; the args are
- * user-supplied and embedded verbatim.
+ * user-supplied and embedded verbatim. Command names match case-insensitively
+ * (like the palette filter does) but aliases are not accepted, so anything the
+ * client does not own — including a user-defined command that shadows one of
+ * these names — is left for omp to resolve.
  */
 
 export interface WebSlashCommandDef {
@@ -19,6 +22,12 @@ export interface WebSlashCommandDef {
   argumentHintKey: string;
   /** Commands without args refuse to run and surface usage instead. */
   requiresArgs: boolean;
+  /**
+   * Optional validation of non-empty args. Returning false surfaces the
+   * command's usage line instead of expanding a prompt nobody asked for —
+   * e.g. `/loop 4`, where the only token is a count and the task is missing.
+   */
+  validateArgs?: (args: string) => boolean;
   buildPrompt: (args: string) => string;
 }
 
@@ -57,12 +66,26 @@ const ADVISOR_PROMPT = (args: string) =>
 
 const LOOP_MAX_ATTEMPTS = 10;
 const LOOP_DEFAULT_ATTEMPTS = 3;
+const LOOP_COUNT_RE = /^(\d+)(?:\s+([\s\S]*))?$/;
+
+/**
+ * Parse `/loop [count] <task>`. A missing count takes the default; a count
+ * without a task, or one below 1, yields null so the dispatcher can report
+ * usage instead of guessing — silently turning `/loop 0 x` into "3 attempts of
+ * x" would run work the user explicitly asked not to repeat.
+ */
+function parseLoopArgs(args: string): { attempts: number; task: string } | null {
+  const match = args.match(LOOP_COUNT_RE);
+  if (!match) return { attempts: LOOP_DEFAULT_ATTEMPTS, task: args };
+  const requested = Number.parseInt(match[1], 10);
+  const task = (match[2] ?? "").trim();
+  if (!task || !Number.isFinite(requested) || requested < 1) return null;
+  return { attempts: Math.min(requested, LOOP_MAX_ATTEMPTS), task };
+}
 
 const LOOP_PROMPT = (args: string) => {
-  const match = args.match(/^(\d+)\s+([\s\S]+)$/);
-  const attempts = match ? Math.min(Math.max(parseInt(match[1], 10) || LOOP_DEFAULT_ATTEMPTS, 1), LOOP_MAX_ATTEMPTS) : LOOP_DEFAULT_ATTEMPTS;
-  const task = match ? match[2].trim() : args;
-  return `Attempt the following task, verifying the result concretely after each attempt (run the relevant checks or tests). If it is not fully done, try again from where it stands, building on what you learned — up to ${attempts} attempts in total. Stop early once it is done. Do not ask for confirmation between attempts.\n\nTask:\n\n${task}`;
+  const { attempts, task } = parseLoopArgs(args) ?? { attempts: LOOP_DEFAULT_ATTEMPTS, task: args };
+  return `Attempt the following task, verifying the result concretely after each attempt (run the relevant checks or tests). If it is not fully done, try again from where it stands, building on what you learned — up to ${attempts} attempt${attempts === 1 ? "" : "s"} in total. Stop early once it is done. Do not ask for confirmation between attempts.\n\nTask:\n\n${task}`;
 };
 
 export const WEB_SLASH_COMMANDS: readonly WebSlashCommandDef[] = [
@@ -134,13 +157,39 @@ export const WEB_SLASH_COMMANDS: readonly WebSlashCommandDef[] = [
     descriptionKey: "chatInput.cmdLoop",
     argumentHintKey: "chatInput.cmdLoopArg",
     requiresArgs: true,
+    validateArgs: (args) => parseLoopArgs(args) !== null,
     buildPrompt: LOOP_PROMPT,
   },
 ];
-const WEB_SLASH_COMMAND_LOOKUP = new Map(WEB_SLASH_COMMANDS.map((command) => [command.name, command]));
+const WEB_SLASH_COMMAND_LOOKUP = new Map(WEB_SLASH_COMMANDS.map((command) => [command.name.toLowerCase(), command]));
 
+/**
+ * Resolve a command by name. Matching is case-insensitive — the palette filters
+ * names case-insensitively, so `/Goal` must not silently fall through to the
+ * agent as literal slash text — while aliases remain unsupported.
+ */
 export function getWebSlashCommand(name: string): WebSlashCommandDef | undefined {
-  return WEB_SLASH_COMMAND_LOOKUP.get(name);
+  return WEB_SLASH_COMMAND_LOOKUP.get(name.toLowerCase());
+}
+
+export interface ParsedSlashCommand {
+  /** Lowercased command name (`"/GOAL ship it"` → `"goal"`). */
+  name: string;
+  /** Everything after the name, trimmed (`"ship it"`). */
+  args: string;
+}
+
+/**
+ * Split a slash line into name + args, or null when the text is not a
+ * single-token slash command. The one parser shared by the composer, the
+ * dispatcher, and the expansion below — three hand-rolled copies of the same
+ * regex were how `/goal clear` ended up handled on only one of them.
+ */
+export function parseSlashCommandLine(text: string): ParsedSlashCommand | null {
+  if (!text.startsWith("/")) return null;
+  const match = text.match(/^\/([^\s]+)(?:\s+([\s\S]*))?$/);
+  if (!match) return null;
+  return { name: match[1].toLowerCase(), args: (match[2] ?? "").trim() };
 }
 
 export type WebSlashCommandExpansion =
@@ -156,14 +205,24 @@ export type WebSlashCommandExpansion =
  * command is never forwarded to omp as literal slash text.
  */
 export function expandWebSlashCommand(text: string): WebSlashCommandExpansion {
-  if (!text.startsWith("/")) return { kind: "not-web" };
-  const match = text.match(/^\/([^\s]+)(?:\s+([\s\S]*))?$/);
-  if (!match) return { kind: "not-web" };
-  const def = getWebSlashCommand(match[1]);
+  const parsed = parseSlashCommandLine(text);
+  if (!parsed) return { kind: "not-web" };
+  const def = getWebSlashCommand(parsed.name);
   if (!def) return { kind: "not-web" };
-  const args = (match[2] ?? "").trim();
-  if (def.requiresArgs && !args) {
+  const args = parsed.args;
+  // Missing args, or args the command cannot use: report usage, never expand.
+  if ((def.requiresArgs && !args) || (args && def.validateArgs?.(args) === false)) {
     return { kind: "usage-error", command: `/${def.name}`, argumentHintKey: def.argumentHintKey };
   }
   return { kind: "expand", prompt: def.buildPrompt(args) };
+}
+
+/**
+ * Lowercased command name of a slash line (`"/goal ship it"` → `"goal"`), or
+ * null when the text is not a single-token slash command. Shared by the idle
+ * dispatcher and the streaming queue so both gate on the same name, and both
+ * ignore case the way the palette does.
+ */
+export function slashCommandNameOf(text: string): string | null {
+  return parseSlashCommandLine(text)?.name ?? null;
 }

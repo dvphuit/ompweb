@@ -208,6 +208,13 @@ export interface CompactResultInfo {
 export interface SlashCommandInfo {
   name: string;
   description?: string;
+  /** omp's own argument hint (`input.hint`), shown after the name in the palette. */
+  argumentHint?: string;
+  /**
+   * Alternate names omp accepts. They are searchable but never inserted: the
+   * palette completes to the primary name, which every omp handler accepts.
+   */
+  aliases?: string[];
   source: "extension" | "prompt" | "skill";
   sourceInfo?: {
     path: string;
@@ -221,6 +228,19 @@ export interface SlashCommandInfo {
 export type BuiltinSlashCommandResult =
   | { handled: false }
   | { handled: true; message?: string; error?: string; action?: "openSessionStats"; retainInput?: boolean };
+
+export interface BuiltinSlashCommandOptions {
+  /**
+   * Replacement for the default "send it now" transport. Callers that cannot use
+   * the plain prompt pipeline — a run is active, so the prompt must be queued;
+   * or an attachment is attached, so it must ride along — pass the delivery
+   * here instead. The dispatcher keeps ownership of command semantics (goal/plan
+   * state, `/goal clear`, the advisor gate, size limits) and only hands back the
+   * expanded prompt, so no caller has to re-implement expansion and quietly
+   * drift from it.
+   */
+  deliver?: (prompt: string) => void | Promise<void>;
+}
 
 export type ThinkingLevelOption = string;
 
@@ -392,9 +412,12 @@ export type SlashCommandsResponse = {
   commands?: RpcAvailableSlashCommand[];
 };
 
-// Map omp's slash-command sources onto the palette's grouping. Builtins are
-// skipped: the client intercepts its own builtin set, and other omp builtins
-// still work when typed (omp executes them via the prompt command).
+// Map omp's slash-command sources onto the palette's grouping. omp's own
+// builtins are skipped: the client implements its own set for them, because the
+// RPC prompt path forwards same-named builtins (`/goal`, `/plan`, …) as literal
+// user text instead of executing them (see lib/web-slash-commands.ts).
+// Extension/prompt/skill commands are different — omp resolves those from the
+// prompt text — so they are advertised verbatim and never rewritten here.
 export function toSlashCommandInfo(command: RpcAvailableSlashCommand): SlashCommandInfo | null {
   if (command.source === "builtin") return null;
   const source: SlashCommandInfo["source"] = command.source === "extension"
@@ -402,5 +425,18 @@ export function toSlashCommandInfo(command: RpcAvailableSlashCommand): SlashComm
     : command.source === "skill"
       ? "skill"
       : "prompt";
-  return { name: command.name, description: command.description, source };
+  // omp's payload is typed, but it arrives over a pipe: read it defensively so a
+  // malformed field cannot throw while the composer renders the palette.
+  const rawHint = command.input?.hint;
+  const argumentHint = typeof rawHint === "string" ? rawHint.trim() : "";
+  const aliases = (command.aliases ?? []).filter(
+    (alias) => typeof alias === "string" && alias.length > 0 && alias !== command.name,
+  );
+  return {
+    name: command.name,
+    description: command.description,
+    ...(argumentHint ? { argumentHint } : {}),
+    ...(aliases.length ? { aliases } : {}),
+    source,
+  };
 }

@@ -13,7 +13,9 @@ export function copyText(text: string): Promise<void> {
     document.body.removeChild(ta);
     return Promise.resolve();
   } catch {
-    return Promise.reject();
+    // Callers surface `error.message`, so reject with a readable Error rather
+    // than an empty rejection (which renders as "undefined" in a toast).
+    return Promise.reject(new Error("Clipboard is unavailable in this browser context"));
   }
 }
 

@@ -3,11 +3,11 @@
 import React, { useRef, useState, useCallback, useEffect, useImperativeHandle, forwardRef, memo, KeyboardEvent } from "react";
 import { ChevronDown, ListChecks, Search, Shrink, Sparkles, Wrench, Zap } from "lucide-react";
 import { getSubmitDuringRunBehavior } from "@/lib/composer-prefs";
-import type { BuiltinSlashCommandResult, CompactResultInfo, QueuedMessages, SlashCommandInfo } from "@/hooks/useAgentSession";
+import type { BuiltinSlashCommandOptions, BuiltinSlashCommandResult, CompactResultInfo, QueuedMessages, SlashCommandInfo } from "@/hooks/useAgentSession";
 import type { ActiveGoal, ActivePlan } from "@/lib/web-mode-state";
 import { toast } from "@/components/ui/toast";
 import { clearDraft, getDraft, setDraft } from "@/lib/draft-store";
-import { expandWebSlashCommand } from "@/lib/web-slash-commands";
+import { expandWebSlashCommand, slashCommandNameOf, type WebSlashCommandExpansion } from "@/lib/web-slash-commands";
 import type { AttachedImage, AttachedTextFile } from "./ChatInput-draft-attachments";
 import {
   draftFilesToAttachedFiles,
@@ -22,7 +22,9 @@ import {
   SLASH_SOURCE_GROUP_LABEL_KEYS,
   SLASH_SOURCE_ORDER,
   SLASH_SOURCES,
+  isActionSlashCommand,
   isDormantSkillCommand,
+  slashCommandMatchesQuery,
   slashMatchRank,
   type SlashCommandPaletteItem,
   type SlashCommandSource,
@@ -115,7 +117,7 @@ interface Props {
   slashCommands?: SlashCommandInfo[];
   slashCommandsLoading?: boolean;
   onLoadSlashCommands?: () => Promise<SlashCommandInfo[]> | SlashCommandInfo[];
-  onBuiltinCommand?: (message: string) => Promise<BuiltinSlashCommandResult>;
+  onBuiltinCommand?: (message: string, options?: BuiltinSlashCommandOptions) => Promise<BuiltinSlashCommandResult>;
   onAudioUnlock?: () => void;
   draftKey?: string;
   /** Session working directory — enables the @ file autocomplete menu */
@@ -564,28 +566,99 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     return error !== null;
   }, []);
 
+  /** A required-arg command with unusable args: show its usage, keep the input. */
+  const reportCommandUsage = useCallback(
+    (usage: Extract<WebSlashCommandExpansion, { kind: "usage-error" }>) => {
+      toast.error(t("chatInput.commandUsageTitle"), t("agentSession.commandRequiresArgs", {
+        command: usage.command,
+        usage: t(usage.argumentHintKey),
+      }));
+    },
+    [t],
+  );
+
+  // Names reported by omp for this session (extension / prompt / skill
+  // commands). A user-defined command always beats the client's look-alike —
+  // both in the palette and at dispatch — so the two views can never disagree.
+  const userCommandNames = React.useMemo(
+    () => new Set((slashCommands ?? []).map((command) => command.name.toLowerCase())),
+    [slashCommands],
+  );
+  /** True when the composer — not omp — executes this slash command. */
+  const isClientOwnedSlashCommand = useCallback(
+    (name: string | null) => name !== null && CLIENT_BUILTIN_COMMAND_NAMES.has(name) && !userCommandNames.has(name),
+    [userCommandNames],
+  );
+
   const handleSend = useCallback(async () => {
     const msg = value.trim();
     if (!msg && !attachedImages.length && !attachedTextFiles.length) return;
     if (isStreaming) return;
     onAudioUnlock?.();
     const composedMessage = composeMessageWithTextAttachments(msg, attachedTextFiles);
-    if (!attachedImages.length && !attachedTextFiles.length && msg.startsWith("/") && onBuiltinCommand) {
+    const hasAttachments = attachedImages.length > 0 || attachedTextFiles.length > 0;
+    const commandName = slashCommandNameOf(msg);
+    if (isClientOwnedSlashCommand(commandName)) {
       const expansion = expandWebSlashCommand(msg);
-      if (expansion.kind === "expand" && rejectsOversizedPrompt(expansion.prompt, attachedImages)) return;
-      const sentValue = value;
-      const result = await onBuiltinCommand(msg);
-      if (result.handled) {
-        // The user may have started typing while the command ran; only clear
-        // if the composer still holds what was sent.
-        if (!result.error && !result.retainInput && valueRef.current === sentValue) clearInput();
+      // The advisor toggle gates every path, including the ones the composer can
+      // resolve without the dispatcher — an attachment must not be a bypass.
+      if (commandName === "advisor" && !advisorEnabled) {
+        toast.error(t("agentSession.advisorDisabled"));
         return;
+      }
+      // Session commands act on the session, not on the message: with an
+      // attachment there is nothing to deliver them through, and sending the
+      // literal "/compact" text would hand the model a command while silently
+      // dropping the file it was attached to.
+      if (hasAttachments && isActionSlashCommand(commandName)) {
+        toast.error(t("chatInput.commandUsageTitle"), t("chatInput.commandNoAttachments"));
+        return;
+      }
+      // The routes reject an oversized prompt only after the optimistic bubble
+      // is up, so preflight the body that will actually be sent — expanded, and
+      // with the files still appended. With no files this is the expanded prompt
+      // unchanged, so one check covers both transports below.
+      const expandedBody = expansion.kind === "expand"
+        ? composeMessageWithTextAttachments(expansion.prompt, attachedTextFiles)
+        : null;
+      if (expandedBody !== null && rejectsOversizedPrompt(expandedBody, attachedImages)) return;
+      if (!onBuiltinCommand) {
+        // A composer mounted without the session hook still must not leak slash
+        // text: expand what we own, report what cannot run, and leave anything
+        // else (omp's own commands) to travel verbatim.
+        if (expansion.kind === "expand") {
+          onSend(expandedBody ?? expansion.prompt, attachedImages.length ? attachedImages : undefined);
+          clearInput();
+          return;
+        }
+        if (expansion.kind === "usage-error") {
+          reportCommandUsage(expansion);
+          return;
+        }
+      } else {
+        // The dispatcher decides what the command means (goal/plan state, the
+        // `/goal clear` verb, usage errors) and hands the expanded prompt back
+        // here when the composer has to deliver it itself — i.e. when files are
+        // attached and must ride along. The pre-composed body is reused so what
+        // is sent is byte-for-byte what the size preflight approved.
+        const sentValue = value;
+        const result = await onBuiltinCommand(msg, hasAttachments ? {
+          deliver: (prompt) => {
+            onSend(expandedBody ?? prompt, attachedImages.length ? attachedImages : undefined);
+          },
+        } : undefined);
+        if (result.handled) {
+          // The user may have started typing while the command ran; only clear
+          // if the composer still holds what was sent.
+          if (!result.error && !result.retainInput && valueRef.current === sentValue) clearInput();
+          return;
+        }
       }
     }
     if (rejectsOversizedPrompt(composedMessage, attachedImages)) return;
     onSend(composedMessage, attachedImages.length ? attachedImages : undefined);
     clearInput();
-  }, [value, attachedImages, attachedTextFiles, isStreaming, onBuiltinCommand, onSend, clearInput, onAudioUnlock, rejectsOversizedPrompt]);
+  }, [value, attachedImages, attachedTextFiles, isStreaming, onBuiltinCommand, onSend, clearInput, onAudioUnlock, rejectsOversizedPrompt, isClientOwnedSlashCommand, reportCommandUsage, advisorEnabled, t]);
 
   const slashQuery = value.startsWith("/") && !/\s/.test(value.slice(1))
     ? value.slice(1).toLowerCase()
@@ -610,24 +683,28 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
       // The /advisor command is linked to Settings → Enable Advisor: hidden
       // from the palette while the advisor is disabled.
       .filter((def) => def.name !== "advisor" || advisorEnabled)
+      // A user-defined command with the same name replaces the client's copy
+      // (dispatch defers to it too), so showing both would advertise a command
+      // that never runs.
+      .filter((def) => !userCommandNames.has(def.name.toLowerCase()))
       .map((def) => ({
         name: def.name,
         description: t(def.descriptionKey),
         ...(def.argumentHintKey ? { argumentHint: t(def.argumentHintKey) } : {}),
         source: "builtin" as const,
       })),
-    [t, advisorEnabled],
+    [t, advisorEnabled, userCommandNames],
   );
 
-  // Externally reported commands (extension/prompt/skill/ompBuiltin) group
-  // below the client built-ins; any name the web UI intercepts itself —
-  // whether an omp builtin or a user extension — is dropped so each command
-  // appears exactly once and the client interception behavior is unchanged.
+  // Externally reported commands (extension/prompt/skill) group below the
+  // client built-ins and keep their own names even when one collides — the
+  // user's definition is what omp will run. Only omp's TUI-only builtins are
+  // dropped, since the client owns a working equivalent for those.
   const externalSlashCommands: SlashCommandPaletteItem[] = React.useMemo(
     () => (slashCommands ?? []).flatMap((command): SlashCommandPaletteItem[] => {
       const source = command.source as string;
-      if (CLIENT_BUILTIN_COMMAND_NAMES.has(command.name)) return [];
       if (source === "builtin" || source === "ompBuiltin") {
+        if (CLIENT_BUILTIN_COMMAND_NAMES.has(command.name.toLowerCase())) return [];
         return [{ name: command.name, description: command.description, source: "ompBuiltin" }];
       }
       return [command];
@@ -637,13 +714,18 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
 
   const filteredSlashCommands = (() => {
     if (slashQuery === null) return [];
-    const commands = [...(isStreaming ? [] : builtinSlashCommands), ...externalSlashCommands];
+    // While a run is active the composer queues what it accepts, so only
+    // commands that survive queueing are listed: prompt-composing commands are
+    // expanded into the queue by the dispatcher, whereas session commands
+    // (/compact, /reload, …) would only sit there as text omp has no reason to
+    // execute. Hiding every builtin — as this used to do — also hid the ones
+    // that work, so a running agent left the palette empty.
+    const visibleBuiltinCommands = isStreaming
+      ? builtinSlashCommands.filter((command) => !isActionSlashCommand(command.name))
+      : builtinSlashCommands;
+    const commands = [...visibleBuiltinCommands, ...externalSlashCommands];
     return [...commands]
-      .filter((command) => {
-        const name = command.name.toLowerCase();
-        const description = command.description?.toLowerCase() ?? "";
-        return name.includes(slashQuery) || description.includes(slashQuery);
-      })
+      .filter((command) => slashCommandMatchesQuery(command, slashQuery))
       .sort((a, b) => {
         const sourceDelta = SLASH_SOURCE_ORDER[a.source] - SLASH_SOURCE_ORDER[b.source];
         if (sourceDelta !== 0) return sourceDelta;
@@ -862,40 +944,52 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     });
   }, []);
 
-  const sendQueued = useCallback((mode: "steer" | "followup") => {
+  const sendQueued = useCallback(async (mode: "steer" | "followup") => {
     const msg = value.trim();
     if (!msg && !attachedImages.length && !attachedTextFiles.length) return;
     if (attachedImages.length || attachedTextFiles.length) return;
     onAudioUnlock?.();
     const streamingBehavior = mode === "steer" ? "steer" : "followUp";
-    if (msg.startsWith("/") && onPromptWithStreamingBehavior) {
-      const commandName = msg.slice(1).split(/\s+/)[0];
+    const commandName = slashCommandNameOf(msg);
+    // A queue transport is what makes a slash command deliverable at all while
+    // a run is active; without one, nothing below can promise delivery.
+    const canQueuePrompt = Boolean(onPromptWithStreamingBehavior);
+    if (canQueuePrompt && isClientOwnedSlashCommand(commandName)) {
       // Same gate as the direct path (useAgentSession refuses /advisor while
       // disabled): queueing must not become a bypass around the toggle.
       if (commandName === "advisor" && !advisorEnabled) {
         toast.error(t("agentSession.advisorDisabled"));
         return;
       }
-      // Web commands must be expanded even when queued: the raw slash text
-      // would otherwise reach omp as a literal message (its /goal //plan are
-      // TUI-only). Action commands (compact/...) keep the raw text so omp's
-      // own ACP handlers can run them.
-      const expansion = expandWebSlashCommand(msg);
-      if (expansion.kind === "expand") {
-        if (rejectsOversizedPrompt(expansion.prompt, attachedImages)) return;
-        onPromptWithStreamingBehavior(expansion.prompt, streamingBehavior, attachedImages.length ? attachedImages : undefined);
+      // Action commands (compact/reload/…) are executed by omp itself from the
+      // prompt text, so they keep their raw slash form — expanding or rewriting
+      // them would turn a session command into a chat message.
+      if (isActionSlashCommand(commandName)) {
+        if (rejectsOversizedPrompt(msg, attachedImages)) return;
+        onPromptWithStreamingBehavior?.(msg, streamingBehavior);
         clearInput();
         return;
       }
-      if (expansion.kind === "usage-error") {
-        toast.error(t("chatInput.commandUsageTitle"), t("agentSession.commandRequiresArgs", {
-          command: expansion.command,
-          usage: t(expansion.argumentHintKey),
-        }));
+      // Web commands must be expanded even when queued: the raw slash text
+      // would otherwise reach omp as a literal message (its /goal, /plan are
+      // TUI-only). The dispatcher owns the semantics — the advisor gate,
+      // goal/plan state, `/goal clear`, size limits — and hands the expanded
+      // prompt back here, so queueing behaves like sending rather than skipping
+      // half of the command.
+      const sentValue = value;
+      const result = await onBuiltinCommand?.(msg, {
+        deliver: (prompt) => { onPromptWithStreamingBehavior?.(prompt, streamingBehavior); },
+      });
+      if (result?.handled) {
+        if (!result.error && !result.retainInput && valueRef.current === sentValue) clearInput();
         return;
       }
+    }
+    // Commands the client does not own (omp extension/prompt/skill commands)
+    // travel verbatim so omp resolves them when the queue drains.
+    if (canQueuePrompt && msg.startsWith("/")) {
       if (rejectsOversizedPrompt(msg, attachedImages)) return;
-      onPromptWithStreamingBehavior(msg, streamingBehavior, attachedImages.length ? attachedImages : undefined);
+      onPromptWithStreamingBehavior?.(msg, streamingBehavior);
       clearInput();
       return;
     }
@@ -906,7 +1000,7 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
       onFollowUp(msg, attachedImages.length ? attachedImages : undefined);
     }
     clearInput();
-  }, [value, attachedImages, attachedTextFiles, onPromptWithStreamingBehavior, onSteer, onFollowUp, clearInput, onAudioUnlock, t, advisorEnabled, rejectsOversizedPrompt]);
+  }, [value, attachedImages, attachedTextFiles, onPromptWithStreamingBehavior, onBuiltinCommand, onSteer, onFollowUp, clearInput, onAudioUnlock, t, advisorEnabled, rejectsOversizedPrompt, isClientOwnedSlashCommand]);
   // A typed, text-only message during a run is a queued follow-up. Keep Stop
   // as the action while the composer is empty or contains attachments.
   const primaryActionQueuesMessage =

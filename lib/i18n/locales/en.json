@@ -255,6 +255,7 @@
   "chatInput.toolPresetFooter": "Applies to new sessions",
   "chatInput.cmdCompact": "Compress context, optionally with instructions",
   "chatInput.commandUsageTitle": "Command usage",
+  "chatInput.commandNoAttachments": "Session commands cannot carry attachments — remove the attachment to run this command",
   "chatInput.cmdGoal": "Set the goal for this session",
   "chatInput.cmdGoalArg": "[goal]",
   "chatInput.goalActive": "Goal active",

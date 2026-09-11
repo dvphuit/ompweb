@@ -255,6 +255,7 @@
   "chatInput.toolPresetFooter": "新規セッションに適用",
   "chatInput.cmdCompact": "コンテキストを圧縮します（任意で指示を追加できます）",
   "chatInput.commandUsageTitle": "コマンドの使い方",
+  "chatInput.commandNoAttachments": "セッションコマンドには添付ファイルを含められません — 削除してから実行してください",
   "chatInput.cmdGoal": "セッションの目標を設定する",
   "chatInput.cmdGoalArg": "[目標]",
   "chatInput.goalActive": "目標が有効",
