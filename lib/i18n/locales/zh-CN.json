@@ -255,6 +255,7 @@
   "chatInput.toolPresetFooter": "仅对新会话生效",
   "chatInput.cmdCompact": "压缩上下文，可附加说明",
   "chatInput.commandUsageTitle": "命令用法",
+  "chatInput.commandNoAttachments": "会话命令不能携带附件——请先移除附件再运行该命令",
   "chatInput.cmdGoal": "设定本次会话的目标",
   "chatInput.cmdGoalArg": "[目标]",
   "chatInput.goalActive": "目标进行中",

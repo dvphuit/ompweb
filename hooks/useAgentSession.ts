@@ -19,8 +19,9 @@ import { createMessageUpdateCoalescer, type MessageUpdateCoalescer } from "@/lib
 import { getToolNamesForPreset, type ToolPreset } from "@/lib/tool-presets";
 import { getPreferredToolPreset, setPreferredToolPreset } from "@/lib/tool-preset-preference";
 import { toast } from "@/components/ui/toast";
-import { expandWebSlashCommand } from "@/lib/web-slash-commands";
+import { expandWebSlashCommand, parseSlashCommandLine } from "@/lib/web-slash-commands";
 import { validateOutgoingPrompt } from "@/lib/image-attachments";
+import { copyText } from "@/lib/clipboard";
 import { createActiveGoal, parseActiveGoal, type ActiveGoal, type ActivePlan } from "@/lib/web-mode-state";
 import type { HostToolDefinition, HostUriSchemeDefinition, LiveRpcSessionState, RpcAvailableSlashCommand, SessionStatsInfo, TodoPhase, WebSessionState } from "@/lib/pi-types";
 import { isRecord } from "@/lib/type-guards";
@@ -92,6 +93,7 @@ import type {
   AgentEvent,
   AgentPhase,
   AttachedImage,
+  BuiltinSlashCommandOptions,
   BuiltinSlashCommandResult,
   ChatInputHandle,
   CompactCommandResult,
@@ -114,6 +116,7 @@ import type {
 export type {
   AgentPhase,
   AttachedImage,
+  BuiltinSlashCommandOptions,
   BuiltinSlashCommandResult,
   ChatInputHandle,
   CompactResultInfo,
@@ -2545,13 +2548,22 @@ addNotice({ type: "error", message: e instanceof Error ? e.message : String(e) }
     }
   }, [isNew, newSessionCwd, session?.cwd]);
 
-  const handleBuiltinSlashCommand = useCallback(async (text: string): Promise<BuiltinSlashCommandResult> => {
-    if (!text.startsWith("/")) return { handled: false };
-    const match = text.match(/^\/([^\s]+)(?:\s+([\s\S]*))?$/);
-    if (!match) return { handled: false };
-
-    const [, commandName, rawArgs = ""] = match;
-    const args = rawArgs.trim();
+  const handleBuiltinSlashCommand = useCallback(async (
+    text: string,
+    options?: BuiltinSlashCommandOptions,
+  ): Promise<BuiltinSlashCommandResult> => {
+    const parsed = parseSlashCommandLine(text);
+    if (!parsed) return { handled: false };
+    // Names are case-insensitive, exactly like the palette filter, so a
+    // "/Compact" typed from memory is dispatched rather than forwarded as text.
+    const { name: commandName, args } = parsed;
+    // A user-defined command (extension/prompt/skill) that collides with one of
+    // the client's names wins: omp resolves those from the prompt text, while
+    // intercepting here would silently shadow the user's own definition. The
+    // palette applies the same rule, so both views agree. (The list loads with
+    // the session; until then the client's own command answers, as it always
+    // has — an empty list can only under-shadow, never hijack.)
+    if (slashCommands.some((command) => command.name.toLowerCase() === commandName)) return { handled: false };
     const sid = sessionIdRef.current ?? await ensureNewSession();
     const complete = (result: BuiltinSlashCommandResult): BuiltinSlashCommandResult => {
       if (!result.handled) return result;
@@ -2621,16 +2633,21 @@ addNotice({ type: "error", message: e instanceof Error ? e.message : String(e) }
           const data = await sendAgentCommand<LastAssistantTextResponse>(sid, { type: "get_last_assistant_text" });
           const textToCopy = data?.text ?? "";
           if (!textToCopy) return complete({ handled: true, error: translate("agentSession.noMessageToCopy") });
-          await navigator.clipboard.writeText(textToCopy);
+          // copyText() falls back to execCommand: navigator.clipboard is only
+          // exposed on secure origins, and this app is routinely served over
+          // plain http on a LAN address (`ompweb start:lan`), where the
+          // Clipboard API is simply absent.
+          await copyText(textToCopy);
           return complete({ handled: true, message: translate("agentSession.copiedLastMessage") });
         }
 
         default: {
           // Web-native prompt commands (/goal, /plan, ...). omp's same-named
-          // builtins are TUI-only and never execute over RPC, so the palette
-          // shows these instead (CLIENT_BUILTIN_COMMAND_NAMES drops omp's
-          // copies). handleSend runs the full prompt pipeline — optimistic
-          // bubble, running state, settlement — with the expanded text.
+          // builtins are TUI-only and never execute over RPC, so the client
+          // owns these names — unless the user defines a command with the same
+          // name, which wins earlier (see the slashCommands check above).
+          // handleSend runs the full prompt pipeline — optimistic bubble,
+          // running state, settlement — with the expanded text.
           // /advisor is gated on the per-chat composer toggle: refuse with a
           // pointer to that toggle while the advisor is disabled.
           if (commandName === "advisor" && !advisorEnabled) {
@@ -2661,10 +2678,28 @@ addNotice({ type: "error", message: e instanceof Error ? e.message : String(e) }
             if (activeSessionId) sessionStorage.setItem(`omp-web:goal:${activeSessionId}`, JSON.stringify(goal));
           }
           if (commandName === "plan") setActivePlan({ objective: args });
-          const sent = await handleSend(expansion.prompt);
-          if (!sent) {
+          // Undo the goal/plan state if the prompt never leaves the client, so a
+          // rejected command cannot leave a stale chip in the composer.
+          const rollbackModeState = () => {
             if (commandName === "plan") setActivePlan(null);
             if (commandName === "goal") handleClearGoal();
+          };
+          if (options?.deliver) {
+            // The composer owns delivery (queue during a run, prompt-with-files
+            // for attachments); the command semantics above still applied, so
+            // `/goal clear` clears the goal rather than asking the agent for a
+            // goal named "clear".
+            const promptError = validateOutgoingPrompt(expansion.prompt);
+            if (promptError) {
+              rollbackModeState();
+              return complete({ handled: true, error: promptError });
+            }
+            await options.deliver(expansion.prompt);
+            return { handled: true };
+          }
+          const sent = await handleSend(expansion.prompt);
+          if (!sent) {
+            rollbackModeState();
             return { handled: true, retainInput: true };
           }
           return { handled: true };
@@ -2678,7 +2713,7 @@ addNotice({ type: "error", message: e instanceof Error ? e.message : String(e) }
         setIsCompacting(false);
       }
     }
-  }, [addNotice, advisorEnabled, ensureNewSession, handleClearGoal, handleSend, isCompacting, loadModels, loadSession, loadSlashCommands, promoteNewSession, onSessionStatsPanelOpen]);
+  }, [addNotice, advisorEnabled, ensureNewSession, handleClearGoal, handleSend, isCompacting, loadModels, loadSession, loadSlashCommands, promoteNewSession, onSessionStatsPanelOpen, slashCommands]);
 
   // Queued (undelivered) messages live in the queue panel only; the chat gets
   // the real user message when pi delivers it (user message_end event). An
