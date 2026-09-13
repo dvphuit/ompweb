@@ -3,6 +3,7 @@ import { errorMessage } from "@/lib/errors";
 import { parseJsonWithinLimit, RequestBodyTooLargeError } from "@/lib/bounded-form-data";
 import { invalidateModelsCache } from "@/lib/models-cache";
 import { enableProvider } from "@/lib/omp/model-roles";
+import { buildLoginUiResponse, mapLoginUiRequest, type LoginPendingDialog } from "@/lib/omp/login-protocol";
 import { RpcProcess, type RpcFrame } from "@/lib/omp/rpc-process";
 import { disposeUtilityRpc } from "@/lib/omp/rpc-utility";
 
@@ -11,14 +12,20 @@ export const dynamic = "force-dynamic";
 
 /**
  * Interactive login over a dedicated `omp --mode rpc-ui` process. omp drives
- * the flow with extension_ui_request frames: `open_url` carries the OAuth URL,
- * `input` asks for the pasted code/redirect URL, `notify` reports progress.
- * The SSE stream keeps pi-web's event names (auth, prompt_request, progress,
- * success, error, cancelled) so the client flow is unchanged; the POST handler
- * feeds the user's pasted value back as an extension_ui_response frame.
+ * the flow with extension_ui_request frames: `open_url` carries the OAuth URL
+ * (+ an optional short loopback `launchUrl` copy target), `input` asks for
+ * the pasted code/redirect URL, `select` offers a choice, `confirm` asks a
+ * yes/no question, and `notify` reports progress.
+ * The SSE stream keeps pi-web's event names (auth, prompt_request,
+ * select_request, confirm_request, progress, success, error, cancelled) so
+ * the client flow is familiar; the POST handler feeds the user's answer back
+ * as an extension_ui_response frame.
  */
 
-const LOGIN_EXTRA_ARGS = ["--no-session", "--no-extensions", "--no-skills", "--no-lsp"];
+// Extensions stay ENABLED (mirroring the shared utility process): they can
+// register login providers, and a login child without them would disagree
+// with the provider list the web UI shows.
+const LOGIN_EXTRA_ARGS = ["--no-session", "--no-skills", "--no-lsp"];
 const READY_TIMEOUT_MS = 60_000;
 const LOGIN_TIMEOUT_MS = 15 * 60_000;
 const HEARTBEAT_MS = 30_000;
@@ -39,7 +46,8 @@ function getLoginRegistry(): Map<string, PendingLogin> {
   return globalThis.__ompLoginRegistry;
 }
 
-// POST /api/auth/login/[provider] — frontend sends redirect URL or auth code
+// POST /api/auth/login/[provider] — frontend sends redirect URL, auth code,
+// selected option, or confirm answer ("true"/"false")
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ provider: string }> }
@@ -102,41 +110,46 @@ export async function GET(
         }
       }, HEARTBEAT_MS);
 
-      // The user may paste the code before omp's input request arrives (the
-      // auth event shows the paste box immediately) — buffer one value.
-      let pendingInputId: string | null = null;
+      // Only one login dialog is ever pending: omp's login flow is strictly
+      // sequential (open_url, then input/select/confirm, then the command
+      // resolves). The user may paste the code before omp's input request
+      // arrives (the auth event shows the paste box immediately) — buffer one
+      // value. The buffer is an *input* answer: it waits for the next input
+      // dialog even if a select/confirm arrives first, so an early paste can
+      // never be misdelivered as a choice the user never saw.
+      let pendingDialog: LoginPendingDialog | null = null;
       let bufferedValue: string | null = null;
 
       let proc: RpcProcess | null = null;
+      const answerDialog = (dialog: LoginPendingDialog, value: string) => {
+        proc?.sendFrame(buildLoginUiResponse(dialog, value));
+      };
       const handleFrame = (frame: RpcFrame) => {
         if (frame.type !== "extension_ui_request") return;
-        const method = frame.method;
-        if (method === "open_url") {
-          send({
-            type: "auth",
-            url: String(frame.url ?? ""),
-            instructions: typeof frame.instructions === "string" ? frame.instructions : null,
-            token,
-          });
-        } else if (method === "input") {
-          const id = String(frame.id);
-          if (bufferedValue !== null) {
+        if (frame.method === "cancel") {
+          // The dialog the browser is showing is dead (e.g. the loopback
+          // OAuth callback completed while the paste box was open). Clear it
+          // and move the UI back to a waiting state instead of leaving a
+          // stale prompt on screen.
+          if (pendingDialog !== null && frame.targetId === pendingDialog.id) {
+            pendingDialog = null;
+            send({ type: "dialog_cancelled" });
+          }
+          return;
+        }
+        const mapped = mapLoginUiRequest(frame, token);
+        if (!mapped?.event) return;
+        if (mapped.pending) {
+          if (mapped.pending.kind === "input" && bufferedValue !== null) {
             const value = bufferedValue;
             bufferedValue = null;
-            proc?.sendFrame({ type: "extension_ui_response", id, value });
+            answerDialog(mapped.pending, value);
           } else {
-            pendingInputId = id;
-            send({
-              type: "prompt_request",
-              message: typeof frame.title === "string" ? frame.title : "Enter the authorization code",
-              placeholder: typeof frame.placeholder === "string" ? frame.placeholder : null,
-              token,
-            });
+            pendingDialog = mapped.pending;
+            send(mapped.event);
           }
-        } else if (method === "notify") {
-          if (typeof frame.message === "string") send({ type: "progress", message: frame.message });
-        } else if (method === "cancel") {
-          if (pendingInputId !== null && frame.targetId === pendingInputId) pendingInputId = null;
+        } else {
+          send(mapped.event);
         }
       };
 
@@ -154,10 +167,10 @@ export async function GET(
       registry.set(token, {
         provider,
         submit: (value: string) => {
-          if (pendingInputId !== null) {
-            const id = pendingInputId;
-            pendingInputId = null;
-            child.sendFrame({ type: "extension_ui_response", id, value });
+          if (pendingDialog !== null) {
+            const dialog = pendingDialog;
+            pendingDialog = null;
+            answerDialog(dialog, value);
           } else {
             bufferedValue = value;
           }

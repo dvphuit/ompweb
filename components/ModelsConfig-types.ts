@@ -25,10 +25,11 @@ export interface ApiKeyProvider {
 export type OAuthLoginState =
   | { phase: "idle" }
   | { phase: "connecting" }
-  | { phase: "auth"; url: string; instructions: string | null; token: string }
+  | { phase: "auth"; url: string; launchUrl: string | null; instructions: string | null; token: string }
   | { phase: "device_code"; userCode: string; verificationUri: string; intervalSeconds: number | null; expiresInSeconds: number | null }
   | { phase: "prompt"; message: string; placeholder: string | null; token: string }
   | { phase: "select"; message: string; options: { id: string; label: string }[]; token: string }
+  | { phase: "confirm"; message: string; token: string }
   | { phase: "progress"; message: string }
   | { phase: "success" }
   | { phase: "error"; message: string };
