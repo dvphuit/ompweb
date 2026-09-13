@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { isSafeOpenUrl } from "@/hooks/useAgentSession-stream";
 import { useI18n } from "@/lib/i18n";
 import { omitUntouchedModelDrafts } from "@/lib/models-config-drafts";
 import { formatApiError } from "@/lib/i18n/api-error";
@@ -783,24 +784,37 @@ function ModelDetail({
 // ── OAuth detail ──────────────────────────────────────────────────────────────
 
 /** Login URL with a copy button, shown while browser authorization is pending.
- *  The "progress" phase overwrites the auth state, so OAuthDetail keeps the
- *  URL aside and passes it back in. */
-function AuthUrlRow({ url }: { url: string }) {
+ *  Later phases overwrite the auth state, so OAuthDetail keeps the URL aside
+ *  and passes it back in — the link stays on screen through prompt, select,
+ *  confirm, and progress. `copyUrl` is omp's short loopback launch URL, the
+ *  upstream-advertised copy target; the anchor itself keeps the full URL. */
+function AuthUrlRow({ url, copyUrl }: { url: string; copyUrl?: string | null }) {
   const { t } = useI18n();
+  const safe = isSafeOpenUrl(url);
+  const target = copyUrl && isSafeOpenUrl(copyUrl) ? copyUrl : url;
   return (
     <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-      <a
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        title={url}
-        style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--accent)" }}
-      >
-        {url}
-      </a>
+      {safe ? (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={url}
+          style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--accent)" }}
+        >
+          {url}
+        </a>
+      ) : (
+        <span
+          title={url}
+          style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text)" }}
+        >
+          {url}
+        </span>
+      )}
       <button
         type="button"
-        onClick={() => { void copyText(url).then(() => toast.success(t("appShell.copied"))).catch(() => toast.error(t("appShell.commandCopyFailed"))); }}
+        onClick={() => { void copyText(target).then(() => toast.success(t("appShell.copied"))).catch(() => toast.error(t("appShell.commandCopyFailed"))); }}
         title={t("appShell.copyCommand")}
         aria-label={t("appShell.copyCommand")}
         style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 10px", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--bg)", color: "var(--text-muted)", cursor: "pointer", fontSize: 11, flexShrink: 0 }}
@@ -814,7 +828,7 @@ function AuthUrlRow({ url }: { url: string }) {
 function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefresh: () => void }) {
   const { t, tn } = useI18n();
   const [loginState, setLoginState] = useState<OAuthLoginState>({ phase: "idle" });
-  const [pendingAuthUrl, setPendingAuthUrl] = useState<string | null>(null);
+  const [pendingAuth, setPendingAuth] = useState<{ url: string; copyUrl: string | null } | null>(null);
   const [inputValue, setInputValue] = useState("");
   const eventSourceRef = useRef<EventSource | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -827,7 +841,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
 
   // Reset state when provider changes
   useEffect(() => {
-    setPendingAuthUrl(null);
+    setPendingAuth(null);
     setLoginState({ phase: "idle" });
     setInputValue("");
     eventSourceRef.current?.close();
@@ -840,6 +854,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
 
   const handleLogin = useCallback(() => {
     eventSourceRef.current?.close();
+    setPendingAuth(null);
     setLoginState({ phase: "connecting" });
     setInputValue("");
 
@@ -848,7 +863,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
 
     es.onmessage = (e) => {
       let data: {
-        type: string; url?: string; instructions?: string | null;
+        type: string; url?: string; launchUrl?: string | null; instructions?: string | null;
         token?: string; message?: string; placeholder?: string | null;
         userCode?: string; verificationUri?: string; intervalSeconds?: number | null; expiresInSeconds?: number | null;
         options?: { id: string; label: string }[];
@@ -860,8 +875,19 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         return;
       }
       if (data.type === "auth") {
-        setPendingAuthUrl(data.url!);
-        setLoginState({ phase: "auth", url: data.url!, instructions: data.instructions ?? null, token: data.token! });
+        const url = typeof data.url === "string" ? data.url : "";
+        const launchUrl = typeof data.launchUrl === "string" ? data.launchUrl : null;
+        setPendingAuth(url ? { url, copyUrl: launchUrl } : null);
+        setLoginState({ phase: "auth", url, launchUrl, instructions: data.instructions ?? null, token: data.token! });
+        // Best effort, mirroring the session open_url flow: pop-up blockers
+        // may stop it, and the link below stays visible as the fallback.
+        if (url && isSafeOpenUrl(url)) {
+          try {
+            window.open(url, "_blank", "noopener,noreferrer");
+          } catch {
+            // Pop-up blocked — the AuthUrlRow below still carries the URL.
+          }
+        }
       } else if (data.type === "device_code") {
         setLoginState({
           phase: "device_code",
@@ -874,20 +900,27 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         setLoginState({ phase: "prompt", message: data.message!, placeholder: data.placeholder ?? null, token: data.token! });
       } else if (data.type === "select_request") {
         setLoginState({ phase: "select", message: data.message!, options: data.options ?? [], token: data.token! });
+      } else if (data.type === "confirm_request") {
+        setLoginState({ phase: "confirm", message: data.message!, token: data.token! });
       } else if (data.type === "progress") {
         setLoginState({ phase: "progress", message: data.message! });
+      } else if (data.type === "dialog_cancelled") {
+        // omp withdrew the dialog the user was answering (e.g. the loopback
+        // OAuth callback completed while the paste box was open). Fall back
+        // to waiting; success or the next dialog follows on the same stream.
+        setLoginState({ phase: "progress", message: t("modelsConfig.continuing") });
       } else if (data.type === "success") {
         es.close();
-        setPendingAuthUrl(null);
+        setPendingAuth(null);
         setLoginState({ phase: "success" });
         onRefresh();
       } else if (data.type === "error") {
         es.close();
-        setPendingAuthUrl(null);
+        setPendingAuth(null);
         setLoginState({ phase: "error", message: data.message! });
       } else if (data.type === "cancelled") {
         es.close();
-        setPendingAuthUrl(null);
+        setPendingAuth(null);
         setLoginState({ phase: "idle" });
       }
     };
@@ -953,7 +986,8 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
 
   const isWorking = loginState.phase === "connecting" || loginState.phase === "progress" ||
     loginState.phase === "auth" || loginState.phase === "device_code" ||
-    loginState.phase === "prompt" || loginState.phase === "select";
+    loginState.phase === "prompt" || loginState.phase === "select" ||
+    loginState.phase === "confirm";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -982,6 +1016,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
             <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
               {loginState.message}
             </p>
+            {pendingAuth && <AuthUrlRow url={pendingAuth.url} copyUrl={pendingAuth.copyUrl} />}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {loginState.options.map((option) => (
                 <button
@@ -995,14 +1030,38 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
             </div>
           </div>
         )}
+        {loginState.phase === "confirm" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+              {loginState.message}
+            </p>
+            {pendingAuth && <AuthUrlRow url={pendingAuth.url} copyUrl={pendingAuth.copyUrl} />}
+            <div style={{ display: "flex", gap: 6 }}>
+              <button
+                onClick={() => submitSelection(loginState.token, "true")}
+                style={{ padding: "6px 12px", background: "var(--accent)", border: "none", borderRadius: "var(--radius-control)", color: "var(--on-accent)", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+              >
+                {t("chatWindow.confirm")}
+              </button>
+              <button
+                onClick={() => submitSelection(loginState.token, "false")}
+                style={{ padding: "6px 12px", background: "none", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", color: "var(--text-muted)", cursor: "pointer", fontSize: 12 }}
+              >
+                {t("modelsConfig.cancel")}
+              </button>
+            </div>
+          </div>
+        )}
         {(loginState.phase === "auth" || loginState.phase === "prompt") && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
+            <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
               {loginState.phase === "auth"
-                ? t("modelsConfig.completeSignIn")
+                ? (loginState.instructions || t("modelsConfig.completeSignIn"))
                 : loginState.message}
             </p>
-            {loginState.phase === "auth" && <AuthUrlRow url={loginState.url} />}
+            {loginState.phase === "auth"
+              ? <AuthUrlRow url={loginState.url} copyUrl={loginState.launchUrl} />
+              : (pendingAuth && <AuthUrlRow url={pendingAuth.url} copyUrl={pendingAuth.copyUrl} />)}
             <div style={{ display: "flex", gap: 6 }}>
               <input
                 ref={inputRef}
@@ -1041,7 +1100,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
         {loginState.phase === "progress" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>{loginState.message}</p>
-            {pendingAuthUrl && <AuthUrlRow url={pendingAuthUrl} />}
+            {pendingAuth && <AuthUrlRow url={pendingAuth.url} copyUrl={pendingAuth.copyUrl} />}
           </div>
         )}
         {loginState.phase === "success" && (
@@ -1056,7 +1115,7 @@ function OAuthDetail({ provider, onRefresh }: { provider: OAuthProvider; onRefre
       <div style={{ display: "flex", gap: 8 }}>
         {isWorking ? (
           <button
-            onClick={() => { eventSourceRef.current?.close(); setPendingAuthUrl(null); setLoginState({ phase: "idle" }); }}
+            onClick={() => { eventSourceRef.current?.close(); setPendingAuth(null); setLoginState({ phase: "idle" }); }}
             style={{ padding: "5px 12px", background: "none", border: "var(--bw) solid var(--border)", borderRadius: "var(--radius-control)", color: "var(--text-muted)", cursor: "pointer", fontSize: 12 }}
           >
             {t("modelsConfig.cancel")}
