@@ -64,7 +64,6 @@ test("keeps the model selector visible when a model error leaves no options", ()
   );
 
   assert.match(html, />(No models|chatInput\.noModels)</);
-  assert.match(html, /title="Model setup: (No models|chatInput\\.noModels)"/);
 });
 
 
@@ -278,32 +277,52 @@ test("renders multiple queued prompts with count and expand action", () => {
   assert.match(html, /First task/);
 });
 
-test("model picker dropdown source uses scale-immune anchored positioning", async () => {
-  const { readFile } = await import("node:fs/promises");
-  const source = await readFile(new URL("./ChatInput.tsx", import.meta.url), "utf8");
 
-  // Ensures the model picker dropdown is anchored with CSS positioning (bottom: calc(100% + 6px), left: 0)
-  // and doesn't rely on raw viewport getBoundingClientRect measurements that break when html zoom is applied.
-  assert.doesNotMatch(source, /setModelDropdownRect/);
-  assert.match(source, /bottom:\s*isMobile\s*\?\s*8\s*:\s*["']calc\(100%\s*\+\s*6px\)["']/);
-});
-
-test("renders the unified model setup trigger when a picker handler is provided", () => {
+test("renders separate model, reasoning, and tool preset triggers", () => {
   const html = renderToStaticMarkup(
     React.createElement(ChatInput, {
       onSend() {},
       onAbort() {},
-      isStreaming: false,
-      toolPreset: "full",
+      onModelChange() {},
+      onThinkingLevelChange() {},
       onToolPresetChange() {},
+      isStreaming: false,
+      model: { provider: "test", modelId: "model" },
+      modelList: [{ provider: "test", modelId: "model", id: "model", name: "Test model" }],
+      modelNames: {},
+      thinkingLevel: "high",
+      toolPreset: "full",
     }),
   );
 
-  assert.match(html, /aria-label="Model setup: full"/);
-  assert.match(html, /aria-haspopup="dialog"/);
+  assert.match(html, /aria-label="Change model: Test model"/);
+  assert.match(html, /aria-label="Change reasoning level: high"/);
+  assert.match(html, /aria-label="Change tool preset: full"/);
+  assert.doesNotMatch(html, /Model setup/);
 });
 
-test("model setup trigger is absent without any picker handler", () => {
+test("keeps the tool preset trigger usable while model and reasoning are locked", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(ChatInput, {
+      onSend() {},
+      onAbort() {},
+      onModelChange() {},
+      onThinkingLevelChange() {},
+      onToolPresetChange() {},
+      isStreaming: true,
+      model: { provider: "test", modelId: "model" },
+      modelList: [{ provider: "test", modelId: "model", id: "model", name: "Test model" }],
+      modelNames: {},
+      toolPreset: "default",
+    }),
+  );
+
+  assert.match(html, /disabled[^>]*aria-label="Change model: Test model"/);
+  assert.match(html, /disabled[^>]*aria-label="Change reasoning level: auto"/);
+  assert.match(html, /aria-label="Change tool preset: default"(?![^>]*disabled)/);
+});
+
+test("model picker trigger is absent without a model change handler", () => {
   const html = renderToStaticMarkup(
     React.createElement(ChatInput, {
       onSend() {},
@@ -312,7 +331,7 @@ test("model setup trigger is absent without any picker handler", () => {
     }),
   );
 
-  assert.doesNotMatch(html, /Model setup/);
+  assert.doesNotMatch(html, /Change model/);
 });
 
 test("renders live status bar attached to the composer top edge when statusText is provided", () => {

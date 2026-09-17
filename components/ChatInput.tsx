@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useCallback, useEffect, useImperativeHandle, forwardRef, memo, KeyboardEvent } from "react";
-import { ChevronDown, ListChecks, Search, Shrink, Sparkles, Wrench, Zap } from "lucide-react";
+import { Brain, ChevronDown, Cpu, ListChecks, Search, Shrink, Sparkles, Wrench, Zap } from "lucide-react";
 import { getSubmitDuringRunBehavior } from "@/lib/composer-prefs";
 import type { BuiltinSlashCommandOptions, BuiltinSlashCommandResult, CompactResultInfo, QueuedMessages, SlashCommandInfo } from "@/hooks/useAgentSession";
 import type { ActiveGoal, ActivePlan } from "@/lib/web-mode-state";
@@ -208,7 +208,12 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     [locale],
   );
   const [value, setValue] = useState(() => (draftKey ? getDraft(draftKey)?.value ?? "" : ""));
-  const [setupOpen, setSetupOpen] = useState(false);
+  type PickerKind = "model" | "reasoning" | "tools";
+  const [openPicker, setOpenPicker] = useState<PickerKind | null>(null);
+  const togglePicker = useCallback((picker: PickerKind) => {
+    setOpenPicker((current) => current === picker ? null : picker);
+  }, []);
+  const closePickers = useCallback(() => setOpenPicker(null), []);
   const [modelSearchQuery, setModelSearchQuery] = useState("");
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>(() => (
     draftKey ? draftImagesToAttachedImages(getDraft(draftKey)?.images) : []
@@ -232,8 +237,12 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   const [atServerResult, setAtServerResult] = useState<{ cwd: string; query: string; matches: FileIndexEntry[] } | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const setupWrapRef = useRef<HTMLDivElement>(null);
-  const setupPanelRef = useRef<HTMLDivElement>(null);
+  const modelWrapRef = useRef<HTMLDivElement>(null);
+  const modelPanelRef = useRef<HTMLDivElement>(null);
+  const reasoningWrapRef = useRef<HTMLDivElement>(null);
+  const reasoningPanelRef = useRef<HTMLDivElement>(null);
+  const toolPresetWrapRef = useRef<HTMLDivElement>(null);
+  const toolPresetPanelRef = useRef<HTMLDivElement>(null);
   const modelSearchInputRef = useRef<HTMLInputElement>(null);
   const historyMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1361,23 +1370,30 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
     if (lvl === "auto" || !thinkingLevelMap) return lvl;
     return thinkingLevelMap[lvl] ?? lvl;
   })();
-  // The unified Model setup control: one trigger + one panel for model ·
-  // reasoning · tools. The trigger stays enabled during runs only when the
-  // tool preset (a browser-side preference for new sessions) is adjustable.
+  // Three independent composer controls: model, reasoning, and tool preset.
+  // Only one picker is open at a time, so each panel stays short and its
+  // current value remains visible on the toolbar.
   const hasModelSection = Boolean((modelOptions.length > 0 || currentName || modelError || showModelsLoading) && onModelChange);
   const hasThinkingSection = Boolean(onThinkingLevelChange);
   const hasToolsSection = Boolean(onToolPresetChange);
   const setupModelLabel = currentName ?? (modelOptions.length > 0
     ? t("chatInput.selectModel")
     : showModelsLoading ? t("chatInput.loadingModels") : t("chatInput.noModels"));
-  const setupLabel = `${t("chatInput.modelSetup")}: ${[
-    ...(hasModelSection ? [setupModelLabel] : []),
-    ...(hasThinkingSection ? [thinkingDisplayLabel] : []),
-    ...(hasToolsSection ? [toolPreset ?? "full"] : []),
-  ].join(", ")}`;
-  const setupTriggerDisabled = isStreaming
-    ? !hasToolsSection
-    : (hasModelSection && !hasThinkingSection && !hasToolsSection ? modelSelectorDisabled : false);
+  const modelPickerOpen = openPicker === "model";
+  const reasoningPickerOpen = openPicker === "reasoning";
+  const toolPresetPickerOpen = openPicker === "tools";
+  const pickerPanelStyle = {
+    position: isMobile ? "fixed" as const : "absolute" as const,
+    bottom: isMobile ? 8 : "calc(100% + 6px)",
+    ...(isMobile
+      ? { left: 8, right: 8, maxWidth: "calc(100vw - 16px)" }
+      : { left: 0, width: "max-content", minWidth: 240, maxWidth: "min(340px, calc(100vw - 32px))" }),
+    zIndex: 500,
+    display: "flex",
+    flexDirection: "column" as const,
+    maxHeight: isMobile ? "calc(100dvh - 32px)" : "min(380px, 60vh)",
+    overflowY: "auto" as const,
+  };
   const thinkingLevelOptions = React.useMemo(
     () => selectableThinkingLevels(availableThinkingLevels),
     [availableThinkingLevels],
@@ -1389,57 +1405,59 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
   );
   const modelPicker = usePickerCursor({
     length: filteredModelOptions.length,
-    open: setupOpen,
+    open: modelPickerOpen,
     initial: activeModelIndex >= 0 ? activeModelIndex : 0,
   });
   const thinkingPicker = usePickerCursor({
     length: thinkingLevelOptions.length,
-    open: setupOpen,
+    open: reasoningPickerOpen,
     initial: Math.max(0, thinkingLevelOptions.indexOf(thinkingLevel ?? "auto")),
   });
   const toolPresetPicker = usePickerCursor({
     length: TOOL_PRESET_OPTIONS.length,
-    open: setupOpen,
+    open: toolPresetPickerOpen,
     initial: Math.max(0, TOOL_PRESET_OPTIONS.findIndex((opt) => opt.value === (toolPreset ?? "full"))),
   });
 
-  // The setup panel intentionally stays open when a run starts: the tool
-  // preset remains adjustable mid-run while the model/reasoning sections
-  // disable themselves (they only apply to the next prompt).
+  useEffect(() => {
+    if (openPicker !== "model") {
+      setModelSearchQuery("");
+    }
+  }, [openPicker]);
 
   useEffect(() => {
-    if (!setupOpen) {
-      setModelSearchQuery("");
-      return;
-    }
-    // The search field owns arrow keys, so it takes focus on open when the
-    // model section is usable; otherwise the panel itself takes focus so
-    // Enter/Escape never reach the textarea.
-    requestAnimationFrame(() => {
-      const search = modelSearchInputRef.current;
-      if (search && !search.disabled) search.focus();
-      else setupPanelRef.current?.focus();
+    const frame = requestAnimationFrame(() => {
+      if (modelPickerOpen) {
+        const search = modelSearchInputRef.current;
+        if (search && !search.disabled) search.focus();
+        else modelPanelRef.current?.focus();
+      } else if (reasoningPickerOpen) {
+        reasoningPanelRef.current?.querySelector<HTMLElement>('[role="menu"]')?.focus();
+      } else if (toolPresetPickerOpen) {
+        toolPresetPanelRef.current?.querySelector<HTMLElement>('[role="menu"]')?.focus();
+      }
     });
-  }, [setupOpen]);
+    return () => cancelAnimationFrame(frame);
+  }, [modelPickerOpen, reasoningPickerOpen, toolPresetPickerOpen]);
 
-  // Close dropdowns on outside click
+  // Close dropdowns on outside click. Each trigger owns its panel, including
+  // the fixed-position mobile panels that extend beyond the trigger wrapper.
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      // The panel is fixed-positioned on mobile, so it escapes the trigger
-      // wrapper and needs its own containment check.
-      if (
-        setupWrapRef.current && !setupWrapRef.current.contains(e.target as Node) &&
-        setupPanelRef.current && !setupPanelRef.current.contains(e.target as Node)
-      ) {
-        setSetupOpen(false);
+      const target = e.target as Node;
+      const insideModel = modelWrapRef.current?.contains(target) || modelPanelRef.current?.contains(target);
+      const insideReasoning = reasoningWrapRef.current?.contains(target) || reasoningPanelRef.current?.contains(target);
+      const insideTools = toolPresetWrapRef.current?.contains(target) || toolPresetPanelRef.current?.contains(target);
+      if (!insideModel && !insideReasoning && !insideTools) {
+        closePickers();
       }
-      if (historyMenuRef.current && !historyMenuRef.current.contains(e.target as Node) && !textareaRef.current?.contains(e.target as Node)) {
+      if (historyMenuRef.current && !historyMenuRef.current.contains(target) && !textareaRef.current?.contains(target)) {
         setHistoryMenuOpen(false);
       }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  }, [closePickers]);
 
   return (
     <div
@@ -2141,320 +2159,330 @@ export const ChatInput = memo(forwardRef<ChatInputHandle, Props>(function ChatIn
               </button>
             )}
 
-            {/* Model setup — one trigger + one panel for model · reasoning ·
-                tools. The trigger stays enabled during runs when the tool
-                preset (a browser-side preference for new sessions) is
-                adjustable; model/reasoning sections disable themselves while
-                streaming since they only apply to the next prompt. */}
-            {(hasModelSection || hasThinkingSection || hasToolsSection) && (
-              <div ref={setupWrapRef} style={{ position: "relative", minWidth: 0 }}>
+            {/* Model picker — changes the model for the next prompt. */}
+            {hasModelSection && (
+              <div ref={modelWrapRef} style={{ position: "relative", minWidth: 0 }}>
                 <button
                   type="button"
-                  onClick={() => setSetupOpen((v) => !v)}
-                  disabled={setupTriggerDisabled}
+                  onClick={() => togglePicker("model")}
+                  disabled={modelSelectorDisabled}
                   className="composer-control"
-                  data-active={setupOpen ? "true" : undefined}
+                  data-active={modelPickerOpen ? "true" : undefined}
                   style={{ maxWidth: 230 }}
-                  title={setupLabel}
-                  aria-label={setupLabel}
-                  aria-expanded={setupOpen}
+                  title={`${t("chatInput.changeModel")}: ${setupModelLabel}`}
+                  aria-label={`${t("chatInput.changeModel")}: ${setupModelLabel}`}
+                  aria-expanded={modelPickerOpen}
                   aria-haspopup="dialog"
                 >
-                  {hasModelSection ? (
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden="true">
-                      <rect x="4" y="4" width="16" height="16" rx="2" />
-                      <rect x="9" y="9" width="6" height="6" />
-                      <line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" />
-                      <line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" />
-                      <line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="14" x2="23" y2="14" />
-                      <line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="14" x2="4" y2="14" />
-                    </svg>
-                  ) : hasToolsSection ? (
-                    <Wrench size={11} strokeWidth={1.8} style={{ flexShrink: 0 }} aria-hidden="true" />
-                  ) : (
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden="true">
-                      <path d="M9.5 2A5.5 5.5 0 0 0 4 7.5c0 1.7.78 3.21 2 4.21V14a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-2.29c1.22-1 2-2.51 2-4.21A5.5 5.5 0 0 0 9.5 2z" />
-                      <line x1="7" y1="18" x2="12" y2="18" /><line x1="8" y1="21" x2="11" y2="21" />
-                    </svg>
-                  )}
-                  {hasModelSection && (
-                    <span className="composer-control-label">
-                      {setupModelLabel}
-                    </span>
-                  )}
-                  {hasThinkingSection && (
-                    <>
-                      {hasModelSection && (
-                        <span aria-hidden="true" style={{ color: "var(--text-dim)", flexShrink: 0 }}>·</span>
-                      )}
-                      <span className="composer-control-label" style={{ textTransform: "capitalize", flexShrink: 0 }}>{thinkingDisplayLabel}</span>
-                    </>
-                  )}
-                  {hasToolsSection && (
-                    <>
-                      {(hasModelSection || hasThinkingSection) && (
-                        <span aria-hidden="true" style={{ color: "var(--text-dim)", flexShrink: 0 }}>·</span>
-                      )}
-                      <span className="composer-control-label" style={{ textTransform: "capitalize", flexShrink: 0 }}>{toolPreset ?? "full"}</span>
-                    </>
-                  )}
-                  <ChevronDown className="composer-control-chevron" data-open={setupOpen} size={12} strokeWidth={1.8} aria-hidden="true" />
+                  <Cpu size={11} strokeWidth={2} style={{ flexShrink: 0 }} aria-hidden="true" />
+                  <span className="composer-control-label">{setupModelLabel}</span>
+                  <ChevronDown className="composer-control-chevron" data-open={modelPickerOpen} size={12} strokeWidth={1.8} aria-hidden="true" />
                 </button>
-                {setupOpen && (
+                {modelPickerOpen && (
                   <div
-                    ref={setupPanelRef}
+                    ref={modelPanelRef}
                     className="picker-panel"
                     role="dialog"
                     tabIndex={-1}
-                    aria-label={t("chatInput.modelSetup")}
+                    aria-label={t("chatInput.modelsLabel")}
                     onKeyDown={(e) => {
                       if (e.key === "Escape") {
                         e.preventDefault();
-                        setSetupOpen(false);
+                        closePickers();
                       }
                     }}
-                    style={{
-                      position: isMobile ? "fixed" : "absolute",
-                      bottom: isMobile ? 8 : "calc(100% + 6px)",
-                      ...(isMobile
-                        ? { left: 8, right: 8, maxWidth: "calc(100vw - 16px)" }
-                        : { left: 0, width: "max-content", minWidth: 240, maxWidth: "min(340px, calc(100vw - 32px))" }),
-                      zIndex: 500,
-                      display: "flex",
-                      flexDirection: "column",
-                      maxHeight: isMobile ? "calc(100dvh - 32px)" : "min(380px, 60vh)",
-                      overflowY: "auto",
-                    }}
+                    style={pickerPanelStyle}
                   >
-                    {hasModelSection && (
-                      <section
-                        aria-label={t("chatInput.modelsLabel")}
-                        style={isStreaming ? { opacity: 0.55 } : undefined}
-                      >
-                        <div className="picker-panel-header">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: "var(--text-muted)" }}>
-                            <rect x="4" y="4" width="16" height="16" rx="2" />
-                            <rect x="9" y="9" width="6" height="6" />
-                          </svg>
-                          <span className="picker-panel-title">{t("chatInput.modelsLabel")}</span>
-                          <span className="picker-panel-count">{modelOptions.length}</span>
-                        </div>
-                        <label className="picker-search">
-                          <Search size={13} strokeWidth={1.8} color="var(--text-dim)" aria-hidden="true" />
-                          <input
-                            ref={modelSearchInputRef}
-                            type="search"
-                            autoComplete="off"
-                            spellCheck={false}
-                            disabled={isStreaming}
-                            value={modelSearchQuery}
-                            onChange={(e) => setModelSearchQuery(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Escape") {
-                                e.preventDefault();
-                                setSetupOpen(false);
-                                return;
-                              }
-                              const option = filteredModelOptions[modelPicker.cursor];
-                              if (e.key === "ArrowDown") {
-                                e.preventDefault();
-                                modelPicker.move(1);
-                              } else if (e.key === "ArrowUp") {
-                                e.preventDefault();
-                                modelPicker.move(-1);
-                              } else if (e.key === "Enter" && option && !isStreaming) {
-                                e.preventDefault();
-                                setSetupOpen(false);
-                                const isActive = option.modelId === model?.modelId && option.provider === model?.provider;
-                                if (!isActive || isAutoModelSelection) onModelChange?.(option.provider, option.modelId);
-                              }
-                            }}
-                            placeholder={t("chatInput.searchModels")}
-                            aria-label={t("chatInput.searchModels")}
-                          />
-                        </label>
-                        <div
-                          className="picker-list"
-                          role="listbox"
-                          aria-label={t("chatInput.modelsLabel")}
-                          style={(hasThinkingSection || hasToolsSection) ? { maxHeight: 200 } : undefined}
+                    <section
+                      aria-label={t("chatInput.modelsLabel")}
+                      style={isStreaming ? { opacity: 0.55 } : undefined}
+                    >
+                      <div className="picker-panel-header">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: "var(--text-muted)" }}>
+                          <rect x="4" y="4" width="16" height="16" rx="2" />
+                          <rect x="9" y="9" width="6" height="6" />
+                        </svg>
+                        <span className="picker-panel-title">{t("chatInput.modelsLabel")}</span>
+                        <span className="picker-panel-count">{modelOptions.length}</span>
+                      </div>
+                      <label className="picker-search">
+                        <Search size={13} strokeWidth={1.8} color="var(--text-dim)" aria-hidden="true" />
+                        <input
+                          ref={modelSearchInputRef}
+                          type="search"
+                          autoComplete="off"
+                          spellCheck={false}
+                          disabled={isStreaming}
+                          value={modelSearchQuery}
+                          onChange={(e) => setModelSearchQuery(e.target.value)}
                           onKeyDown={(e) => {
-                            if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
-                            e.preventDefault();
-                            modelPicker.move(e.key === "ArrowDown" ? 1 : -1);
+                            if (e.key === "Escape") {
+                              e.preventDefault();
+                              closePickers();
+                              return;
+                            }
+                            const option = filteredModelOptions[modelPicker.cursor];
+                            if (e.key === "ArrowDown") {
+                              e.preventDefault();
+                              modelPicker.move(1);
+                            } else if (e.key === "ArrowUp") {
+                              e.preventDefault();
+                              modelPicker.move(-1);
+                            } else if (e.key === "Enter" && option && !isStreaming) {
+                              e.preventDefault();
+                              closePickers();
+                              const isActive = option.modelId === model?.modelId && option.provider === model?.provider;
+                              if (!isActive || isAutoModelSelection) onModelChange?.(option.provider, option.modelId);
+                            }
                           }}
-                        >
-                          {modelsByProvider.length === 0 ? (
-                            <div style={{ padding: "9px 8px", color: "var(--text-dim)", fontSize: 12, whiteSpace: "nowrap" }}>
-                              {modelSearchQuery.trim() ? t("chatInput.noMatchingModels") : showModelsLoading ? t("chatInput.loadingModels") : t("chatInput.noAvailableModels")}
-                            </div>
-                          ) : modelsByProvider.map((group) => (
-                            <div key={group.provider}>
-                              <div className="picker-group-label">{group.provider}</div>
-                              {group.options.map((opt) => {
-                                const isActive = opt.modelId === model?.modelId && opt.provider === model?.provider;
-                                const flatIndex = filteredModelOptions.indexOf(opt);
-                                return (
-                                  <button
-                                    type="button"
-                                    role="option"
-                                    className="picker-row"
-                                    data-active={isActive}
-                                    data-cursor={flatIndex === modelPicker.cursor && !isActive ? "true" : undefined}
-                                    aria-selected={isActive}
-                                    disabled={isStreaming}
-                                    style={isStreaming ? { cursor: "default" } : undefined}
-                                    ref={(node) => { modelPicker.refs.current[flatIndex] = node; }}
-                                    key={`${opt.provider}:${opt.modelId}`}
-                                    onClick={() => { if (isStreaming) return; setSetupOpen(false); if (!isActive || isAutoModelSelection) onModelChange?.(opt.provider, opt.modelId); }}
-                                  >
-                                    <span className="picker-check">
-                                      {isActive && <svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1.5 5 4 7.5 8.5 2.5" /></svg>}
-                                    </span>
-                                    <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{opt.name}</span>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          ))}
-                        </div>
-                      </section>
-                    )}
-                    {hasThinkingSection && (
-                      <section
-                        aria-label={t("chatInput.reasoningLabel")}
-                        style={{
-                          borderTop: hasModelSection ? "var(--bw) solid var(--border)" : undefined,
-                          opacity: isStreaming ? 0.55 : undefined,
+                          placeholder={t("chatInput.searchModels")}
+                          aria-label={t("chatInput.searchModels")}
+                        />
+                      </label>
+                      <div
+                        className="picker-list"
+                        role="listbox"
+                        aria-label={t("chatInput.modelsLabel")}
+                        onKeyDown={(e) => {
+                          if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+                          e.preventDefault();
+                          modelPicker.move(e.key === "ArrowDown" ? 1 : -1);
                         }}
                       >
-                        <div className="picker-panel-header">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: "var(--text-muted)" }}>
-                            <path d="M9.5 2A5.5 5.5 0 0 0 4 7.5c0 1.7.78 3.21 2 4.21V14a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-2.29c1.22-1 2-2.51 2-4.21A5.5 5.5 0 0 0 9.5 2z" />
-                            <line x1="7" y1="18" x2="12" y2="18" />
-                          </svg>
-                          <span className="picker-panel-title">{t("chatInput.reasoningLabel")}</span>
-                          <span className="picker-panel-count">{thinkingLevelOptions.length}</span>
-                        </div>
-                        <div
-                          className="picker-thinking-cards"
-                          role="menu"
-                          tabIndex={-1}
-                          aria-label={t("chatInput.reasoningLabel")}
-                          onKeyDown={(e) => {
-                            if (e.key === "Escape") {
-                              e.preventDefault();
-                              setSetupOpen(false);
-                              return;
-                            }
-                            const level = thinkingLevelOptions[thinkingPicker.cursor];
-                            if (e.key === "ArrowDown") {
-                              e.preventDefault();
-                              thinkingPicker.move(1);
-                            } else if (e.key === "ArrowUp") {
-                              e.preventDefault();
-                              thinkingPicker.move(-1);
-                            } else if (e.key === "Enter" && level && !isStreaming) {
-                              e.preventDefault();
-                              setSetupOpen(false);
-                              if (level !== (thinkingLevel ?? "auto")) onThinkingLevelChange?.(level);
-                            }
-                          }}
-                        >
-                          {thinkingLevelOptions.map((lvl, index) => {
-                            const isActive = (thinkingLevel ?? "auto") === lvl;
-                            const mappedVal = (lvl !== "auto" && thinkingLevelMap) ? thinkingLevelMap[lvl] : undefined;
-                            const displayLabel = (mappedVal != null && mappedVal !== lvl) ? mappedVal : lvl;
-                            return (
-                              <button
-                                className="picker-thinking-card"
-                                data-active={isActive}
-                                data-cursor={index === thinkingPicker.cursor && !isActive ? "true" : undefined}
-                                role="menuitemradio"
-                                aria-checked={isActive}
-                                disabled={isStreaming}
-                                style={isStreaming ? { cursor: "default" } : undefined}
-                                ref={(node) => { thinkingPicker.refs.current[index] = node; }}
-                                key={lvl}
-                                onClick={() => { setSetupOpen(false); if (!isActive && !isStreaming) onThinkingLevelChange?.(lvl); }}
-                              >
-                                <span className="picker-check">
-                                  {isActive && <svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1.5 5 4 7.5 8.5 2.5" /></svg>}
-                                </span>
-                                <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textTransform: "capitalize" }}>{displayLabel}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                        <div className="picker-panel-footer">
-                          <span>{t("chatInput.appliesNextPrompt")}</span>
-                          <span style={{ fontWeight: 600, color: "var(--text-muted)", textTransform: "capitalize" }}>{thinkingDisplayLabel}</span>
-                        </div>
-                      </section>
-                    )}
-                    {hasToolsSection && (
-                      <section
-                        aria-label={t("chatInput.toolPresetLabel")}
-                        style={(hasModelSection || hasThinkingSection) ? { borderTop: "var(--bw) solid var(--border)" } : undefined}
+                        {modelsByProvider.length === 0 ? (
+                          <div style={{ padding: "9px 8px", color: "var(--text-dim)", fontSize: 12, whiteSpace: "nowrap" }}>
+                            {modelSearchQuery.trim() ? t("chatInput.noMatchingModels") : showModelsLoading ? t("chatInput.loadingModels") : t("chatInput.noAvailableModels")}
+                          </div>
+                        ) : modelsByProvider.map((group) => (
+                          <div key={group.provider}>
+                            <div className="picker-group-label">{group.provider}</div>
+                            {group.options.map((opt) => {
+                              const isActive = opt.modelId === model?.modelId && opt.provider === model?.provider;
+                              const flatIndex = filteredModelOptions.indexOf(opt);
+                              return (
+                                <button
+                                  type="button"
+                                  role="option"
+                                  className="picker-row"
+                                  data-active={isActive}
+                                  data-cursor={flatIndex === modelPicker.cursor && !isActive ? "true" : undefined}
+                                  aria-selected={isActive}
+                                  disabled={isStreaming}
+                                  style={isStreaming ? { cursor: "default" } : undefined}
+                                  ref={(node) => { modelPicker.refs.current[flatIndex] = node; }}
+                                  key={`${opt.provider}:${opt.modelId}`}
+                                  onClick={() => { if (isStreaming) return; closePickers(); if (!isActive || isAutoModelSelection) onModelChange?.(opt.provider, opt.modelId); }}
+                                >
+                                  <span className="picker-check">
+                                    {isActive && <svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1.5 5 4 7.5 8.5 2.5" /></svg>}
+                                  </span>
+                                  <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{opt.name}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Reasoning picker — changes the effort level for the next prompt. */}
+            {hasThinkingSection && (
+              <div ref={reasoningWrapRef} style={{ position: "relative", minWidth: 0 }}>
+                <button
+                  type="button"
+                  onClick={() => togglePicker("reasoning")}
+                  disabled={isStreaming}
+                  className="composer-control"
+                  data-active={reasoningPickerOpen ? "true" : undefined}
+                  style={{ maxWidth: 150 }}
+                  title={t("chatInput.changeReasoningTitle", { level: thinkingDisplayLabel })}
+                  aria-label={t("chatInput.changeReasoningTitle", { level: thinkingDisplayLabel })}
+                  aria-expanded={reasoningPickerOpen}
+                  aria-haspopup="dialog"
+                >
+                  <Brain size={11} strokeWidth={1.8} style={{ flexShrink: 0 }} aria-hidden="true" />
+                  <span className="composer-control-label" style={{ textTransform: "capitalize" }}>{thinkingDisplayLabel}</span>
+                  <ChevronDown className="composer-control-chevron" data-open={reasoningPickerOpen} size={12} strokeWidth={1.8} aria-hidden="true" />
+                </button>
+                {reasoningPickerOpen && (
+                  <div
+                    ref={reasoningPanelRef}
+                    className="picker-panel"
+                    role="dialog"
+                    tabIndex={-1}
+                    aria-label={t("chatInput.reasoningLabel")}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        closePickers();
+                      }
+                    }}
+                    style={pickerPanelStyle}
+                  >
+                    <section aria-label={t("chatInput.reasoningLabel")} style={isStreaming ? { opacity: 0.55 } : undefined}>
+                      <div className="picker-panel-header">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: "var(--text-muted)" }}>
+                          <path d="M9.5 2A5.5 5.5 0 0 0 4 7.5c0 1.7.78 3.21 2 4.21V14a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-2.29c1.22-1 2-2.51 2-4.21A5.5 5.5 0 0 0 9.5 2z" />
+                          <line x1="7" y1="18" x2="12" y2="18" />
+                        </svg>
+                        <span className="picker-panel-title">{t("chatInput.reasoningLabel")}</span>
+                        <span className="picker-panel-count">{thinkingLevelOptions.length}</span>
+                      </div>
+                      <div
+                        className="picker-thinking-cards"
+                        role="menu"
+                        tabIndex={-1}
+                        aria-label={t("chatInput.reasoningLabel")}
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") {
+                            e.preventDefault();
+                            closePickers();
+                            return;
+                          }
+                          const level = thinkingLevelOptions[thinkingPicker.cursor];
+                          if (e.key === "ArrowDown") {
+                            e.preventDefault();
+                            thinkingPicker.move(1);
+                          } else if (e.key === "ArrowUp") {
+                            e.preventDefault();
+                            thinkingPicker.move(-1);
+                          } else if (e.key === "Enter" && level && !isStreaming) {
+                            e.preventDefault();
+                            closePickers();
+                            if (level !== (thinkingLevel ?? "auto")) onThinkingLevelChange?.(level);
+                          }
+                        }}
                       >
-                        <div className="picker-panel-header">
-                          <Wrench size={12} strokeWidth={1.8} style={{ color: "var(--text-muted)", flexShrink: 0 }} aria-hidden="true" />
-                          <span className="picker-panel-title">{t("chatInput.toolPresetLabel")}</span>
-                          <span className="picker-panel-count">{TOOL_PRESET_OPTIONS.length}</span>
-                        </div>
-                        <div
-                          className="picker-thinking-cards"
-                          role="menu"
-                          tabIndex={-1}
-                          aria-label={t("chatInput.toolPresetLabel")}
-                          onKeyDown={(e) => {
-                            if (e.key === "Escape") {
-                              e.preventDefault();
-                              setSetupOpen(false);
-                              return;
-                            }
-                            const option = TOOL_PRESET_OPTIONS[toolPresetPicker.cursor];
-                            if (e.key === "ArrowDown") {
-                              e.preventDefault();
-                              toolPresetPicker.move(1);
-                            } else if (e.key === "ArrowUp") {
-                              e.preventDefault();
-                              toolPresetPicker.move(-1);
-                            } else if (e.key === "Enter" && option) {
-                              e.preventDefault();
-                              setSetupOpen(false);
-                              if (option.value !== (toolPreset ?? "full")) onToolPresetChange?.(option.value);
-                            }
-                          }}
-                        >
-                          {TOOL_PRESET_OPTIONS.map((opt, index) => {
-                            const isActive = (toolPreset ?? "full") === opt.value;
-                            return (
-                              <button
-                                className="picker-thinking-card"
-                                data-active={isActive}
-                                data-cursor={index === toolPresetPicker.cursor && !isActive ? "true" : undefined}
-                                role="menuitemradio"
-                                aria-checked={isActive}
-                                ref={(node) => { toolPresetPicker.refs.current[index] = node; }}
-                                key={opt.value}
-                                title={t(opt.descriptionKey)}
-                                onClick={() => { setSetupOpen(false); if (!isActive) onToolPresetChange?.(opt.value); }}
-                              >
-                                <span className="picker-check">
-                                  {isActive && <svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1.5 5 4 7.5 8.5 2.5" /></svg>}
-                                </span>
-                                <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textTransform: "capitalize" }}>{opt.value}</span>
-                                <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11, color: "var(--text-dim)" }}>{t(opt.descriptionKey)}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                        <div className="picker-panel-footer">
-                          <span>{t("chatInput.toolPresetFooter")}</span>
-                        </div>
-                      </section>
-                    )}
+                        {thinkingLevelOptions.map((lvl, index) => {
+                          const isActive = (thinkingLevel ?? "auto") === lvl;
+                          const mappedVal = (lvl !== "auto" && thinkingLevelMap) ? thinkingLevelMap[lvl] : undefined;
+                          const displayLabel = (mappedVal != null && mappedVal !== lvl) ? mappedVal : lvl;
+                          return (
+                            <button
+                              className="picker-thinking-card"
+                              data-active={isActive}
+                              data-cursor={index === thinkingPicker.cursor && !isActive ? "true" : undefined}
+                              role="menuitemradio"
+                              aria-checked={isActive}
+                              disabled={isStreaming}
+                              style={isStreaming ? { cursor: "default" } : undefined}
+                              ref={(node) => { thinkingPicker.refs.current[index] = node; }}
+                              key={lvl}
+                              onClick={() => { closePickers(); if (!isActive && !isStreaming) onThinkingLevelChange?.(lvl); }}
+                            >
+                              <span className="picker-check">
+                                {isActive && <svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1.5 5 4 7.5 8.5 2.5" /></svg>}
+                              </span>
+                              <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textTransform: "capitalize" }}>{displayLabel}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="picker-panel-footer">
+                        <span>{t("chatInput.appliesNextPrompt")}</span>
+                        <span style={{ fontWeight: 600, color: "var(--text-muted)", textTransform: "capitalize" }}>{thinkingDisplayLabel}</span>
+                      </div>
+                    </section>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tool preset picker — browser-side preference for new sessions. */}
+            {hasToolsSection && (
+              <div ref={toolPresetWrapRef} style={{ position: "relative", minWidth: 0 }}>
+                <button
+                  type="button"
+                  onClick={() => togglePicker("tools")}
+                  className="composer-control"
+                  data-active={toolPresetPickerOpen ? "true" : undefined}
+                  style={{ maxWidth: 150 }}
+                  title={t("chatInput.changeToolPresetTitle", { preset: toolPreset ?? "full" })}
+                  aria-label={t("chatInput.changeToolPresetTitle", { preset: toolPreset ?? "full" })}
+                  aria-expanded={toolPresetPickerOpen}
+                  aria-haspopup="dialog"
+                >
+                  <Wrench size={11} strokeWidth={1.8} style={{ flexShrink: 0 }} aria-hidden="true" />
+                  <span className="composer-control-label" style={{ textTransform: "capitalize" }}>{toolPreset ?? "full"}</span>
+                  <ChevronDown className="composer-control-chevron" data-open={toolPresetPickerOpen} size={12} strokeWidth={1.8} aria-hidden="true" />
+                </button>
+                {toolPresetPickerOpen && (
+                  <div
+                    ref={toolPresetPanelRef}
+                    className="picker-panel"
+                    role="dialog"
+                    tabIndex={-1}
+                    aria-label={t("chatInput.toolPresetLabel")}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        closePickers();
+                      }
+                    }}
+                    style={pickerPanelStyle}
+                  >
+                    <section aria-label={t("chatInput.toolPresetLabel")}>
+                      <div className="picker-panel-header">
+                        <Wrench size={12} strokeWidth={1.8} style={{ color: "var(--text-muted)", flexShrink: 0 }} aria-hidden="true" />
+                        <span className="picker-panel-title">{t("chatInput.toolPresetLabel")}</span>
+                        <span className="picker-panel-count">{TOOL_PRESET_OPTIONS.length}</span>
+                      </div>
+                      <div
+                        className="picker-thinking-cards"
+                        role="menu"
+                        tabIndex={-1}
+                        aria-label={t("chatInput.toolPresetLabel")}
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") {
+                            e.preventDefault();
+                            closePickers();
+                            return;
+                          }
+                          const option = TOOL_PRESET_OPTIONS[toolPresetPicker.cursor];
+                          if (e.key === "ArrowDown") {
+                            e.preventDefault();
+                            toolPresetPicker.move(1);
+                          } else if (e.key === "ArrowUp") {
+                            e.preventDefault();
+                            toolPresetPicker.move(-1);
+                          } else if (e.key === "Enter" && option) {
+                            e.preventDefault();
+                            closePickers();
+                            if (option.value !== (toolPreset ?? "full")) onToolPresetChange?.(option.value);
+                          }
+                        }}
+                      >
+                        {TOOL_PRESET_OPTIONS.map((opt, index) => {
+                          const isActive = (toolPreset ?? "full") === opt.value;
+                          return (
+                            <button
+                              className="picker-thinking-card"
+                              data-active={isActive}
+                              data-cursor={index === toolPresetPicker.cursor && !isActive ? "true" : undefined}
+                              role="menuitemradio"
+                              aria-checked={isActive}
+                              ref={(node) => { toolPresetPicker.refs.current[index] = node; }}
+                              key={opt.value}
+                              title={t(opt.descriptionKey)}
+                              onClick={() => { closePickers(); if (!isActive) onToolPresetChange?.(opt.value); }}
+                            >
+                              <span className="picker-check">
+                                {isActive && <svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1.5 5 4 7.5 8.5 2.5" /></svg>}
+                              </span>
+                              <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textTransform: "capitalize" }}>{opt.value}</span>
+                              <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11, color: "var(--text-dim)" }}>{t(opt.descriptionKey)}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="picker-panel-footer">
+                        <span>{t("chatInput.toolPresetFooter")}</span>
+                      </div>
+                    </section>
                   </div>
                 )}
               </div>
