@@ -20,6 +20,10 @@ export async function GET(
   // Hoisted so the stream's cancel() (half-open disconnects that never fire
   // the abort signal) can release the heartbeat and the RpcProcess listener.
   let streamCleanup: (() => void) | null = null;
+  // Hoisted flush handle: pull() (slow-consumer resume) needs to flush the
+  // coalesced message_update, but the controller and `closed` state live
+  // inside start(). The handle is wired up there.
+  let streamFlush: (() => void) | null = null;
   const stream = new ReadableStream({
     start(controller) {
       let closed = false;
@@ -54,6 +58,10 @@ export async function GET(
         }
       };
       streamCleanup = cleanup;
+      streamFlush = () => {
+        if (closed) return;
+        flushPendingUpdate();
+      };
 
       const flushPendingUpdate = (): boolean => {
         const data = pendingUpdate;
@@ -116,9 +124,22 @@ export async function GET(
         return;
       }
 
-      encode({ type: "connected", sessionId: id });
-      if (closed) return;
-      unsubscribe = session.onEvent((event) => encode(event));
+      // onEvent can synchronously replay pending UI requests. Subscribe before
+      // sampling the cursor/announcing readiness so catch-up has no event gap.
+      const detach = session.onEvent((event) => encode(event));
+      if (closed) {
+        detach();
+        return;
+      }
+      unsubscribe = detach;
+      encode({ type: "connected", sessionId: id, web: session.getStreamSnapshot().cursor });
+    },
+    // When a slow consumer resumes reading, the stream calls pull() as soon
+    // as queue space is available. Flush any coalesced message_update here so
+    // the latest snapshot is delivered without waiting for a new event or the
+    // 30s heartbeat.
+    pull() {
+      streamFlush?.();
     },
     cancel() {
       streamCleanup?.();
