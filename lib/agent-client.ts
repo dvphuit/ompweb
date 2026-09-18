@@ -29,19 +29,25 @@ export async function sendAgentCommand<T = unknown>(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(command),
   });
-  // Use text → json so 429 plain-text bodies are not lost when .json() fails.
-  const rawText = await res.text().catch(() => "");
+  // Prefer text so plain-text 429 bodies survive, but accept Response-like
+  // adapters that expose only json() (tests, extensions, and older webviews).
+  let rawText = "";
   let body: { success?: boolean; data?: T; error?: string; code?: string } = {};
-  if (rawText) {
-    try {
-      body = JSON.parse(rawText) as typeof body;
-    } catch {
-      // Non-JSON response (e.g. 429 from proxy/rate-limiter): surface the text.
-      if (!res.ok) {
-        const text = rawText.trim().slice(0, 800);
-        throw new Error(text || `HTTP ${res.status}`);
+  if (typeof res.text === "function") {
+    rawText = await res.text().catch(() => "");
+    if (rawText) {
+      try {
+        body = JSON.parse(rawText) as typeof body;
+      } catch {
+        // Non-JSON response (e.g. 429 from proxy/rate-limiter): surface the text.
+        if (!res.ok) {
+          const text = rawText.trim().slice(0, 800);
+          throw new Error(text || `HTTP ${res.status}`);
+        }
       }
     }
+  } else if (typeof res.json === "function") {
+    body = await res.json().catch(() => ({})) as typeof body;
   }
   if (!res.ok || body.error) {
     // Routes attach a stable `code` for well-known failures; these messages are

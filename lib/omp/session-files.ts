@@ -35,6 +35,7 @@ import type {
   SessionTreeNode,
 } from "../types";
 import { getArchivedSessionsDir, getBlobsDir, getSessionsDir } from "./paths";
+import { sessionPathKey } from "../paths";
 
 /**
  * Pure-Node reader/writer for oh-my-pi's session JSONL files (format v3).
@@ -329,7 +330,7 @@ function resolveBlobsInValue(value: unknown, key: string | undefined): void {
 }
 
 /** Cheap precheck so blob-free entries skip the resolution walk entirely. */
-function containsBlobRef(value: unknown): boolean {
+export function containsBlobRef(value: unknown): boolean {
   if (typeof value === "string") return isBlobRef(value);
   if (Array.isArray(value)) {
     for (const item of value) if (containsBlobRef(item)) return true;
@@ -380,6 +381,9 @@ export interface LoadedSession {
 export interface LoadSessionOptions extends ResolveBlobOptions {
   /** Resolve blob:sha256 image references to inline base64 for display. */
   resolveBlobs?: boolean;
+  /** Retain only an entry's indexing metadata while scanning. Runs before
+   * legacy migration; byte ranges exclude LF but include any CR. */
+  projectEntry?: (entry: SessionEntry, offset: number, length: number) => SessionEntry;
 }
 
 const SESSION_READ_CHUNK_BYTES = 1024 * 1024;
@@ -398,44 +402,41 @@ export const MAX_SESSION_LOAD_BYTES = 1024 * 1024 * 1024;
  * past Node's ~512 MiB string cap still open. Lines exclude the newline; the
  * decoder carries multi-byte characters across chunk boundaries.
  */
-export function forEachFileLineSync(filePath: string, onLine: (line: string) => void): void {
+export function forEachFileLineSync(
+  filePath: string,
+  onLine: (line: string, offset: number, length: number) => void,
+): void {
   const fd = openSync(filePath, "r");
   try {
     const buffer = Buffer.allocUnsafe(SESSION_READ_CHUNK_BYTES);
     const decoder = new StringDecoder("utf8");
-    // Fragments of the current unterminated line, joined only when a chunk
-    // actually contains a newline (or EOF completes the file). Appending to a
-    // single `pending` string per 1 MiB chunk copies the whole accumulated
-    // prefix every chunk — quadratic on single-line files (17ms @8MiB → 149ms
-    // @32MiB). With fragments, a newline-free file is joined exactly once at
-    // EOF; a file with newlines joins only the (small) tail since the last
-    // newline, so the total cost stays linear in file size.
+    // Join a long line only once; offsets count physical bytes, not UTF-16.
     const fragments: string[] = [];
-    let hasNewline = false;
+    let offset = 0;
+    let length = 0;
     for (;;) {
       const bytesRead = readSync(fd, buffer, 0, buffer.length, null);
       if (bytesRead === 0) break;
-      const decoded = decoder.write(buffer.subarray(0, bytesRead));
-      hasNewline = hasNewline || decoded.includes("\n");
-      fragments.push(decoded);
-      if (!hasNewline) continue;
-      // Materialize the accumulated buffer once, emit every completed line,
-      // and keep only the unterminated tail (bounded by the largest line).
-      const joined = fragments.join("");
-      fragments.length = 0;
-      hasNewline = false;
       let start = 0;
-      let newlineIndex = joined.indexOf("\n", start);
-      while (newlineIndex !== -1) {
-        onLine(joined.slice(start, newlineIndex));
-        start = newlineIndex + 1;
-        newlineIndex = joined.indexOf("\n", start);
+      while (start < bytesRead) {
+        const newline = buffer.indexOf(10, start);
+        const end = newline >= 0 && newline < bytesRead ? newline : bytesRead;
+        fragments.push(decoder.write(buffer.subarray(start, end)));
+        length += end - start;
+        if (end < bytesRead) {
+          fragments.push(decoder.end());
+          onLine(fragments.join(""), offset, length);
+          fragments.length = 0;
+          offset += length + 1;
+          length = 0;
+        }
+        start = end + 1;
       }
-      if (start < joined.length) fragments.push(joined.slice(start));
     }
-    const tail = decoder.end();
-    if (tail) fragments.push(tail);
-    if (fragments.length > 0) onLine(fragments.join(""));
+    if (length > 0) {
+      fragments.push(decoder.end());
+      onLine(fragments.join(""), offset, length);
+    }
   } finally {
     closeSync(fd);
   }
@@ -464,7 +465,7 @@ export function loadSessionFile(filePath: string, options: LoadSessionOptions = 
   const records: Record<string, unknown>[] = [];
   let isFirstLine = true;
   try {
-    forEachFileLineSync(filePath, (rawLine) => {
+    forEachFileLineSync(filePath, (rawLine, offset, length) => {
       if (isFirstLine) {
         isFirstLine = false;
         titleSlot = parseTitleSlotLine(rawLine);
@@ -472,11 +473,15 @@ export function loadSessionFile(filePath: string, options: LoadSessionOptions = 
       }
       const line = rawLine.trim();
       if (!line) return;
+      let record: Record<string, unknown>;
       try {
-        records.push(JSON.parse(line) as Record<string, unknown>);
+        record = JSON.parse(line) as Record<string, unknown>;
       } catch {
-        // Skip malformed line (torn write).
+        return; // Skip malformed line (torn write).
       }
+      records.push(records.length > 0 && record && record.type !== "session" && options.projectEntry
+        ? options.projectEntry(record as unknown as SessionEntry, offset, length) as unknown as Record<string, unknown>
+        : record);
     });
   } catch (error) {
     // A single line past the string cap, or an allocation failure part-way in.
@@ -946,9 +951,34 @@ declare global {
 
 const MAX_SESSION_SCAN_CACHE_ENTRIES = 2048;
 
+/** Normalized cache key: sessionPathKey lowercases and normalizes separators
+ * on Windows so invalidation from a differently-cased path still hits. */
+function scanCacheKey(filePath: string): string {
+  return sessionPathKey(filePath);
+}
+
 function getSessionScanCache(): Map<string, SessionScanCacheEntry> {
   if (!globalThis.__ompSessionScanCache) globalThis.__ompSessionScanCache = new Map();
   return globalThis.__ompSessionScanCache;
+}
+
+/** Invalidate the memoized scan (prefix/suffix window info) for ONE session
+ * file. Callers that know exactly which session changed (live RPC events with
+ * a session file path, the file watcher with a concrete filename) use this
+ * when the file's size+mtime may NOT have changed (title-slot rewrites, title
+ * updates, reparent rewrites, delete-while-open) so the list scan picks up the
+ * new window without dropping every other session's scan memo. */
+export function invalidateSessionScanCache(filePath: string): void {
+  globalThis.__ompSessionScanCache?.delete(scanCacheKey(filePath));
+}
+
+/** Clear EVERY per-file scan memo. Used by the full list-cache flush for
+ * unknown-source changes (delete/archive/import fallbacks): a change whose
+ * path is unknown cannot target one memo, and without this an unknown
+ * same-size + same-mtime rewrite would keep serving the OLD scan summary
+ * (old title / old parent link) to the sidebar. */
+export function invalidateAllSessionScanCaches(): void {
+  globalThis.__ompSessionScanCache?.clear();
 }
 
 /** scanSessionInfo memoized on (path, size, mtimeMs). Callers must treat the
@@ -961,18 +991,19 @@ function scanSessionInfoCached(filePath: string): OmpSessionInfo | undefined {
     return undefined;
   }
   const cache = getSessionScanCache();
-  const cached = cache.get(filePath);
+  const key = scanCacheKey(filePath);
+  const cached = cache.get(key);
   if (cached && cached.size === stat.size && cached.mtimeMs === stat.mtimeMs) {
-    cache.delete(filePath);
-    cache.set(filePath, cached);
+    cache.delete(key);
+    cache.set(key, cached);
     return cached.info;
   }
-  if (cached) cache.delete(filePath);
+  if (cached) cache.delete(key);
   const info = scanSessionInfo(filePath, true);
   // Failed scans are not negatively cached: a transient read error must not
   // hide a session until its next mtime bump.
   if (info) {
-    cache.set(filePath, { size: stat.size, mtimeMs: stat.mtimeMs, info });
+    cache.set(key, { size: stat.size, mtimeMs: stat.mtimeMs, info });
     while (cache.size > MAX_SESSION_SCAN_CACHE_ENTRIES) {
       const oldestKey = cache.keys().next().value;
       if (oldestKey === undefined) break;

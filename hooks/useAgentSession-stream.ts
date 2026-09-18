@@ -17,6 +17,7 @@ import type {
   SubagentProgress,
 } from "@/lib/subagent-types";
 import { translate } from "@/lib/i18n";
+import type { SessionStreamCursor } from "@/lib/session-sync";
 
 export interface SessionData {
   sessionId: string;
@@ -60,6 +61,7 @@ export function streamReducer(state: StreamingState, action: StreamAction): Stre
 
 export interface AgentEvent {
   type: string;
+  web?: SessionStreamCursor;
   [key: string]: unknown;
 }
 
@@ -165,6 +167,7 @@ export type AgentStateResponse = {
   isPromptRunning?: boolean;
   isBashRunning?: boolean;
   isCompacting?: boolean;
+  responseObserved?: boolean;
   tokensPerSecond?: number | null;
   extensionStatuses?: ExtensionStatusItem[];
   extensionWidgets?: ExtensionWidgetItem[];
@@ -258,6 +261,13 @@ export const BASH_STATE_RECONCILE_MS = 1_000;
 export const EVENT_STREAM_CONNECT_TIMEOUT_MS = 60_000;
 // Tell the user something is happening if the stream is still connecting.
 export const EVENT_STREAM_SLOW_CONNECT_MS = 4_000;
+// Manual reconnect backoff for a CLOSED event stream (fatal per EventSource,
+// so the browser will not retry on its own). Doubles per consecutive failure,
+// caps at the max; reset on any successful open. Without this, an idle
+// session whose stream died (server hiccup, wrapper respawn) stays dead
+// silently until a full page reload.
+export const EVENT_STREAM_RETRY_MIN_MS = 1_000;
+export const EVENT_STREAM_RETRY_MAX_MS = 30_000;
 
 export const SCROLL_KEYS = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " ", "Space", "Spacebar"]);
 export function isQuotaLikeError(text: string): boolean {
@@ -316,17 +326,12 @@ export function extractMessageText(message: Partial<AgentMessage>): string {
     .join("\n");
 }
 
-export function describeMcpMountNotice(message: CustomMessage): string {
-  return extractMessageText(message).trim() || "The MCP tool inventory changed.";
-}
-
-export function imageSignature(block: unknown): string {
+function imageSignature(block: unknown): string {
   if (!block || typeof block !== "object" || (block as { type?: unknown }).type !== "image") return "";
-  const source = (block as { source?: unknown }).source;
-  if (source && typeof source === "object") {
-    const src = source as { type?: unknown; media_type?: unknown; data?: unknown; url?: unknown };
+  const src = (block as { source?: { type?: unknown; media_type?: unknown; data?: unknown; url?: unknown } }).source;
+  if (src) {
     return [
-      src.type === "url" ? "url" : "base64",
+      typeof src.type === "string" ? src.type : "",
       typeof src.media_type === "string" ? src.media_type : "",
       typeof src.data === "string" ? src.data : "",
       typeof src.url === "string" ? src.url : "",
@@ -349,6 +354,10 @@ export function userMessageKey(message: Partial<AgentMessage>): string {
     text: extractMessageText(message),
     images: content.map(imageSignature).filter(Boolean),
   });
+}
+
+export function describeMcpMountNotice(message: CustomMessage): string {
+  return extractMessageText(message).trim() || "The MCP tool inventory changed.";
 }
 
 export function readCompactResult(result: unknown, reason: string): CompactResultInfo | null {
