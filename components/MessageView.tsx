@@ -433,12 +433,14 @@ function AssistantMessageView({
   liveTokensPerSecond?: number | null;
 }) {
   const { t, locale } = useI18n();
+  const { copied, copy: copyContent } = useCopyFeedback();
   const time = showTimestamp ? formatTime(message.timestamp, locale) : null;
   const blockItems = (message.content ?? [])
     .map((block, originalIndex) => ({ block, originalIndex }))
     .filter(({ block }) => !isEmptyThinkingBlock(block));
   const blocks = blockItems.map(({ block }) => block);
   const hasActivityBlocks = blocks.some((block) => block.type === "thinking" || block.type === "toolCall");
+  const hasResponseText = blocks.some((block) => block.type === "text" && block.text.trim().length > 0);
   const blockItemsRef = useRef(blockItems);
   blockItemsRef.current = blockItems;
 
@@ -653,9 +655,23 @@ function AssistantMessageView({
         </div>
       )}
 
-      {time && !isStreaming && (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 3 }}>
-          <span style={{ fontSize: 10, color: "var(--text-dim)" }}>{time}</span>
+      {!isStreaming && (hasResponseText || time) && (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
+          {hasResponseText && (
+            <Tooltip content={t("messageView.copyMarkdown")}>
+              <button
+                type="button"
+                onClick={() => copyContent(getMessageText(message.content ?? []))}
+                aria-label={t("messageView.copyMarkdown")}
+                className="composer-control composer-control-tiny message-action-button"
+                style={copied ? { color: "var(--status-success)", borderColor: "var(--status-success)" } : undefined}
+              >
+                {copied ? <Check size={11} strokeWidth={1.8} /> : <Copy size={11} strokeWidth={1.8} />}
+                {copied ? t("messageView.copied") : t("messageView.copyMarkdown")}
+              </button>
+            </Tooltip>
+          )}
+          {time && <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--text-dim)" }}>{time}</span>}
         </div>
       )}
     </div>
@@ -1540,7 +1556,7 @@ function CustomMessageView({ message, cwd, onOpenFile }: { message: CustomMessag
   );
 }
 
-function getMessageText(content: CustomMessage["content"] | UserMessage["content"]): string {
+function getMessageText(content: CustomMessage["content"] | UserMessage["content"] | AssistantMessage["content"]): string {
   if (typeof content === "string") return content;
   return content
     .filter((b): b is TextContent => b.type === "text")
